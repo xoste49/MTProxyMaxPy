@@ -11,7 +11,7 @@ set -eo pipefail
 export LC_NUMERIC=C
 
 # ── Section 1: Initialization ────────────────────────────────
-VERSION="1.0.1"
+VERSION="1.0.2"
 SCRIPT_NAME="mtproxymax"
 INSTALL_DIR="/opt/mtproxymax"
 CONFIG_DIR="${INSTALL_DIR}/mtproxy"
@@ -1258,6 +1258,37 @@ get_proxy_stats() {
     echo "${bytes_in:-0} ${bytes_out:-0} ${connections:-0}"
 }
 
+# Get cumulative global traffic (persisted across restarts)
+get_cumulative_proxy_stats() {
+    local _stats_dir="${INSTALL_DIR}/relay_stats"
+    local _tf="${_stats_dir}/cumulative_traffic"
+    local _gsnap="${_stats_dir}/global_traffic_snapshot"
+
+    local saved_in=0 saved_out=0
+    if [ -f "$_tf" ]; then
+        IFS='|' read -r saved_in saved_out < "$_tf"
+    fi
+    [[ "${saved_in:-0}" =~ ^[0-9]+$ ]] || saved_in=0
+    [[ "${saved_out:-0}" =~ ^[0-9]+$ ]] || saved_out=0
+
+    local snap_in=0 snap_out=0
+    if [ -f "$_gsnap" ]; then
+        IFS='|' read -r snap_in snap_out < "$_gsnap"
+    fi
+    [[ "${snap_in:-0}" =~ ^[0-9]+$ ]] || snap_in=0
+    [[ "${snap_out:-0}" =~ ^[0-9]+$ ]] || snap_out=0
+
+    local live_in=0 live_out=0 conns=0
+    read -r live_in live_out conns < <(get_proxy_stats)
+
+    local delta_in=$((live_in - snap_in))
+    local delta_out=$((live_out - snap_out))
+    [ "$delta_in" -lt 0 ] 2>/dev/null && delta_in=$live_in
+    [ "$delta_out" -lt 0 ] 2>/dev/null && delta_out=$live_out
+
+    echo "$(( saved_in + delta_in )) $(( saved_out + delta_out )) ${conns}"
+}
+
 # Get per-user stats from Prometheus
 # Returns: bytes_in bytes_out connections
 get_user_stats() {
@@ -1272,6 +1303,243 @@ get_user_stats() {
         return
     fi
     echo "0 0 0"
+}
+
+# Get cumulative per-user traffic (persisted across restarts)
+# Reads saved cumulative + adds delta from current live Prometheus session
+# Returns: bytes_in bytes_out connections
+get_cumulative_user_stats() {
+    local user="$1"
+    local _stats_dir="${INSTALL_DIR}/relay_stats"
+    local _ut_file="${_stats_dir}/user_traffic"
+    local _snap_file="${_stats_dir}/user_traffic_snapshot"
+
+    # Read saved cumulative for this user
+    local saved_in=0 saved_out=0
+    if [ -f "$_ut_file" ]; then
+        local _line
+        _line=$(awk -F'|' -v u="$user" '$1 == u {print $2"|"$3; exit}' "$_ut_file")
+        if [ -n "$_line" ]; then
+            IFS='|' read -r saved_in saved_out <<< "$_line"
+        fi
+    fi
+    [[ "${saved_in:-0}" =~ ^[0-9]+$ ]] || saved_in=0
+    [[ "${saved_out:-0}" =~ ^[0-9]+$ ]] || saved_out=0
+
+    # Read snapshot (raw Prometheus values at last save)
+    local snap_in=0 snap_out=0
+    if [ -f "$_snap_file" ]; then
+        local _sline
+        _sline=$(awk -F'|' -v u="$user" '$1 == u {print $2"|"$3; exit}' "$_snap_file")
+        if [ -n "$_sline" ]; then
+            IFS='|' read -r snap_in snap_out <<< "$_sline"
+        fi
+    fi
+    [[ "${snap_in:-0}" =~ ^[0-9]+$ ]] || snap_in=0
+    [[ "${snap_out:-0}" =~ ^[0-9]+$ ]] || snap_out=0
+
+    # Get current live Prometheus values
+    local live_in=0 live_out=0 live_conns=0
+    read -r live_in live_out live_conns < <(get_user_stats "$user" 2>/dev/null)
+
+    # Compute delta since last save
+    # If live < snapshot, a restart happened — delta is just the live value
+    local delta_in=$((live_in - snap_in))
+    local delta_out=$((live_out - snap_out))
+    [ "$delta_in" -lt 0 ] 2>/dev/null && delta_in=$live_in
+    [ "$delta_out" -lt 0 ] 2>/dev/null && delta_out=$live_out
+
+    echo "$(( saved_in + delta_in )) $(( saved_out + delta_out )) ${live_conns}"
+}
+
+# Batch-load cumulative stats for ALL users in one pass (avoids N*8 forks)
+# Populates: _batch_cum_in[label], _batch_cum_out[label], _batch_cum_conns[label]
+declare -A _batch_cum_in _batch_cum_out _batch_cum_conns
+_load_all_cumulative_user_stats() {
+    _batch_cum_in=(); _batch_cum_out=(); _batch_cum_conns=()
+    local _stats_dir="${INSTALL_DIR}/relay_stats"
+    local _ut_file="${_stats_dir}/user_traffic"
+    local _snap_file="${_stats_dir}/user_traffic_snapshot"
+
+    # Load cumulative from disk (one read)
+    declare -A _saved_in _saved_out _snap_in _snap_out
+    if [ -f "$_ut_file" ]; then
+        while IFS='|' read -r _l _i _o; do
+            [[ "$_l" =~ ^[a-zA-Z0-9_-]+$ ]] || continue
+            _i=${_i:-0}; _o=${_o:-0}
+            [[ "$_i" =~ ^[0-9]+$ ]] || _i=0
+            [[ "$_o" =~ ^[0-9]+$ ]] || _o=0
+            _saved_in["$_l"]=$_i; _saved_out["$_l"]=$_o
+        done < "$_ut_file"
+    fi
+    if [ -f "$_snap_file" ]; then
+        while IFS='|' read -r _l _i _o; do
+            [[ "$_l" =~ ^[a-zA-Z0-9_-]+$ ]] || continue
+            _i=${_i:-0}; _o=${_o:-0}
+            [[ "$_i" =~ ^[0-9]+$ ]] || _i=0
+            [[ "$_o" =~ ^[0-9]+$ ]] || _o=0
+            _snap_in["$_l"]=$_i; _snap_out["$_l"]=$_o
+        done < "$_snap_file"
+    fi
+
+    # Fetch metrics once
+    local _m=""
+    _m=$(_fetch_metrics 2>/dev/null) || true
+
+    # Extract all per-user stats in a single awk pass
+    if [ -n "$_m" ]; then
+        while IFS='|' read -r _l _li _lo _lc; do
+            local si=${_snap_in["$_l"]:-0} so=${_snap_out["$_l"]:-0}
+            local di=$((_li - si)) doo=$((_lo - so))
+            [ "$di" -lt 0 ] 2>/dev/null && di=$_li
+            [ "$doo" -lt 0 ] 2>/dev/null && doo=$_lo
+            _batch_cum_in["$_l"]=$(( ${_saved_in["$_l"]:-0} + di ))
+            _batch_cum_out["$_l"]=$(( ${_saved_out["$_l"]:-0} + doo ))
+            _batch_cum_conns["$_l"]=${_lc:-0}
+        done < <(echo "$_m" | awk '
+            /^telemt_user_octets_from_client\{/ {
+                match($0, /user="([^"]+)"/, m); users_in[m[1]] += $NF
+            }
+            /^telemt_user_octets_to_client\{/ {
+                match($0, /user="([^"]+)"/, m); users_out[m[1]] += $NF
+            }
+            /^telemt_user_connections_current\{/ {
+                match($0, /user="([^"]+)"/, m); users_conns[m[1]] += $NF
+            }
+            END {
+                for (u in users_in) {
+                    printf "%s|%.0f|%.0f|%.0f\n", u, users_in[u]+0, users_out[u]+0, users_conns[u]+0
+                }
+                # Users with only out/conns but no in
+                for (u in users_out) {
+                    if (!(u in users_in)) printf "%s|0|%.0f|%.0f\n", u, users_out[u]+0, users_conns[u]+0
+                }
+            }
+        ')
+    fi
+
+    # Fill in users that have saved data but no live metrics (e.g., after restart with 0 traffic)
+    for _l in "${!_saved_in[@]}"; do
+        if [ -z "${_batch_cum_in[$_l]+x}" ]; then
+            _batch_cum_in["$_l"]=${_saved_in["$_l"]:-0}
+            _batch_cum_out["$_l"]=${_saved_out["$_l"]:-0}
+            _batch_cum_conns["$_l"]=0
+        fi
+    done
+}
+
+# One-shot flush of traffic counters to disk (for use before stop/restart)
+# Works standalone — loads cumulative from disk, computes delta from live metrics, saves back
+flush_traffic_to_disk() {
+    local _stats_dir="${INSTALL_DIR}/relay_stats"
+    local _tf="${_stats_dir}/cumulative_traffic"
+    local _utf="${_stats_dir}/user_traffic"
+    local _snap="${_stats_dir}/user_traffic_snapshot"
+    mkdir -p "$_stats_dir" 2>/dev/null
+    # Acquire lock to prevent race with daemon's save_traffic
+    exec 9>"${_stats_dir}/.traffic.lock"
+    flock -w 5 9 2>/dev/null || return
+
+    # Load existing cumulative totals
+    local cum_in=0 cum_out=0
+    if [ -f "$_tf" ]; then
+        IFS='|' read -r cum_in cum_out < "$_tf"
+    fi
+    [[ "${cum_in:-0}" =~ ^[0-9]+$ ]] || cum_in=0
+    [[ "${cum_out:-0}" =~ ^[0-9]+$ ]] || cum_out=0
+
+    # Load existing per-user cumulative and snapshots
+    declare -A _fu_cum_in _fu_cum_out _fu_snap_in _fu_snap_out
+    if [ -f "$_utf" ]; then
+        while IFS='|' read -r _l _i _o; do
+            [[ "$_l" =~ ^[a-zA-Z0-9_-]+$ ]] || continue
+            _i=${_i:-0}; _o=${_o:-0}
+            [[ "$_i" =~ ^[0-9]+$ ]] || _i=0
+            [[ "$_o" =~ ^[0-9]+$ ]] || _o=0
+            _fu_cum_in["$_l"]=$_i; _fu_cum_out["$_l"]=$_o
+        done < "$_utf"
+    fi
+    if [ -f "$_snap" ]; then
+        while IFS='|' read -r _l _i _o; do
+            [[ "$_l" =~ ^[a-zA-Z0-9_-]+$ ]] || continue
+            _i=${_i:-0}; _o=${_o:-0}
+            [[ "$_i" =~ ^[0-9]+$ ]] || _i=0
+            [[ "$_o" =~ ^[0-9]+$ ]] || _o=0
+            _fu_snap_in["$_l"]=$_i; _fu_snap_out["$_l"]=$_o
+        done < "$_snap"
+    fi
+
+    # Load previous global snapshot
+    local snap_gin=0 snap_gout=0
+    if [ -f "${_stats_dir}/global_traffic_snapshot" ]; then
+        IFS='|' read -r snap_gin snap_gout < "${_stats_dir}/global_traffic_snapshot"
+    fi
+    [[ "${snap_gin:-0}" =~ ^[0-9]+$ ]] || snap_gin=0
+    [[ "${snap_gout:-0}" =~ ^[0-9]+$ ]] || snap_gout=0
+
+    # Fetch current live metrics
+    local _metrics
+    _metrics=$(curl -s --max-time 2 "http://127.0.0.1:${PROXY_METRICS_PORT:-9090}/metrics" 2>/dev/null) || { exec 9>&-; return; }
+    [ -z "$_metrics" ] && { exec 9>&-; return; }
+
+    # Global traffic delta
+    local cur_gin cur_gout
+    cur_gin=$(echo "$_metrics" | awk '/^telemt_user_octets_from_client\{/{s+=$NF}END{printf "%.0f",s}')
+    cur_gout=$(echo "$_metrics" | awk '/^telemt_user_octets_to_client\{/{s+=$NF}END{printf "%.0f",s}')
+    cur_gin=${cur_gin:-0}; cur_gout=${cur_gout:-0}
+    local gd_in=$((cur_gin - snap_gin)) gd_out=$((cur_gout - snap_gout))
+    [ "$gd_in" -lt 0 ] 2>/dev/null && gd_in=$cur_gin
+    [ "$gd_out" -lt 0 ] 2>/dev/null && gd_out=$cur_gout
+    cum_in=$((cum_in + gd_in))
+    cum_out=$((cum_out + gd_out))
+
+    # Per-user traffic delta
+    [ -f "$SECRETS_FILE" ] && while IFS='|' read -r label secret created enabled _mc _mi _q _ex; do
+        [[ "$label" =~ ^# ]] && continue; [ -z "$secret" ] && continue
+        [ "$enabled" != "true" ] && continue
+        local ui uo
+        ui=$(echo "$_metrics" | awk -v u="$label" '$0 ~ "^telemt_user_octets_from_client\\{.*user=\"" u "\"" {print $NF}')
+        uo=$(echo "$_metrics" | awk -v u="$label" '$0 ~ "^telemt_user_octets_to_client\\{.*user=\"" u "\"" {print $NF}')
+        ui=${ui:-0}; uo=${uo:-0}
+        local si=${_fu_snap_in["$label"]:-0} so=${_fu_snap_out["$label"]:-0}
+        local di=$((ui - si)) doo=$((uo - so))
+        [ "$di" -lt 0 ] 2>/dev/null && di=$ui
+        [ "$doo" -lt 0 ] 2>/dev/null && doo=$uo
+        _fu_cum_in["$label"]=$(( ${_fu_cum_in["$label"]:-0} + di ))
+        _fu_cum_out["$label"]=$(( ${_fu_cum_out["$label"]:-0} + doo ))
+        _fu_snap_in["$label"]=$ui
+        _fu_snap_out["$label"]=$uo
+    done < "$SECRETS_FILE"
+
+    # Write cumulative traffic
+    local _tmp
+    _tmp=$(mktemp "${_stats_dir}/.traffic.XXXXXX" 2>/dev/null) || { exec 9>&-; return; }
+    chmod 600 "$_tmp"
+    echo "${cum_in}|${cum_out}" > "$_tmp"
+    mv "$_tmp" "$_tf" 2>/dev/null || { rm -f "$_tmp"; exec 9>&-; return; }
+
+    # Write per-user cumulative
+    _tmp=$(mktemp "${_stats_dir}/.traffic.XXXXXX" 2>/dev/null) || { exec 9>&-; return; }
+    chmod 600 "$_tmp"
+    for _l in "${!_fu_cum_in[@]}"; do
+        echo "${_l}|${_fu_cum_in[$_l]}|${_fu_cum_out[$_l]}" >> "$_tmp"
+    done
+    mv "$_tmp" "$_utf" 2>/dev/null || rm -f "$_tmp"
+
+    # Write per-user snapshot
+    _tmp=$(mktemp "${_stats_dir}/.traffic.XXXXXX" 2>/dev/null) || { exec 9>&-; return; }
+    chmod 600 "$_tmp"
+    for _l in "${!_fu_snap_in[@]}"; do
+        echo "${_l}|${_fu_snap_in[$_l]}|${_fu_snap_out[$_l]}" >> "$_tmp"
+    done
+    mv "$_tmp" "$_snap" 2>/dev/null || rm -f "$_tmp"
+
+    # Write global snapshot
+    _tmp=$(mktemp "${_stats_dir}/.traffic.XXXXXX" 2>/dev/null) || { exec 9>&-; return; }
+    chmod 600 "$_tmp"
+    echo "${cur_gin}|${cur_gout}" > "$_tmp"
+    mv "$_tmp" "${_stats_dir}/global_traffic_snapshot" 2>/dev/null || rm -f "$_tmp"
+    exec 9>&-  # Release lock
 }
 
 # ── Section 8: Secret Management ─────────────────────────────
@@ -1420,6 +1688,10 @@ secret_remove() {
 
 # Batch add multiple secrets (single restart)
 secret_add_batch() {
+    local no_restart="false"
+    if [ "$1" = "true" ] || [ "$1" = "false" ]; then
+        no_restart="$1"; shift
+    fi
     local labels=("$@")
 
     if [ ${#labels[@]} -eq 0 ]; then
@@ -1437,7 +1709,7 @@ secret_add_batch() {
     done
 
     # Single restart after all additions
-    if [ $added -gt 0 ] && is_proxy_running; then
+    if [ "$no_restart" != "true" ] && [ $added -gt 0 ] && is_proxy_running; then
         restart_proxy_container
     fi
 
@@ -1449,6 +1721,10 @@ secret_add_batch() {
 secret_remove_batch() {
     local force="${1:-false}"
     shift 2>/dev/null || true
+    local no_restart="false"
+    if [ "$1" = "true" ] || [ "$1" = "false" ]; then
+        no_restart="$1"; shift
+    fi
     local labels=("$@")
 
     if [ ${#labels[@]} -eq 0 ]; then
@@ -1490,7 +1766,7 @@ secret_remove_batch() {
     done
 
     # Single restart after all removals
-    if [ $removed -gt 0 ] && is_proxy_running; then
+    if [ "$no_restart" != "true" ] && [ $removed -gt 0 ] && is_proxy_running; then
         restart_proxy_container
     fi
 
@@ -1512,6 +1788,9 @@ secret_list() {
     draw_header "SECRETS"
     echo ""
 
+    # Batch-load all user stats in one pass (single metrics fetch + single file read)
+    _load_all_cumulative_user_stats 2>/dev/null
+
     # Table header
     printf "  ${BOLD}%-4s %-16s %-10s %-10s %-12s %-12s${NC}\n" "#" "LABEL" "STATUS" "CREATED" "TRAFFIC IN" "TRAFFIC OUT"
     echo -e "  ${DIM}$(_repeat '─' 70)${NC}"
@@ -1531,18 +1810,17 @@ secret_list() {
             status_text="${RED}disabled${NC}"
         fi
 
-        # Format creation date
+        # Format creation date (use printf builtin when available, fallback to date)
         local created_fmt
-        created_fmt=$(date -d "@${created}" '+%Y-%m-%d' 2>/dev/null || date -r "$created" '+%Y-%m-%d' 2>/dev/null || echo "unknown")
+        created_fmt=$(printf '%(%Y-%m-%d)T' "$created" 2>/dev/null) || \
+            created_fmt=$(date -d "@${created}" '+%Y-%m-%d' 2>/dev/null || echo "unknown")
 
-        # Get per-user traffic
-        local user_stats traffic_in_fmt traffic_out_fmt
-        user_stats=$(get_user_stats "$label" 2>/dev/null)
-        local u_in u_out
-        u_in=$(echo "$user_stats" | awk '{print $1}')
-        u_out=$(echo "$user_stats" | awk '{print $2}')
-        traffic_in_fmt=$(format_bytes "${u_in:-0}")
-        traffic_out_fmt=$(format_bytes "${u_out:-0}")
+        # Get per-user traffic from batch-loaded arrays
+        local u_in=${_batch_cum_in["$label"]:-0}
+        local u_out=${_batch_cum_out["$label"]:-0}
+        local traffic_in_fmt traffic_out_fmt
+        traffic_in_fmt=$(format_bytes "$u_in")
+        traffic_out_fmt=$(format_bytes "$u_out")
 
         printf "  %-4s %-16s ${status_icon} %-8b %-10s %-12s %-12s\n" \
             "$((i+1))" "$label" "$status_text" "$created_fmt" "$traffic_in_fmt" "$traffic_out_fmt"
@@ -2219,6 +2497,8 @@ run_proxy_container() {
 
 stop_proxy_container() {
     if is_proxy_running; then
+        # Flush traffic counters to disk before stopping
+        flush_traffic_to_disk 2>/dev/null
         if docker stop --timeout 10 "$CONTAINER_NAME" 2>/dev/null; then
             traffic_tracking_teardown
             log_success "Proxy stopped"
@@ -3079,8 +3359,8 @@ is_running() {
 get_stats() {
     local m=$(curl -s --max-time 2 "http://127.0.0.1:${PROXY_METRICS_PORT:-9090}/metrics" 2>/dev/null)
     [ -z "$m" ] && echo "0 0 0" && return
-    local i=$(echo "$m"|awk '/^telemt_user_octets_to_client\{/{s+=$NF}END{printf "%.0f",s}')
-    local o=$(echo "$m"|awk '/^telemt_user_octets_from_client\{/{s+=$NF}END{printf "%.0f",s}')
+    local i=$(echo "$m"|awk '/^telemt_user_octets_from_client\{/{s+=$NF}END{printf "%.0f",s}')
+    local o=$(echo "$m"|awk '/^telemt_user_octets_to_client\{/{s+=$NF}END{printf "%.0f",s}')
     local c=$(echo "$m"|awk '/^telemt_user_connections_current\{/{s+=$NF}END{printf "%.0f",s}')
     echo "${i:-0} ${o:-0} ${c:-0}"
 }
@@ -3096,8 +3376,8 @@ get_user_stats_tg() {
     local user="$1" m="${2:-}"
     [ -z "$m" ] && m=$(curl -s --max-time 2 "http://127.0.0.1:${PROXY_METRICS_PORT:-9090}/metrics" 2>/dev/null)
     [ -z "$m" ] && echo "0 0 0" && return
-    local i=$(echo "$m"|awk -v u="$user" '$0 ~ "^telemt_user_octets_to_client\\{.*user=\"" u "\"" {print $NF}')
-    local o=$(echo "$m"|awk -v u="$user" '$0 ~ "^telemt_user_octets_from_client\\{.*user=\"" u "\"" {print $NF}')
+    local i=$(echo "$m"|awk -v u="$user" '$0 ~ "^telemt_user_octets_from_client\\{.*user=\"" u "\"" {print $NF}')
+    local o=$(echo "$m"|awk -v u="$user" '$0 ~ "^telemt_user_octets_to_client\\{.*user=\"" u "\"" {print $NF}')
     local c=$(echo "$m"|awk -v u="$user" '$0 ~ "^telemt_user_connections_current\\{.*user=\"" u "\"" {print $NF}')
     echo "${i:-0} ${o:-0} ${c:-0}"
 }
@@ -3136,16 +3416,32 @@ load_traffic() {
 save_traffic() {
     local _tdir="${INSTALL_DIR}/relay_stats"
     mkdir -p "$_tdir" 2>/dev/null
-    local _tmp=$(mktemp "${_tdir}/.traffic.XXXXXX" 2>/dev/null) || return
+    # Acquire lock to prevent race with flush_traffic_to_disk
+    exec 9>"${_tdir}/.traffic.lock"
+    flock -w 5 9 2>/dev/null || return
+    local _tmp=$(mktemp "${_tdir}/.traffic.XXXXXX" 2>/dev/null) || { exec 9>&-; return; }
     chmod 600 "$_tmp"
     echo "${_cum_in}|${_cum_out}" > "$_tmp"
-    mv "$_tmp" "$TRAFFIC_FILE" 2>/dev/null || { rm -f "$_tmp"; return; }
-    _tmp=$(mktemp "${_tdir}/.traffic.XXXXXX" 2>/dev/null) || return
+    mv "$_tmp" "$TRAFFIC_FILE" 2>/dev/null || { rm -f "$_tmp"; exec 9>&-; return; }
+    _tmp=$(mktemp "${_tdir}/.traffic.XXXXXX" 2>/dev/null) || { exec 9>&-; return; }
     chmod 600 "$_tmp"
     for _ul in "${!_cum_user_in[@]}"; do
         echo "${_ul}|${_cum_user_in[$_ul]}|${_cum_user_out[$_ul]}" >> "$_tmp"
     done
     mv "$_tmp" "$USER_TRAFFIC_FILE" 2>/dev/null || rm -f "$_tmp"
+    # Save raw Prometheus snapshot so secret list can compute deltas
+    _tmp=$(mktemp "${_tdir}/.traffic.XXXXXX" 2>/dev/null) || { exec 9>&-; return; }
+    chmod 600 "$_tmp"
+    for _ul in "${!_prev_user_in[@]}"; do
+        echo "${_ul}|${_prev_user_in[$_ul]:-0}|${_prev_user_out[$_ul]:-0}" >> "$_tmp"
+    done
+    mv "$_tmp" "${_tdir}/user_traffic_snapshot" 2>/dev/null || rm -f "$_tmp"
+    # Save global Prometheus snapshot
+    _tmp=$(mktemp "${_tdir}/.traffic.XXXXXX" 2>/dev/null) || { exec 9>&-; return; }
+    chmod 600 "$_tmp"
+    echo "${_prev_total_in}|${_prev_total_out}" > "$_tmp"
+    mv "$_tmp" "${_tdir}/global_traffic_snapshot" 2>/dev/null || rm -f "$_tmp"
+    exec 9>&-  # Release lock
 }
 
 update_traffic() {
@@ -3154,8 +3450,8 @@ update_traffic() {
     _metrics=$(curl -s --max-time 2 "http://127.0.0.1:${PROXY_METRICS_PORT:-9090}/metrics" 2>/dev/null)
     local cur_in cur_out
     if [ -n "$_metrics" ]; then
-        cur_in=$(echo "$_metrics"|awk '/^telemt_user_octets_to_client\{/{s+=$NF}END{printf "%.0f",s}')
-        cur_out=$(echo "$_metrics"|awk '/^telemt_user_octets_from_client\{/{s+=$NF}END{printf "%.0f",s}')
+        cur_in=$(echo "$_metrics"|awk '/^telemt_user_octets_from_client\{/{s+=$NF}END{printf "%.0f",s}')
+        cur_out=$(echo "$_metrics"|awk '/^telemt_user_octets_to_client\{/{s+=$NF}END{printf "%.0f",s}')
     fi
     cur_in=${cur_in:-0}; cur_out=${cur_out:-0}
 
@@ -3173,9 +3469,8 @@ update_traffic() {
     while IFS='|' read -r label secret created enabled _mc _mi _q _ex; do
         [[ "$label" =~ ^# ]] && continue; [ -z "$secret" ] && continue
         [ "$enabled" != "true" ] && continue
-        local us=$(get_user_stats_tg "$label" "$_metrics")
-        local ui=$(echo "$us"|awk '{print $1}')
-        local uo=$(echo "$us"|awk '{print $2}')
+        local ui=0 uo=0 _uc=0
+        read -r ui uo _uc <<< "$(get_user_stats_tg "$label" "$_metrics")"
         local prev_ui=${_prev_user_in["$label"]:-0}
         local prev_uo=${_prev_user_out["$label"]:-0}
         local du=$((ui - prev_ui))
@@ -3498,17 +3793,17 @@ _last_traffic_update=0
 while true; do
     load_tg_settings
     _report_interval=$(( ${TELEGRAM_INTERVAL:-6} * 3600 ))
-    [ "$TELEGRAM_ENABLED" != "true" ] && sleep 30 && continue
-
-    # Process bot commands
-    process_commands 2>/dev/null
-
-    # Update traffic counters every 60 seconds
+    # Update traffic counters every 60 seconds (always, even if bot is disabled)
     _now=$(date +%s)
     if [ $((_now - _last_traffic_update)) -ge 60 ] && is_running; then
         _last_traffic_update=$_now
         update_traffic 2>/dev/null
     fi
+
+    [ "$TELEGRAM_ENABLED" != "true" ] && sleep 30 && continue
+
+    # Process bot commands
+    process_commands 2>/dev/null
 
     # Health check every 5 minutes
     if [ $((_now - _last_health)) -ge 300 ]; then
@@ -4063,11 +4358,7 @@ show_status() {
         up_secs=$(get_proxy_uptime)
         uptime_str=$(format_duration "$up_secs")
 
-        local stats
-        stats=$(get_proxy_stats)
-        traffic_in=$(echo "$stats" | awk '{print $1}')
-        traffic_out=$(echo "$stats" | awk '{print $2}')
-        connections=$(echo "$stats" | awk '{print $3}')
+        read -r traffic_in traffic_out connections < <(get_cumulative_proxy_stats)
     else
         status_str=$(draw_status stopped)
         uptime_str="—"
@@ -4150,7 +4441,11 @@ cli_main() {
                     secret_add "${_args[0]:-}" "${_args[1]:-}" "$_no_restart"
                     ;;
                 add-batch)
-                    check_root; secret_add_batch "$@" ;;
+                    check_root
+                    local _no_restart="false" _args=()
+                    for _a in "$@"; do [[ "$_a" == "--no-restart" ]] && _no_restart="true" || _args+=("$_a"); done
+                    secret_add_batch "$_no_restart" "${_args[@]}"
+                    ;;
                 remove)
                     check_root
                     local _no_restart="false"
@@ -4160,7 +4455,11 @@ cli_main() {
                     secret_remove "${_args[0]:-}" "false" "$_no_restart"
                     ;;
                 remove-batch)
-                    check_root; secret_remove_batch "false" "$@" ;;
+                    check_root
+                    local _no_restart="false" _args=()
+                    for _a in "$@"; do [[ "$_a" == "--no-restart" ]] && _no_restart="true" || _args+=("$_a"); done
+                    secret_remove_batch "false" "$_no_restart" "${_args[@]}"
+                    ;;
                 list)    secret_list ;;
                 rotate)  check_root; secret_rotate "$1" ;;
                 link)    get_proxy_link_https "${1:-}"; echo "" ;;
@@ -4409,12 +4708,10 @@ cli_main() {
             load_secrets
             echo ""
             draw_header "TRAFFIC"
-            local stats
-            stats=$(get_proxy_stats)
             local t_in t_out conns
-            t_in=$(echo "$stats" | awk '{print $1}')
-            t_out=$(echo "$stats" | awk '{print $2}')
-            conns=$(echo "$stats" | awk '{print $3}')
+            read -r t_in t_out conns < <(get_cumulative_proxy_stats)
+            # Batch-load all user stats
+            _load_all_cumulative_user_stats 2>/dev/null
             echo ""
             echo -e "  ${BOLD}Total:${NC} ${SYM_DOWN} $(format_bytes "$t_in")  ${SYM_UP} $(format_bytes "$t_out")  ${BOLD}Connections:${NC} ${conns}"
             echo ""
@@ -4422,13 +4719,11 @@ cli_main() {
             # Per-user breakdown
             for i in "${!SECRETS_LABELS[@]}"; do
                 [ "${SECRETS_ENABLED[$i]}" = "true" ] || continue
-                local u_stats
-                u_stats=$(get_user_stats "${SECRETS_LABELS[$i]}")
-                local u_in u_out u_conns
-                u_in=$(echo "$u_stats" | awk '{print $1}')
-                u_out=$(echo "$u_stats" | awk '{print $2}')
-                u_conns=$(echo "$u_stats" | awk '{print $3}')
-                echo -e "  ${GREEN}${SYM_OK}${NC} ${BOLD}${SECRETS_LABELS[$i]}${NC}: ${SYM_DOWN} $(format_bytes "$u_in")  ${SYM_UP} $(format_bytes "$u_out")  conns: ${u_conns}"
+                local label="${SECRETS_LABELS[$i]}"
+                local u_in=${_batch_cum_in["$label"]:-0}
+                local u_out=${_batch_cum_out["$label"]:-0}
+                local u_conns=${_batch_cum_conns["$label"]:-0}
+                echo -e "  ${GREEN}${SYM_OK}${NC} ${BOLD}${label}${NC}: ${SYM_DOWN} $(format_bytes "$u_in")  ${SYM_UP} $(format_bytes "$u_out")  conns: ${u_conns}"
             done
             echo ""
             ;;
@@ -4723,7 +5018,7 @@ show_main_menu() {
             local up_secs=$(( $(date +%s) - _cached_start_epoch ))
             uptime_str=$(format_duration "$up_secs")
             # Parse all stats fields in a single read (no awk subprocesses)
-            read -r traffic_in traffic_out connections < <(get_proxy_stats)
+            read -r traffic_in traffic_out connections < <(get_cumulative_proxy_stats)
         else
             status_str=$(draw_status stopped)
             uptime_str="—"
@@ -5238,12 +5533,11 @@ show_traffic_menu() {
         return
     fi
 
-    local stats
-    stats=$(get_proxy_stats)
     local t_in t_out conns
-    t_in=$(echo "$stats" | awk '{print $1}')
-    t_out=$(echo "$stats" | awk '{print $2}')
-    conns=$(echo "$stats" | awk '{print $3}')
+    read -r t_in t_out conns < <(get_cumulative_proxy_stats)
+
+    # Batch-load all user stats in one pass
+    _load_all_cumulative_user_stats 2>/dev/null
 
     echo ""
     echo -e "  ${BOLD}Total Traffic${NC}"
@@ -5258,13 +5552,11 @@ show_traffic_menu() {
     local i
     for i in "${!SECRETS_LABELS[@]}"; do
         [ "${SECRETS_ENABLED[$i]}" = "true" ] || continue
-        local u_stats
-        u_stats=$(get_user_stats "${SECRETS_LABELS[$i]}")
-        local u_in u_out u_conns
-        u_in=$(echo "$u_stats" | awk '{print $1}')
-        u_out=$(echo "$u_stats" | awk '{print $2}')
-        u_conns=$(echo "$u_stats" | awk '{print $3}')
-        echo -e "  ${GREEN}${SYM_OK}${NC} ${BOLD}${SECRETS_LABELS[$i]}${NC}"
+        local label="${SECRETS_LABELS[$i]}"
+        local u_in=${_batch_cum_in["$label"]:-0}
+        local u_out=${_batch_cum_out["$label"]:-0}
+        local u_conns=${_batch_cum_conns["$label"]:-0}
+        echo -e "  ${GREEN}${SYM_OK}${NC} ${BOLD}${label}${NC}"
         echo -e "    ${SYM_DOWN} $(format_bytes "$u_in")  ${SYM_UP} $(format_bytes "$u_out")  conns: ${u_conns}"
     done
 

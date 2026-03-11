@@ -5,7 +5,7 @@
     One script. Full control. Zero hassle.
   </p>
   <p align="center">
-    <img src="https://img.shields.io/badge/version-1.0.1-brightgreen" alt="Version"/>
+    <img src="https://img.shields.io/badge/version-1.0.2-brightgreen" alt="Version"/>
     <img src="https://img.shields.io/badge/license-MIT-blue" alt="License"/>
     <img src="https://img.shields.io/badge/engine-Rust_(telemt_3.x)-orange" alt="Engine"/>
     <img src="https://img.shields.io/badge/platform-Linux-lightgrey" alt="Platform"/>
@@ -500,11 +500,20 @@ mtproxymax telegram remove              # Remove bot completely
 
 ## 📋 Changelog
 
+### v1.0.2 — Persistent Traffic & TUI Performance
+
+- **Persistent Traffic Counters** — Traffic stats (TRAFFIC IN / TRAFFIC OUT) now survive container restarts ([#13](https://github.com/SamNet-dev/MTProxyMax/issues/13))
+- **Always-On Traffic Tracking** — Cumulative traffic saved to disk every 60s, even without Telegram bot enabled
+- **Pre-Stop Traffic Flush** — Final traffic snapshot saved before every stop/restart, no data loss on clean shutdown
+- **TUI Batch Stats Loading** — Single metrics fetch + single file read replaces per-user subprocess spawning
+- **Atomic File Writes with Locking** — Traffic files use `flock` to prevent race conditions between daemon and CLI
+- **Fixed In/Out Direction Mapping** — Consistent `from_client`=in, `to_client`=out across all functions
+
 ### v1.0.1 — Batch Secret Management
 
-- **Batch Add** — `secret add-batch <l1> <l2> ...` adds multiple secrets with a single restart
+- **Batch Add** — `secret add-batch <l1> <l2> ...` adds multiple secrets with a single restart ([#12](https://github.com/SamNet-dev/MTProxyMax/issues/12))
 - **Batch Remove** — `secret remove-batch <l1> <l2> ...` removes multiple secrets with a single restart
-- **`--no-restart` flag** — `secret add/remove --no-restart` for scripting and automation
+- **`--no-restart` flag** — `secret add/remove/add-batch/remove-batch --no-restart` for scripting and automation
 - **TUI options** — Interactive menu options [6] and [7] for batch operations
 
 ### v1.0.0 — Engine v3.3.14
