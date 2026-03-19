@@ -2461,6 +2461,7 @@ run_proxy_container() {
     [ -n "${PROXY_MEMORY}" ] && _docker_args+=(--memory "${PROXY_MEMORY}" --memory-swap "${PROXY_MEMORY}")
 
     docker run -d "${_docker_args[@]}" \
+        --ulimit nofile=65535:65535 \
         -v "${CONFIG_DIR}/config.toml:/etc/telemt.toml:ro" \
         "$(get_docker_image)" /etc/telemt.toml \
         &>/dev/null || {
