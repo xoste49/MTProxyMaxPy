@@ -2746,6 +2746,9 @@ restart_proxy_container() {
 reload_proxy_config() {
     generate_telemt_config || { log_error "Config generation failed"; return 1; }
 
+    # Flush traffic counters to disk before reload (in case SIGHUP triggers a restart)
+    flush_traffic_to_disk 2>/dev/null
+
     # Signal primary container to reload config (inotify may miss bind-mount changes)
     is_proxy_running && docker kill -s SIGHUP "$CONTAINER_NAME" 2>/dev/null || true
 
@@ -3205,9 +3208,12 @@ self_update() {
         local _lfd
         exec {_lfd}>/tmp/.mtproxymax_update.lock
         if ! flock -n "$_lfd" 2>/dev/null; then
-            log_warn "Another update is already running."
+            log_warn "Another update check is already in progress."
+            exec {_lfd}>&- 2>/dev/null
             return 1
         fi
+        # Ensure lock FD is released when function returns
+        trap "exec ${_lfd}>&- 2>/dev/null" RETURN
     fi
 
     local _script_updated=false
@@ -3262,6 +3268,7 @@ self_update() {
                 mv "$_tmp" "${INSTALL_DIR}/mtproxymax"
                 log_success "Script updated to v${_new_ver:-?}"
                 _script_updated=true
+                _SCRIPT_NEEDS_REEXEC=true
                 rm -f "$_UPDATE_BADGE"
 
                 # Save new commit SHA as baseline
@@ -3311,6 +3318,21 @@ self_update() {
             load_secrets
             restart_proxy_container
         fi
+        # Clean up old engine images (keep only the current version + latest)
+        local _old_img
+        while IFS= read -r _old_img; do
+            [ -z "$_old_img" ] && continue
+            [[ "$_old_img" == *":${_expected_ver}" ]] && continue
+            [[ "$_old_img" == *":latest" ]] && continue
+            docker rmi "$_old_img" 2>/dev/null && log_info "Removed old image: ${_old_img}"
+        done <<< "$(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep "^${DOCKER_IMAGE_BASE}:")"
+        # Also clean registry-prefixed copies
+        while IFS= read -r _old_img; do
+            [ -z "$_old_img" ] && continue
+            [[ "$_old_img" == *":${_expected_ver}" ]] && continue
+            [[ "$_old_img" == *":latest" ]] && continue
+            docker rmi "$_old_img" 2>/dev/null || true
+        done <<< "$(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep "^${REGISTRY_IMAGE}:")"
     fi
 }
 
@@ -7374,7 +7396,15 @@ show_about() {
         local choice
         choice=$(read_choice "Choice" "0")
         case "$choice" in
-            1) self_update || true; press_any_key ;;
+            1)
+                self_update || true
+                if [ "${_SCRIPT_NEEDS_REEXEC:-}" = "true" ]; then
+                    log_info "Restarting with updated script..."
+                    sleep 1
+                    exec "${INSTALL_DIR}/mtproxymax" menu
+                fi
+                press_any_key
+                ;;
             2) create_backup || true; press_any_key ;;
             3)
                 list_backups
