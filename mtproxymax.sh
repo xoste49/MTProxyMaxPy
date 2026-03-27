@@ -3318,22 +3318,22 @@ self_update() {
             load_secrets
             restart_proxy_container
         fi
-        # Clean up old engine images (keep only the current version + latest)
-        local _old_img
-        while IFS= read -r _old_img; do
-            [ -z "$_old_img" ] && continue
-            [[ "$_old_img" == *":${_expected_ver}" ]] && continue
-            [[ "$_old_img" == *":latest" ]] && continue
-            docker rmi "$_old_img" 2>/dev/null && log_info "Removed old image: ${_old_img}"
-        done <<< "$(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep "^${DOCKER_IMAGE_BASE}:")"
-        # Also clean registry-prefixed copies
-        while IFS= read -r _old_img; do
-            [ -z "$_old_img" ] && continue
-            [[ "$_old_img" == *":${_expected_ver}" ]] && continue
-            [[ "$_old_img" == *":latest" ]] && continue
-            docker rmi "$_old_img" 2>/dev/null || true
-        done <<< "$(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep "^${REGISTRY_IMAGE}:")"
     fi
+
+    # Clean up old engine images (keep only the current version + latest)
+    local _old_img
+    while IFS= read -r _old_img; do
+        [ -z "$_old_img" ] && continue
+        [[ "$_old_img" == *":${_expected_ver}" ]] && continue
+        [[ "$_old_img" == *":latest" ]] && continue
+        docker rmi "$_old_img" 2>/dev/null && log_info "Removed old image: ${_old_img}"
+    done <<< "$(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep "^${DOCKER_IMAGE_BASE}:")"
+    while IFS= read -r _old_img; do
+        [ -z "$_old_img" ] && continue
+        [[ "$_old_img" == *":${_expected_ver}" ]] && continue
+        [[ "$_old_img" == *":latest" ]] && continue
+        docker rmi "$_old_img" 2>/dev/null || true
+    done <<< "$(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep "^${REGISTRY_IMAGE}:")"
 }
 
 # ── Section 14: Telegram Integration ────────────────────────
