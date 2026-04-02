@@ -2129,6 +2129,7 @@ secret_set_limits() {
     if [ -n "$max_conns" ]; then
         [[ "$max_conns" =~ ^[0-9]+$ ]] || { log_error "Max connections must be a number"; return 1; }
         [ "$max_conns" -gt 1000000 ] && { log_error "Max connections cannot exceed 1000000"; return 1; }
+        [ "$max_conns" -gt 0 ] && [ "$max_conns" -lt 5 ] && log_warn "Telegram uses ~3 connections per device; values below 5 may break connectivity"
         SECRETS_MAX_CONNS[$idx]="$max_conns"
     fi
     if [ -n "$max_ips" ]; then
@@ -5372,7 +5373,7 @@ run_installer() {
         fi
     fi
 
-    echo -en "  ${DIM}Enter memory limit [unlimited]:${NC} "
+    echo -en "  ${DIM}Enter memory limit, e.g. 256m, 1g [unlimited]:${NC} "
     local mem_input
     read -r mem_input
     if [ -n "$mem_input" ]; then
@@ -7475,7 +7476,7 @@ show_settings_menu() {
                         log_error "Invalid CPU value (must be a number >= 0.1, e.g. 1, 2, 0.5)"
                     fi
                 fi
-                echo -en "  ${BOLD}Memory [${PROXY_MEMORY:-unlimited}]:${NC} "
+                echo -en "  ${BOLD}Memory, e.g. 256m, 1g [${PROXY_MEMORY:-unlimited}]:${NC} "
                 local m; read -r m
                 if [ -n "$m" ]; then
                     if [[ "$m" =~ ^[0-9]+[bBkKmMgG]?$ ]]; then
