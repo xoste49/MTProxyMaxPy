@@ -1067,9 +1067,13 @@ domain_to_hex() {
 # Build the full FakeTLS secret for sharing (ee + raw_secret + domain_hex)
 build_faketls_secret() {
     local raw_secret="$1" domain="${2:-$PROXY_DOMAIN}"
-    local domain_hex
-    domain_hex=$(domain_to_hex "$domain")
-    echo "ee${raw_secret}${domain_hex}"
+    if [ "${MASKING_ENABLED:-true}" = "false" ]; then
+        echo "dd${raw_secret}"
+    else
+        local domain_hex
+        domain_hex=$(domain_to_hex "$domain")
+        echo "ee${raw_secret}${domain_hex}"
+    fi
 }
 
 # Generate telemt config.toml
