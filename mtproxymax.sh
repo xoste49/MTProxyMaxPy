@@ -2688,12 +2688,13 @@ run_proxy_container() {
     [ -n "${PROXY_CPUS}" ] && _docker_args+=(--cpus "${PROXY_CPUS}")
     [ -n "${PROXY_MEMORY}" ] && _docker_args+=(--memory "${PROXY_MEMORY}" --memory-swap "${PROXY_MEMORY}")
 
-    docker run -d "${_docker_args[@]}" \
+    local _run_out
+    _run_out=$(docker run -d "${_docker_args[@]}" \
         --ulimit nofile=65535:65535 \
         -v "${CONFIG_DIR}/config.toml:/etc/telemt.toml:ro" \
-        "$(get_docker_image)" /etc/telemt.toml \
-        &>/dev/null || {
+        "$(get_docker_image)" /etc/telemt.toml 2>&1) || {
             log_error "Failed to start container"
+            echo -e "  ${DIM}${_run_out}${NC}"
             return 1
         }
 
