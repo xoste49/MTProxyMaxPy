@@ -18,7 +18,8 @@
     <a href="#-comparison">Comparison</a> &bull;
     <a href="#-telegram-bot-17-commands">Telegram Bot</a> &bull;
     <a href="#-cli-reference">CLI Reference</a> &bull;
-    <a href="#-changelog">Changelog</a>
+    <a href="#-changelog">Changelog</a> &bull;
+    <a href="https://www.samnet.dev/learn/networking/mtproto-proxy-telegram/">Full Guide ↗</a>
   </p>
 </p>
 
@@ -686,6 +687,19 @@ mtproxymax telegram remove              # Remove bot completely
 ## 🙏 Credits
 
 Built on top of **telemt** — a high-performance MTProto proxy engine written in Rust/Tokio. All proxy protocol handling, FakeTLS, traffic masking, and per-user enforcement is powered by telemt.
+
+---
+
+## 📖 Documentation & Guides
+
+For step-by-step tutorials with screenshots and detailed explanations, visit our guides on SamNet:
+
+- **[Complete MTProto Proxy Setup Guide](https://www.samnet.dev/learn/networking/mtproto-proxy-telegram/)** — Full walkthrough: install, multi-user management, FakeTLS, Telegram bot, proxy chaining, geo-blocking, replication, and ad-tag monetization.
+- **[3X-UI Panel Setup Guide](https://www.samnet.dev/learn/networking/xui-setup/)** — If you need VLESS/VMess/Reality/Trojan protocols alongside MTProto.
+- **[Server Hardening Guide](https://www.samnet.dev/learn/security/server-hardening/)** — Secure your proxy server: SSH hardening, firewall rules, fail2ban.
+- **[iptables Cheat Sheet](https://www.samnet.dev/learn/cheatsheets/iptables-guide/)** — Firewall rules reference for protecting your proxy.
+- **[VPN Leak Test](https://www.samnet.dev/tools/vpn-leak-test/)** — Verify your proxy is hiding your real IP.
+- **[Port Scanner](https://www.samnet.dev/tools/port-scanner/)** — Check if your proxy port is accessible from the internet.
 
 ---
 
