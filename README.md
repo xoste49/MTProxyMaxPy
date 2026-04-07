@@ -586,78 +586,34 @@ mtproxymax telegram remove              # Remove bot completely
 
 ## 📋 Changelog
 
-### v1.0.4 — Replication, Engine v3.3.39, SNI Policy & Metrics Dashboard
+### v1.0.4 — Replication, Engine v3.3.39, Metrics Dashboard
 
-- **Replication** — sync config from master to slave servers via rsync+SSH with systemd timer
-- **Auto-exclude** — `settings.conf` and `replication.conf` are never synced to slaves, preserving their role and local state
-- **Wizard** — interactive setup for master, slave, and standalone roles
-- **Slave protection** — setting slave role stops any local sync timer and clears stale peer list
-- **Promote** — `mtproxymax replication promote` for manual failover (slave → master)
-- **Role guards** — `replication add/remove/sync` are blocked with a clear error on slave servers
-- **Sync script auto-update** — manual `sync` always regenerates the script from current binary
+- Replication — master/slave sync via rsync+SSH with wizard, promote, and role guards
+- Engine v3.3.39 — Apple/XNU fixes, ME rewrite, conntrack control, TLS fronting fix, memory hard-bounds, bounded retries
+- Engine metrics dashboard — `mtproxymax metrics` / `mtproxymax metrics live`
+- Unknown SNI policy — configurable `mask` or `drop` ([#40](https://github.com/SamNet-dev/MTProxyMax/issues/40))
+- Reset traffic counters — `mtproxymax secret reset-traffic <label|all>`
+- Alpine fixes — broken pipe, double-input, SNI rejection ([#37](https://github.com/SamNet-dev/MTProxyMax/issues/37), [#38](https://github.com/SamNet-dev/MTProxyMax/issues/38))
 
-**Engine Upgrade (v3.3.31 → v3.3.39):**
+### v1.0.3 — Quota Enforcement, Multi-Port, Hot-Reload
 
-- **Apple/XNU Connectivity Fixes** — Resolves connection issues for iOS/macOS Telegram clients
-- **ME Rewrite** — Hybrid routing loop, ArcSwap snapshots, parallel health checks, refined quarantine, tiered backpressure
-- **Conntrack Control** — Automatic conntrack table management under connection pressure with configurable watermarks
-- **New Relay Methods** — Improved middle/direct relay with adaptive buffers
-- **ME2DC Fast Init** — Faster startup, unstoppable initialization (now enabled by default)
-- **Memory Optimizations** — Buffer pool trim, session vec shrink, reduced stats memory footprint
-- **Upstream Timeout Tuning** — `tg_connect` timeout now applied to DC TCP connect attempts, prevents hanging connections
-- **Active IPs API** — New `/v1/stats/users/active-ips` endpoint
-- **Config Fallback** — Engine gracefully falls back if primary config fails to load
-- **TLS Fronting Fix** — Hashed cert payload before emulation, improves fake-TLS compatibility
-- **Memory Hard-bounds** — Prevents unbounded memory growth under load
-- **Bounded Retries** — Round-bounded retries on data routes, prevents infinite retry loops
+- Secret notes, expiry warnings, quota auto-disable at 100%
+- JSON status, connection log, backup & restore
+- Multi-port instances, hot-reload for secrets
+- Whitelist geo-blocking ([#29](https://github.com/SamNet-dev/MTProxyMax/issues/29))
 
-**New Features:**
+### v1.0.2 — Persistent Traffic
 
-- **Unknown SNI Policy** — Configurable `mask` (permissive, default) or `drop` (strict) for TLS connections with non-matching SNI. TUI: Security & Routing > Unknown SNI Policy. CLI: `mtproxymax sni-policy [mask|drop]` ([#40](https://github.com/SamNet-dev/MTProxyMax/issues/40))
-- **Engine Metrics Dashboard** — `mtproxymax metrics` shows connections, upstream routing, per-user stats, and ME pool status. `mtproxymax metrics live` for auto-refresh
-- **Reset Traffic Counters** — `mtproxymax secret reset-traffic <label|all>` to manually reset per-user cumulative traffic
+- Traffic counters survive restarts, saved every 60s ([#13](https://github.com/SamNet-dev/MTProxyMax/issues/13))
+- Atomic writes with flock, pre-stop flush, batched stats loading
 
-**Bug Fixes:**
+### v1.0.1 — Batch Secrets
 
-- **Fix broken pipe on Alpine** — Replaced process-substitution FIFOs with here-strings to avoid SIGPIPE race ([#37](https://github.com/SamNet-dev/MTProxyMax/issues/37))
-- **Fix double-input on Alpine** — Drain leftover escape-sequence bytes from multi-byte key presses in TUI menus ([#38](https://github.com/SamNet-dev/MTProxyMax/issues/38))
-- **Fix SNI rejection after engine upgrade** — `unknown_sni_action` default changed to `drop` in telemt v3.3.31+, now explicitly set to `mask` for backward compatibility ([#40](https://github.com/SamNet-dev/MTProxyMax/issues/40))
-
-### v1.0.3 — Notes, Quota Enforcement, Multi-Port & More
-
-- **Secret Notes** — Attach descriptions to secrets (`secret note <label> <text>`, TUI option [8])
-- **Expiry Warnings** — Secret list shows `(3d left)` / `(expired)`, Telegram alerts 3 days before expiry
-- **Quota Enforcement** — Auto-disables secrets at 100% quota, warns at 80%, works even without Telegram bot
-- **Auto-disable on Quota Hit** — `secret reenable <label>` to restore with optional traffic reset
-- **JSON Status** — `mtproxymax status --json` for Grafana/Zabbix/monitoring integration
-- **Connection Log** — Per-user activity log with auto-rotation (`connlog` CLI, TUI Logs & Traffic > [2])
-- **Backup & Restore** — `mtproxymax backup`, `restore <file>`, `backups` — includes all config, secrets, and stats
-- **Multi-Port Instances** — Run proxy on multiple ports with shared secrets (`instance add/remove/list`)
-- **Hot-Reload for Secrets** — Add/remove/rotate secrets without dropping active connections
-- **Whitelist Geo-Blocking** — Allow only specific countries, block everything else ([#29](https://github.com/SamNet-dev/MTProxyMax/issues/29))
-
-### v1.0.2 — Persistent Traffic & TUI Performance
-
-- **Persistent Traffic Counters** — Traffic stats (TRAFFIC IN / TRAFFIC OUT) now survive container restarts ([#13](https://github.com/SamNet-dev/MTProxyMax/issues/13))
-- **Always-On Traffic Tracking** — Cumulative traffic saved to disk every 60s, even without Telegram bot enabled
-- **Pre-Stop Traffic Flush** — Final traffic snapshot saved before every stop/restart, no data loss on clean shutdown
-- **TUI Batch Stats Loading** — Single metrics fetch + single file read replaces per-user subprocess spawning
-- **Atomic File Writes with Locking** — Traffic files use `flock` to prevent race conditions between daemon and CLI
-- **Fixed In/Out Direction Mapping** — Consistent `from_client`=in, `to_client`=out across all functions
-
-### v1.0.1 — Batch Secret Management
-
-- **Batch Add/Remove** — `secret add-batch` / `secret remove-batch` with single restart ([#12](https://github.com/SamNet-dev/MTProxyMax/issues/12))
-- **`--no-restart` flag** — for scripting and automation
+- `secret add-batch` / `secret remove-batch` ([#12](https://github.com/SamNet-dev/MTProxyMax/issues/12))
 
 ### v1.0.0 — Initial Release
 
-- Full MTProto proxy management with telemt 3.x Rust engine
-- Interactive TUI + complete CLI
-- Multi-user secret management with per-user limits, quotas, and expiry
-- FakeTLS obfuscation with traffic masking
-- Telegram bot with 17 commands for remote management
-- Proxy chaining, geo-blocking, Prometheus metrics, auto-update
+- telemt 3.x Rust engine, TUI + CLI, multi-user secrets, FakeTLS, Telegram bot, proxy chaining, geo-blocking
 
 ---
 
