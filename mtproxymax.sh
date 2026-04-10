@@ -7824,8 +7824,12 @@ show_secrets_menu() {
         echo -e "  ${DIM}[8]${NC} Edit note/description"
         echo -e "  ${DIM}[9]${NC} Rename a secret"
         echo -e "  ${DIM}[c]${NC} Clone a secret"
+        echo -e "  ${DIM}[x]${NC} Extend a secret's expiry"
         echo -e "  ${DIM}[e]${NC} Bulk-extend all expiry dates"
         echo -e "  ${DIM}[d]${NC} Disable expired secrets"
+        echo -e "  ${DIM}[s]${NC} User stats overview"
+        echo -e "  ${DIM}[t]${NC} Sort secrets"
+        echo -e "  ${DIM}[i]${NC} Export / Import"
         echo -e "  ${DIM}[0]${NC} Back"
 
         local choice
@@ -7958,7 +7962,49 @@ show_secrets_menu() {
                 [ -n "$ext_days" ] && { secret_bulk_extend "$ext_days" || true; }
                 press_any_key
                 ;;
+            x|X)
+                echo -en "  ${BOLD}Label or #:${NC} "
+                local ext_label; read -r ext_label
+                if [[ "$ext_label" =~ ^[0-9]+$ ]] && [ "$ext_label" -ge 1 ] && [ "$ext_label" -le "${#SECRETS_LABELS[@]}" ]; then
+                    ext_label="${SECRETS_LABELS[$((ext_label - 1))]}"
+                fi
+                if [ -n "$ext_label" ]; then
+                    echo -en "  ${BOLD}Extend by how many days?${NC} "
+                    local ext_d; read -r ext_d
+                    [ -n "$ext_d" ] && { secret_extend "$ext_label" "$ext_d" || true; }
+                fi
+                press_any_key
+                ;;
             d|D) secret_disable_expired; press_any_key ;;
+            s|S) secret_stats; press_any_key ;;
+            t|T)
+                echo -e "  ${DIM}[1] By traffic  [2] By connections  [3] By date  [4] By name${NC}"
+                local sort_choice; sort_choice=$(read_choice "Choice" "1")
+                case "$sort_choice" in
+                    1) secret_sort traffic ;;
+                    2) secret_sort conns ;;
+                    3) secret_sort date ;;
+                    4) secret_sort name ;;
+                esac
+                press_any_key
+                ;;
+            i|I)
+                echo -e "  ${DIM}[1] Export to file  [2] Import from file${NC}"
+                local io_choice; io_choice=$(read_choice "Choice" "0")
+                case "$io_choice" in
+                    1)
+                        local exp_file="/tmp/mtproxymax-secrets-$(date +%Y%m%d).csv"
+                        secret_export > "$exp_file"
+                        log_success "Exported to ${exp_file}"
+                        ;;
+                    2)
+                        echo -en "  ${BOLD}File path:${NC} "
+                        local imp_file; read -r imp_file
+                        [ -n "$imp_file" ] && { secret_import "$imp_file" || true; }
+                        ;;
+                esac
+                press_any_key
+                ;;
             0|"") return ;;
             *) ;;
         esac
@@ -8894,6 +8940,8 @@ show_info_menu() {
         echo -e "  ${BRIGHT_CYAN}[p]${NC}  Port Forwarding Guide (Home Users)"
         echo -e "  ${BRIGHT_CYAN}[f]${NC}  Firewall Configuration Guide"
         echo ""
+        echo -e "  ${BRIGHT_CYAN}[d]${NC}  Run Doctor (diagnostics)"
+        echo ""
         echo -e "  ${DIM}[0]${NC}  Back"
 
         local choice
@@ -8913,6 +8961,7 @@ show_info_menu() {
             c|C) show_info_upstreams ;;
             p|P) show_port_forward_guide ;;
             f|F) show_firewall_guide ;;
+            d|D) run_doctor; press_any_key ;;
             0|"") return ;;
             *) ;;
         esac
