@@ -2334,6 +2334,164 @@ secret_show_limits() {
     echo ""
 }
 
+# Rename a secret's label
+secret_rename() {
+    local old_label="$1" new_label="$2"
+    [ -z "$old_label" ] || [ -z "$new_label" ] && { log_error "Usage: mtproxymax secret rename <old-label> <new-label>"; return 1; }
+
+    # Validate new label
+    [[ "$new_label" =~ ^[a-zA-Z0-9_-]+$ ]] || { log_error "Label must be alphanumeric (a-z, 0-9, _, -)"; return 1; }
+    [ ${#new_label} -gt 32 ] && { log_error "Label must be 32 characters or less"; return 1; }
+
+    # Find old label
+    local idx=-1 i
+    for i in "${!SECRETS_LABELS[@]}"; do
+        [ "${SECRETS_LABELS[$i]}" = "$old_label" ] && { idx=$i; break; }
+    done
+    [ $idx -eq -1 ] && { log_error "Secret '${old_label}' not found"; return 1; }
+
+    # Check new label doesn't exist
+    for i in "${!SECRETS_LABELS[@]}"; do
+        [ "${SECRETS_LABELS[$i]}" = "$new_label" ] && { log_error "Secret '${new_label}' already exists"; return 1; }
+    done
+
+    SECRETS_LABELS[$idx]="$new_label"
+    save_secrets
+    reload_proxy_config
+    log_success "Secret renamed: '${old_label}' → '${new_label}'"
+}
+
+# Export secrets to CSV (stdout)
+secret_export() {
+    echo "# label|key|enabled|max_conns|max_ips|quota|expires|notes"
+    local i
+    for i in "${!SECRETS_LABELS[@]}"; do
+        echo "${SECRETS_LABELS[$i]}|${SECRETS_KEYS[$i]}|${SECRETS_ENABLED[$i]}|${SECRETS_MAX_CONNS[$i]:-0}|${SECRETS_MAX_IPS[$i]:-0}|${SECRETS_QUOTA[$i]:-0}|${SECRETS_EXPIRES[$i]:-0}|${SECRETS_NOTES[$i]:-}"
+    done
+}
+
+# Import secrets from CSV file
+secret_import() {
+    local file="$1"
+    [ -z "$file" ] && { log_error "Usage: mtproxymax secret import <file>"; return 1; }
+    [ -f "$file" ] || { log_error "File not found: ${file}"; return 1; }
+
+    local added=0 skipped=0
+    while IFS='|' read -r label key enabled max_conns max_ips quota expires notes; do
+        [[ "$label" =~ ^#|^$ ]] && continue
+        # Skip if label already exists
+        local exists=false i
+        for i in "${!SECRETS_LABELS[@]}"; do
+            [ "${SECRETS_LABELS[$i]}" = "$label" ] && { exists=true; break; }
+        done
+        if $exists; then
+            skipped=$((skipped + 1))
+            continue
+        fi
+        # Validate
+        [[ "$label" =~ ^[a-zA-Z0-9_-]+$ ]] || { log_warn "Skipping invalid label: ${label}"; continue; }
+        [[ "$key" =~ ^[a-fA-F0-9]{32}$ ]] || { log_warn "Skipping invalid key for ${label}"; continue; }
+
+        SECRETS_LABELS+=("$label")
+        SECRETS_KEYS+=("$key")
+        SECRETS_CREATED+=("$(date +%s)")
+        SECRETS_ENABLED+=("${enabled:-true}")
+        SECRETS_MAX_CONNS+=("${max_conns:-0}")
+        SECRETS_MAX_IPS+=("${max_ips:-0}")
+        SECRETS_QUOTA+=("${quota:-0}")
+        SECRETS_EXPIRES+=("${expires:-0}")
+        SECRETS_NOTES+=("${notes:-}")
+        added=$((added + 1))
+    done < "$file"
+
+    if [ $added -gt 0 ]; then
+        save_secrets
+        reload_proxy_config
+    fi
+    log_success "Imported ${added} secrets (${skipped} skipped as duplicates)"
+}
+
+# Show live active connections per user
+show_connections() {
+    local m
+    if ! m=$(_fetch_metrics 2>/dev/null); then
+        log_error "Metrics endpoint unavailable — is the proxy running?"
+        return 1
+    fi
+
+    local parsed
+    parsed=$(echo "$m" | awk '
+        function lbl(s, k,    p, q) {
+            p = index(s, k "=\""); if (!p) return ""
+            s = substr(s, p + length(k) + 2)
+            q = index(s, "\""); return q ? substr(s, 1, q-1) : ""
+        }
+        /^telemt_user_connections_current\{/  { u=lbl($0,"user"); if(u) uc[u]+=$NF }
+        /^telemt_user_connections_total\{/    { u=lbl($0,"user"); if(u) ut[u]+=$NF }
+        /^telemt_user_unique_ips_current\{/   { u=lbl($0,"user"); if(u) ui[u]+=$NF }
+        /^telemt_user_octets_from_client\{/   { u=lbl($0,"user"); if(u) rx[u]+=$NF }
+        /^telemt_user_octets_to_client\{/     { u=lbl($0,"user"); if(u) tx[u]+=$NF }
+        /^telemt_connections_current /         { total=$NF }
+        END {
+            printf "T|%.0f\n", total+0
+            for (u in uc)
+                printf "U|%s|%.0f|%.0f|%.0f|%.0f|%.0f\n", u, uc[u]+0, ut[u]+0, ui[u]+0, rx[u]+0, tx[u]+0
+        }
+    ')
+
+    local total=0
+    IFS='|' read -r _ total <<< "$(echo "$parsed" | grep '^T|')"
+
+    draw_header "ACTIVE CONNECTIONS"
+    echo ""
+    echo -e "  ${BOLD}Total active:${NC} ${total:-0}"
+    echo ""
+
+    local user_lines
+    user_lines=$(echo "$parsed" | grep '^U|' | sort -t'|' -k3 -rn)
+    if [ -n "$user_lines" ]; then
+        printf "  ${BOLD}%-16s %8s %8s %6s %12s %12s${NC}\n" "USER" "ACTIVE" "TOTAL" "IPs" "DOWN" "UP"
+        echo -e "  ${DIM}$(_repeat '─' 68)${NC}"
+        while IFS='|' read -r _ uname ucur utot uips urx utx; do
+            printf "  %-16s %8s %8s %6s %12s %12s\n" "$uname" "$ucur" "$utot" "$uips" "$(format_bytes "$urx")" "$(format_bytes "$utx")"
+        done <<< "$user_lines"
+    else
+        echo -e "  ${DIM}No users connected${NC}"
+    fi
+    echo ""
+}
+
+# Disable all expired secrets
+secret_disable_expired() {
+    local now_epoch disabled=0
+    now_epoch=$(date +%s)
+
+    local i
+    for i in "${!SECRETS_LABELS[@]}"; do
+        local exp="${SECRETS_EXPIRES[$i]:-0}"
+        [ "$exp" = "0" ] && continue
+        [ "${SECRETS_ENABLED[$i]}" = "false" ] && continue
+
+        local exp_epoch
+        exp_epoch=$(_iso_to_epoch "$exp")
+        [ "$exp_epoch" -le 0 ] && continue
+
+        if [ "$exp_epoch" -le "$now_epoch" ]; then
+            SECRETS_ENABLED[$i]="false"
+            disabled=$((disabled + 1))
+            log_info "Disabled expired secret: ${SECRETS_LABELS[$i]} (expired ${exp%%T*})"
+        fi
+    done
+
+    if [ $disabled -gt 0 ]; then
+        save_secrets
+        reload_proxy_config
+        log_success "Disabled ${disabled} expired secret(s)"
+    else
+        log_info "No expired secrets found"
+    fi
+}
+
 # ── Section 8b: Upstream Management ──────────────────────────
 
 # Add a new upstream
@@ -5900,6 +6058,10 @@ show_cli_help() {
     echo -e "    ${GREEN}secret setlimit${NC} <label> conns|ips|quota|expires <value> [--no-restart]"
     echo -e "    ${GREEN}secret setlimits${NC} <label> <conns> <ips> <quota> [expires] [--no-restart]"
     echo -e "    ${GREEN}secret reset-traffic${NC} <label|all>  Reset traffic counters"
+    echo -e "    ${GREEN}secret rename${NC} <old> <new>     Rename a secret"
+    echo -e "    ${GREEN}secret export${NC}                 Export secrets to CSV (stdout)"
+    echo -e "    ${GREEN}secret import${NC} <file>          Import secrets from CSV file"
+    echo -e "    ${GREEN}secret disable-expired${NC}        Disable all expired secrets"
     echo -e "    ${DIM}Tip: add/remove support --no-restart flag for scripting${NC}"
     echo ""
     echo -e "  ${BOLD}Upstream Routing:${NC}"
@@ -5920,6 +6082,7 @@ show_cli_help() {
     echo ""
     echo -e "  ${BOLD}Monitoring:${NC}"
     echo -e "    ${GREEN}traffic${NC}                 Show traffic stats"
+    echo -e "    ${GREEN}connections${NC}             Show live active connections per user"
     echo -e "    ${GREEN}metrics${NC}                 Show live engine metrics (connections, upstream, users, ME)"
     echo -e "    ${GREEN}metrics live${NC} [seconds]  Auto-refresh metrics dashboard (default: 5s)"
     echo -e "    ${GREEN}logs${NC}                    Stream container logs"
@@ -6339,6 +6502,24 @@ cli_main() {
                     [ -z "$label" ] && { log_error "Usage: mtproxymax secret note <label> [text]"; return 1; }
                     secret_edit_note "$label" "$note_text"
                     ;;
+                rename)
+                    check_root
+                    [ -z "$1" ] || [ -z "$2" ] && { log_error "Usage: mtproxymax secret rename <old> <new>"; return 1; }
+                    secret_rename "$1" "$2"
+                    ;;
+                export)
+                    load_secrets
+                    secret_export
+                    ;;
+                import)
+                    check_root
+                    [ -z "$1" ] && { log_error "Usage: mtproxymax secret import <file>"; return 1; }
+                    secret_import "$1"
+                    ;;
+                disable-expired)
+                    check_root
+                    secret_disable_expired
+                    ;;
                 *)       log_error "Unknown: secret ${subcmd}"; show_cli_help; return 1 ;;
             esac
             ;;
@@ -6443,7 +6624,17 @@ cli_main() {
                         PROXY_DOMAIN="$new_domain"
                         save_settings
                         log_success "Domain changed to ${new_domain}"
-                        log_warn "Proxy links contain the old domain — share new links with your users"
+                        log_warn "Existing proxy links still encode the old domain"
+                        echo -en "  ${BOLD}Rotate all secrets for new domain? [Y/n]:${NC} "
+                        local _rot; read -r _rot
+                        if [[ ! "$_rot" =~ ^[nN] ]]; then
+                            local _ri
+                            for _ri in "${!SECRETS_LABELS[@]}"; do
+                                SECRETS_KEYS[$_ri]=$(generate_secret)
+                            done
+                            save_secrets
+                            log_success "All secrets rotated — share new links with your users"
+                        fi
                         if is_proxy_running; then
                             load_secrets
                             restart_proxy_container
@@ -6599,6 +6790,12 @@ cli_main() {
                 echo -e "  ${GREEN}${SYM_OK}${NC} ${BOLD}${label}${NC}: ${SYM_DOWN} $(format_bytes "$u_in")  ${SYM_UP} $(format_bytes "$u_out")  conns: ${u_conns}"
             done
             echo ""
+            ;;
+
+        connections)
+            load_settings
+            load_secrets
+            show_connections
             ;;
 
         metrics)
@@ -7168,6 +7365,8 @@ show_secrets_menu() {
         echo -e "  ${DIM}[6]${NC} Batch add secrets"
         echo -e "  ${DIM}[7]${NC} Batch remove secrets"
         echo -e "  ${DIM}[8]${NC} Edit note/description"
+        echo -e "  ${DIM}[9]${NC} Rename a secret"
+        echo -e "  ${DIM}[d]${NC} Disable expired secrets"
         echo -e "  ${DIM}[0]${NC} Back"
 
         local choice
@@ -7267,6 +7466,21 @@ show_secrets_menu() {
                 fi
                 press_any_key
                 ;;
+            9)
+                echo -en "  ${BOLD}Label or # to rename:${NC} "
+                local old_label
+                read -r old_label
+                if [[ "$old_label" =~ ^[0-9]+$ ]] && [ "$old_label" -ge 1 ] && [ "$old_label" -le "${#SECRETS_LABELS[@]}" ]; then
+                    old_label="${SECRETS_LABELS[$((old_label - 1))]}"
+                fi
+                if [ -n "$old_label" ]; then
+                    echo -en "  ${BOLD}New label:${NC} "
+                    local new_label; read -r new_label
+                    [ -n "$new_label" ] && { secret_rename "$old_label" "$new_label" || true; }
+                fi
+                press_any_key
+                ;;
+            d|D) secret_disable_expired; press_any_key ;;
             0|"") return ;;
             *) ;;
         esac
@@ -7467,7 +7681,17 @@ show_settings_menu() {
                 if $_domain_changed; then
                     save_settings
                     log_success "Domain set to ${PROXY_DOMAIN}"
-                    log_warn "Proxy links contain the old domain — share new links with your users"
+                    log_warn "Existing proxy links still encode the old domain"
+                    echo -en "  ${BOLD}Rotate all secrets for new domain? [Y/n]:${NC} "
+                    local _rot; read -r _rot
+                    if [[ ! "$_rot" =~ ^[nN] ]]; then
+                        local _ri
+                        for _ri in "${!SECRETS_LABELS[@]}"; do
+                            SECRETS_KEYS[$_ri]=$(generate_secret)
+                        done
+                        save_secrets
+                        log_success "All secrets rotated — share new links with your users"
+                    fi
                     if is_proxy_running; then
                         echo -en "  ${DIM}Restart proxy now? [Y/n]:${NC} "
                         local r; read -r r
@@ -7655,6 +7879,7 @@ show_traffic_menu() {
     echo -e "  ${DIM}[2]${NC} Connection log"
     echo -e "  ${DIM}[3]${NC} Engine metrics"
     echo -e "  ${DIM}[4]${NC} Engine metrics (live)"
+    echo -e "  ${DIM}[5]${NC} Active connections"
     echo -e "  ${DIM}[0]${NC} Back"
 
     local choice
@@ -7681,6 +7906,7 @@ show_traffic_menu() {
                 done
             )
             ;;
+        5) show_connections; press_any_key ;;
     esac
 }
 
