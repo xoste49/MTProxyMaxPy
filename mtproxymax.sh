@@ -6947,7 +6947,6 @@ cli_main() {
                     secret_bulk_extend "$1"
                     ;;
                 export)
-                    load_secrets
                     secret_export
                     ;;
                 import)
