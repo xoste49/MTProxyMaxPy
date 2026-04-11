@@ -1,61 +1,56 @@
 <p align="center">
-  <h1 align="center">MTProxyMax</h1>
+  <h1 align="center">MTProxyMaxPy</h1>
   <p align="center"><b>The Ultimate Telegram MTProto Proxy Manager</b></p>
   <p align="center">
-    One script. Full control. Zero hassle.
+    Interactive TUI &middot; Full CLI &middot; Telegram Bot &middot; Per-user Access Control
   </p>
   <p align="center">
-    <img src="https://img.shields.io/badge/version-1.0.5-brightgreen" alt="Version"/>
+    <img src="https://img.shields.io/badge/version-1.0.0-brightgreen" alt="Version"/>
     <img src="https://img.shields.io/badge/license-MIT-blue" alt="License"/>
     <img src="https://img.shields.io/badge/engine-Rust_(telemt_3.x)-orange" alt="Engine"/>
     <img src="https://img.shields.io/badge/platform-Linux-lightgrey" alt="Platform"/>
-    <img src="https://img.shields.io/badge/bash-4.2+-yellow" alt="Bash"/>
-    <img src="https://img.shields.io/badge/docker-multi--arch-blue" alt="Docker"/>
+    <img src="https://img.shields.io/badge/python-3.13+-yellow" alt="Python"/>
   </p>
   <p align="center">
     <a href="#-quick-start">Quick Start</a> &bull;
     <a href="#-features">Features</a> &bull;
     <a href="#-comparison">Comparison</a> &bull;
-    <a href="#-telegram-bot-17-commands">Telegram Bot</a> &bull;
+    <a href="#-telegram-bot">Telegram Bot</a> &bull;
     <a href="#-cli-reference">CLI Reference</a> &bull;
-    <a href="#-changelog">Changelog</a> &bull;
-    <a href="https://www.samnet.dev/learn/networking/mtproto-proxy-telegram/">Full Guide ↗</a>
+    <a href="#-changelog">Changelog</a>
   </p>
 </p>
 
 ---
 
-MTProxyMax is a full-featured Telegram MTProto proxy manager powered by the **telemt 3.x Rust engine**. It wraps the raw proxy engine with an interactive TUI, a complete CLI, a Telegram bot for remote management, per-user access control, traffic monitoring, proxy chaining, and automatic updates — all in a single bash script.
-
-<img src="main.png" width="600" alt="MTProxyMax Main Menu"/>
+MTProxyMaxPy is a full-featured Telegram MTProto proxy manager powered by the **telemt 3.x Rust engine**. It wraps the raw proxy engine with an interactive TUI, a complete CLI, a Telegram bot for remote management, per-user access control, traffic monitoring, and proxy chaining — all as a clean Python application.
 
 ```bash
-sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/SamNet-dev/MTProxyMax/main/install.sh)"
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/xoste49/MTProxyMaxPy/main/install.sh)"
 ```
 
 ---
 
-## Why MTProxyMax?
+## Why MTProxyMaxPy?
 
-Most MTProxy tools give you a proxy and a link. That's it. MTProxyMax gives you a **full management platform**:
+Most MTProxy tools give you a proxy and a link. That is it. MTProxyMaxPy gives you a **full management platform**:
 
-- 🔐 **Multi-user secrets** with individual bandwidth quotas, device limits, and expiry dates
-- 🤖 **Telegram bot** with 17 commands — manage everything from your phone
-- 🗂️ **Replication** — sync config to slave servers automatically via rsync+SSH
-- 🖥️ **Interactive TUI** — no need to memorize commands, menu-driven setup
-- 📊 **Prometheus metrics** — real per-user traffic stats, not just iptables guesses
-- 🔗 **Proxy chaining** — route through SOCKS5 upstreams for extra privacy
-- 🔄 **Auto-recovery** — detects downtime, restarts automatically, alerts you on Telegram
-- 🐳 **Pre-built Docker images** — installs in seconds, not minutes
+- **Multi-user secrets** with individual bandwidth quotas, device limits, and expiry dates
+- **Telegram bot** — manage everything from your phone
+- **Interactive TUI** — no need to memorize commands, menu-driven setup
+- **Real-time traffic stats** — real per-user data from the engine
+- **Proxy chaining** — route through SOCKS5 upstreams for extra privacy
+- **Auto-recovery** — detects downtime, restarts automatically, alerts you on Telegram
+- **Pure Python** — no Docker, no Bash, easy to extend
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### One-Line Install
 
 ```bash
-sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/SamNet-dev/MTProxyMax/main/install.sh)"
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/xoste49/MTProxyMaxPy/main/install.sh)"
 ```
 
 The interactive wizard walks you through everything: port, domain, first user secret, and optional Telegram bot setup.
@@ -63,31 +58,30 @@ The interactive wizard walks you through everything: port, domain, first user se
 ### Manual Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/SamNet-dev/MTProxyMax/main/mtproxymax.sh -o mtproxymax
-chmod +x mtproxymax
-sudo ./mtproxymax install
+curl -fsSL https://raw.githubusercontent.com/xoste49/MTProxyMaxPy/main/install.sh -o install.sh
+sudo bash install.sh
 ```
 
 ### After Install
 
 ```bash
-mtproxymax           # Open interactive TUI
-mtproxymax status    # Check proxy health
+mtproxymaxpy           # Open interactive TUI
+mtproxymaxpy status    # Check proxy health
 ```
 
 ---
 
-## ✨ Features
+## Features
 
-### 🛡️ FakeTLS V2 Obfuscation
+### FakeTLS V2 Obfuscation
 
-Your proxy traffic looks identical to normal HTTPS traffic. The **Fake TLS V2** engine mirrors real TLS 1.3 sessions — per-domain profiles, real cipher suites, dynamic certificate lengths, and realistic record fragmentation. The TLS handshake SNI points to a cover domain (e.g., `cloudflare.com`), making it indistinguishable from regular web browsing to any DPI system.
+Proxy traffic is indistinguishable from normal HTTPS. The **telemt** engine mirrors real TLS 1.3 sessions — per-domain profiles, real cipher suites, dynamic certificate lengths, and realistic record fragmentation. The SNI points to a cover domain (e.g. `cloudflare.com`), so DPI sees ordinary web browsing.
 
-**Traffic masking** goes further — when a non-Telegram client probes your server, the connection is forwarded to the real cover domain. Your server responds exactly like cloudflare.com would.
+**Traffic masking** — when a non-Telegram client probes the server, the connection is forwarded to the real cover domain and responds exactly as it would.
 
 ---
 
-### 👥 Multi-User Secret Management
+### Multi-User Secret Management
 
 Each user gets their own **secret key** with a human-readable label:
 
@@ -98,568 +92,217 @@ Each user gets their own **secret key** with a human-readable label:
 
 ---
 
-### 🔒 Per-User Access Control
+### Per-User Access Control
 
 Fine-grained limits enforced at the engine level:
 
-| Limit | Description | Example | Best For |
-|-------|-------------|---------|----------|
-| **Max Connections** | Concurrent TCP connections (~3 per device) | `15` | **Device limiting** |
-| **Max IPs** | Unique IP addresses allowed | `5` | Anti-sharing / abuse |
-| **Data Quota** | Lifetime bandwidth cap | `10G`, `500M` | Fair usage |
-| **Expiry Date** | Auto-disable after date | `2026-12-31` | Temporary access |
-
-> **Tip:** Each Telegram app opens **~3 TCP connections** (one per DC). So for device limiting, multiply by 3: `conns 15` ≈ max 5 devices. Setting below 5 will likely break even a single device. IP limits are less reliable because mobile users roam between cell towers (briefly showing 2 IPs for 1 device), and multiple devices behind the same WiFi share 1 IP. Use `ips` as a secondary anti-sharing measure.
->
-> **Traffic and quotas are lifetime (cumulative)**, not monthly. They don't auto-reset. Use `mtproxymax secret reset-traffic <label>` to manually reset counters, or rotate the secret.
+| Limit | Description | Example |
+|-------|-------------|---------|
+| **Max Connections** | Concurrent TCP connections (~3 per device) | `15` |
+| **Max IPs** | Unique IP addresses allowed | `5` |
+| **Data Quota** | Lifetime bandwidth cap | `10G` |
+| **Expiry Date** | Auto-disable after date | `2026-12-31` |
 
 ```bash
-mtproxymax secret setlimits alice 100 5 10G 2026-12-31
+mtproxymaxpy secret add alice
+mtproxymaxpy secret list
+mtproxymaxpy secret rotate alice
+mtproxymaxpy secret remove alice
 ```
 
 ---
 
-### 📋 User Management Recipes
+### Telegram Bot
 
-<details>
-<summary><b>Limit Devices Per User (Recommended)</b></summary>
+Full proxy management from your phone. Supports `/status`, `/users`, `/restart` and sends automatic alerts:
 
-```bash
-mtproxymax secret setlimit alice conns 5    # Single device (~3 conns per device, with headroom)
-mtproxymax secret setlimit family conns 15  # Family — up to 5 devices
-```
-
-Each Telegram app opens ~3 TCP connections. Setting `conns 5` allows one device with headroom. If someone shares their link, the second device will hit the limit.
-
-</details>
-
-<details>
-<summary><b>Device Limit Tiers</b></summary>
-
-| Scenario | `conns` | `ips` (optional) |
-|----------|---------|-------------------|
-| Single person, one device | `1` | `2` (allow roaming) |
-| Single person, multiple devices | `3` | `5` |
-| Small family | `5` | `10` |
-| Small group / office | `30` | `50` |
-| Public/open link | `0` | `0` (unlimited) |
-
-> Set `ips` slightly higher than `conns` to allow for mobile roaming (cell tower switches temporarily show 2 IPs for 1 device).
-
-</details>
-
-<details>
-<summary><b>Time-Limited Sharing Link</b></summary>
+- Proxy down: instant notification + auto-restart attempt
+- Proxy recovered: notification with connection details
+- Periodic traffic reports at your chosen interval
 
 ```bash
-mtproxymax secret add shared-link
-mtproxymax secret setlimits shared-link 50 30 10G 2026-06-01
+mtproxymaxpy telegram-bot          # Run bot (used by systemd)
 ```
 
-When the expiry date hits, the link stops working automatically.
-
-</details>
-
-<details>
-<summary><b>Per-Person Keys (Recommended)</b></summary>
-
-```bash
-mtproxymax secret add alice
-mtproxymax secret add bob
-mtproxymax secret add charlie
-
-# Each person gets their own link — revoke individually
-mtproxymax secret setlimit alice conns 10   # ~3 devices
-mtproxymax secret setlimit bob conns 5     # 1 device
-mtproxymax secret setlimit charlie conns 15 # ~5 devices
-```
-
-</details>
-
-<details>
-<summary><b>Disable, Rotate, Remove</b></summary>
-
-```bash
-mtproxymax secret disable bob    # Temporarily cut off
-mtproxymax secret enable bob     # Restore access
-
-mtproxymax secret rotate alice   # New key, old link dies instantly
-
-mtproxymax secret remove bob     # Permanent removal
-```
-
-</details>
+Configure via TUI (Settings screen) or edit `settings.toml` directly.
 
 ---
 
-### 🤖 Telegram Bot (17 Commands)
-
-Full proxy management from your phone. Setup takes 60 seconds:
-
-```bash
-mtproxymax telegram setup
-```
-
-| Command | Description |
-|---------|-------------|
-| `/mp_status` | Proxy status, uptime, connections |
-| `/mp_secrets` | List all users with active connections |
-| `/mp_link` | Get proxy details + QR code image |
-| `/mp_add <label>` | Add new user |
-| `/mp_remove <label>` | Delete user |
-| `/mp_rotate <label>` | Generate new key for user |
-| `/mp_enable <label>` | Re-enable disabled user |
-| `/mp_disable <label>` | Temporarily disable user |
-| `/mp_limits` | Show all user limits |
-| `/mp_setlimit` | Set user limits |
-| `/mp_traffic` | Per-user traffic breakdown |
-| `/mp_upstreams` | List proxy chains |
-| `/mp_health` | Run diagnostics |
-| `/mp_restart` | Restart proxy |
-| `/mp_update` | Check for updates |
-| `/mp_help` | Show all commands |
-
-**Automatic alerts:**
-- 🔴 Proxy down → instant notification + auto-restart attempt
-- 🟢 Proxy started → sends connection details + QR codes
-- 📊 Periodic traffic reports at your chosen interval
-
----
-
-### 🗂️ Replication (Master-Slave Config Sync)
-
-Keep multiple proxy servers in sync automatically. The master pushes config changes to all slaves via rsync+SSH on a configurable interval. Slaves receive `secrets.conf`, `upstreams.conf`, `instances.conf`, and `config.toml` — their own role settings and local state are never overwritten.
-
-**Setup takes two commands:**
-
-```bash
-# On master — run wizard, select Master, add slave
-mtproxymax replication setup
-
-# On slave — run wizard, select Slave
-mtproxymax replication setup
-```
-
-**How it works:**
-- Master generates a self-contained sync script at `/opt/mtproxymax/mtproxymax-sync.sh`
-- A systemd timer fires every N seconds (default: 60) and runs the sync
-- On change — proxy container on slave is automatically restarted
-- `settings.conf` and `replication.conf` are always excluded — slave role is never overwritten
-
-```bash
-mtproxymax replication status     # Show role, timer state, last sync
-mtproxymax replication sync       # Trigger immediate sync
-mtproxymax replication logs       # View sync log
-mtproxymax replication test       # Test SSH connectivity to all slaves
-mtproxymax replication promote    # Promote slave to master (failover)
-```
-
-**Roles:**
-
-| Role | Description |
-|------|-------------|
-| **Master** | Pushes config to slaves on schedule |
-| **Slave** | Receives config, read-only. Changes must be made on master |
-| **Standalone** | Replication disabled (default) |
-
----
-
-
----
-
-### 🔗 Proxy Chaining (Upstream Routing)
+### Proxy Chaining (Upstream Routing)
 
 Route traffic through intermediate servers:
 
 ```bash
-# Route 20% through Cloudflare WARP
-mtproxymax upstream add warp socks5 127.0.0.1:40000 - - 20
-
-# Route through a backup VPS
-mtproxymax upstream add backup socks5 203.0.113.50:1080 user pass 80
-
-# Hostnames are supported (resolved by the engine)
-mtproxymax upstream add remote socks5 my-proxy.example.com:1080 user pass 50
+mtproxymaxpy upstream add warp socks5 127.0.0.1:40000 --weight 20
+mtproxymaxpy upstream add backup socks5 203.0.113.50:1080 --user user --password pass
+mtproxymaxpy upstream list
+mtproxymaxpy upstream remove warp
 ```
 
-Supports **SOCKS5** (with auth), **SOCKS4**, and **direct** routing with weight-based load balancing. Addresses can be IPs or hostnames.
+Supports **SOCKS5** (with auth), **SOCKS4**, and **direct** routing with weight-based load balancing.
 
 ---
 
-### 📊 Real-Time Traffic Monitoring
-
-Prometheus metrics give you real per-user stats:
+### Real-Time Traffic Monitoring
 
 ```bash
-mtproxymax traffic       # Per-user breakdown
-mtproxymax status        # Overview with connections count
+mtproxymaxpy status    # Overview with connection count and uptime
 ```
 
-- Bytes uploaded/downloaded per user
-- Active connections per user
-- Cumulative tracking across restarts
+Per-user traffic data is read directly from the telemt engine stats.
 
 ---
 
-### 🌍 Geo-Blocking
+## Comparison
 
-```bash
-mtproxymax geoblock add ir    # Block Iran
-mtproxymax geoblock add cn    # Block China
-mtproxymax geoblock list      # See blocked countries
-```
-
-IP-level CIDR blocklists enforced via iptables — traffic is dropped before reaching the proxy.
-
----
-
-### 💰 Ad-Tag Monetization
-
-```bash
-mtproxymax adtag set <hex_from_MTProxyBot>
-```
-
-Get your ad-tag from [@MTProxyBot](https://t.me/MTProxyBot). Users see a pinned channel — you earn from the proxy.
+| Feature | **MTProxyMaxPy** | **mtg v2** (Go) | **Official MTProxy** (C) |
+|---------|:-:|:-:|:-:|
+| Engine | telemt 3.x (Rust) | mtg (Go) | MTProxy (C) |
+| FakeTLS | Yes | Yes | No |
+| Traffic Masking | Yes | Yes | No |
+| Multi-User Secrets | Yes (unlimited) | No (1 secret) | Multi-secret |
+| Per-User Limits | Yes (conns, IPs, quota, expiry) | No | No |
+| Per-User Traffic Stats | Yes | No | No |
+| Telegram Bot | Yes | No | No |
+| Interactive TUI | Yes | No | No |
+| Proxy Chaining | Yes (SOCKS5/4, weighted) | Yes (SOCKS5) | No |
+| QR Code Generation | Yes | No | No |
+| Auto-Recovery | Yes (with alerts) | No | No |
+| Auto-Update | Yes | No | No |
+| Active Development | Yes | Yes | Abandoned |
 
 ---
 
-### ⚙️ Engine Management
-
-```bash
-mtproxymax engine status              # Current engine version
-mtproxymax engine rebuild             # Force rebuild engine image
-mtproxymax rebuild                    # Force rebuild from source
-```
-
-Engine updates are delivered through `mtproxymax update`. Pre-built multi-arch Docker images (amd64 + arm64) are pulled automatically. Source compilation is the automatic fallback.
-
----
-
-## 📊 Comparison
-
-### MTProxyMax vs Other Solutions
-
-| Feature | **MTProxyMax** | **mtg v2** (Go) | **Official MTProxy** (C) | **Bash Installers** |
-|---------|:-:|:-:|:-:|:-:|
-| **Engine** | telemt 3.x (Rust) | mtg (Go) | MTProxy (C) | Various |
-| **FakeTLS** | ✅ | ✅ | ❌ (needs patches) | Varies |
-| **Traffic Masking** | ✅ | ✅ | ❌ | ❌ |
-| **Multi-User Secrets** | ✅ (unlimited) | ❌ (1 secret) | Multi-secret | Usually 1 |
-| **Per-User Limits** | ✅ (conns, IPs, quota, expiry) | ❌ | ❌ | ❌ |
-| **Per-User Traffic Stats** | ✅ (Prometheus) | ❌ | ❌ | ❌ |
-| **Telegram Bot** | ✅ (17 commands) | ❌ | ❌ | ❌ |
-| **Interactive TUI** | ✅ | ❌ | ❌ | ❌ |
-| **Proxy Chaining** | ✅ (SOCKS5/4, weighted) | ✅ (SOCKS5) | ❌ | ❌ |
-| **Master-Slave Replication** | ✅ (rsync+SSH, systemd) | ❌ | ❌ | ❌ |
-| **Geo-Blocking** | ✅ | IP allowlist/blocklist | ❌ | ❌ |
-| **Ad-Tag Support** | ✅ | ❌ (removed in v2) | ✅ | Varies |
-| **QR Code Generation** | ✅ | ❌ | ❌ | Some |
-| **Auto-Recovery** | ✅ (with alerts) | ❌ | ❌ | ❌ |
-| **Auto-Update** | ✅ | ❌ | ❌ | ❌ |
-| **Docker** | ✅ (multi-arch) | ✅ | ❌ | Varies |
-| **User Expiry Dates** | ✅ | ❌ | ❌ | ❌ |
-| **Bandwidth Quotas** | ✅ | ❌ | ❌ | ❌ |
-| **Device Limits** | ✅ | ❌ | ❌ | ❌ |
-| **Active Development** | ✅ | ✅ | Abandoned | Varies |
-
-<details>
-<summary><b>Why Not mtg?</b></summary>
-
-[mtg](https://github.com/9seconds/mtg) is solid and minimal — by design. It's **"highly opinionated"** and intentionally barebones. Fine for a single-user fire-and-forget proxy.
-
-But mtg v2 dropped ad-tag support, only supports one secret, has no user limits, no management interface, and no auto-recovery.
-
-</details>
-
-<details>
-<summary><b>Why Not the Official MTProxy?</b></summary>
-
-[Telegram's official MTProxy](https://github.com/TelegramMessenger/MTProxy) (C implementation) was **last updated in 2019**. No FakeTLS, no traffic masking, no per-user controls, manual compilation, no Docker.
-
-</details>
-
-<details>
-<summary><b>Why Not a Simple Bash Installer?</b></summary>
-
-Scripts like MTProtoProxyInstaller install a proxy and give you a link. That's it. No user management, no monitoring, no bot, no updates, no recovery.
-
-MTProxyMax is not just an installer — it's a **management platform** that happens to install itself.
-
-</details>
-
----
-
-## 🏗️ Architecture
+## Architecture
 
 ```
 Telegram Client
-      │
-      ▼
-┌─────────────────────────┐
-│  Your Server (port 443) │
-│  ┌───────────────────┐  │
-│  │  Docker Container  │  │
-│  │  ┌─────────────┐  │  │
-│  │  │   telemt     │  │  │  ← Rust/Tokio engine
-│  │  │  (FakeTLS)   │  │  │
-│  │  └──────┬──────┘  │  │
-│  └─────────┼─────────┘  │
-│            │             │
-│     ┌──────┴──────┐     │
-│     ▼             ▼     │
-│  Direct      SOCKS5     │  ← Upstream routing
-│  routing     chaining   │
-└─────────┬───────────────┘
-          │
-          ▼
+      |
+      v
++-------------------------+
+|  Your Server (port 443) |
+|  +-------------------+  |
+|  |  telemt binary    |  |  <- Rust/Tokio engine (native)
+|  |  (FakeTLS v2)     |  |
+|  +------+------------+  |
+|         |               |
+|  +------+------+        |
+|  v             v        |
+|  Direct    SOCKS5       |  <- Upstream routing
++-------------------------+
+          |
+          v
    Telegram Servers
-
-
-Master-Slave Replication (optional):
-
-  Master Server              Slave Server(s)
-  ┌──────────────┐           ┌──────────────┐
-  │ mtproxymax   │──rsync──▶ │ mtproxymax   │
-  │ (systemd     │   +SSH    │ (receives    │
-  │  timer 60s)  │           │  config)     │
-  └──────────────┘           └──────────────┘
 ```
 
 | Component | Role |
 |-----------|------|
-| **mtproxymax.sh** | Single bash script: CLI, TUI, config manager |
-| **telemt** | Rust MTProto engine running inside Docker |
-| **Telegram bot service** | Independent systemd service polling Bot API |
-| **Replication sync service** | systemd timer pushing config to slave servers |
-| **Prometheus endpoint** | `/metrics` on port 9090 (localhost only) |
+| **mtproxymaxpy** | Python CLI + TUI: config manager, process supervisor |
+| **telemt** | Native Rust binary — MTProto engine |
+| **Telegram bot service** | Independent systemd service (`mtproxymaxpy-telegram`) |
+| **settings.toml** | Proxy configuration (Pydantic-validated TOML) |
+| **secrets.json** | User secrets with per-user limits |
 
 ---
 
-## 📖 CLI Reference
+## CLI Reference
 
-<details>
-<summary><b>Proxy Management</b></summary>
-
-```bash
-mtproxymax install              # Run installation wizard
-mtproxymax uninstall            # Remove everything
-mtproxymax start                # Start proxy
-mtproxymax stop                 # Stop proxy
-mtproxymax restart              # Restart proxy
-mtproxymax status               # Show proxy status
-mtproxymax menu                 # Open interactive TUI
-```
-
-</details>
-
-<details>
-<summary><b>User Secrets</b></summary>
+### Proxy Management
 
 ```bash
-mtproxymax secret add <label>           # Add user
-mtproxymax secret remove <label>        # Remove user
-mtproxymax secret list                  # List all users
-mtproxymax secret rotate <label>        # New key, same label
-mtproxymax secret enable <label>        # Re-enable user
-mtproxymax secret disable <label>       # Temporarily disable
-mtproxymax secret link [label]          # Show proxy link
-mtproxymax secret qr [label]            # Show QR code
-mtproxymax secret setlimit <label> <type> <value>  # Set individual limit
-mtproxymax secret setlimits <label> <conns> <ips> <quota> [expires]  # Set all limits
-mtproxymax secret reset-traffic <label|all>  # Reset traffic counters
+mtproxymaxpy install              # Download telemt binary and run setup wizard
+mtproxymaxpy start                # Start proxy
+mtproxymaxpy stop                 # Stop proxy
+mtproxymaxpy restart              # Restart proxy
+mtproxymaxpy status               # Show proxy status
+mtproxymaxpy update               # Download latest telemt binary and restart
+mtproxymaxpy version              # Print version
 ```
 
-</details>
-
-<details>
-<summary><b>Configuration</b></summary>
+### User Secrets
 
 ```bash
-mtproxymax port [get|<number>]          # Get/set proxy port
-mtproxymax ip [get|auto|<address>]      # Get/set custom IP for proxy links
-mtproxymax domain [get|clear|<host>]    # Get/set FakeTLS domain
-mtproxymax adtag set <hex>              # Set ad-tag
-mtproxymax adtag remove                 # Remove ad-tag
+mtproxymaxpy secret add <label>           # Add user
+mtproxymaxpy secret remove <label>        # Remove user
+mtproxymaxpy secret list                  # List all users
+mtproxymaxpy secret rotate <label>        # New key, same label
 ```
 
-</details>
-
-
-<details>
-<summary><b>Replication</b></summary>
+### Upstream Routing
 
 ```bash
-mtproxymax replication setup            # Interactive wizard (master/slave/standalone)
-mtproxymax replication status           # Role, timer state, last sync, slave list
-mtproxymax replication add <host> [port] [label]   # Register a slave server
-mtproxymax replication remove <host_or_label>      # Remove a slave
-mtproxymax replication list             # List all slaves
-mtproxymax replication enable           # Enable sync timer
-mtproxymax replication disable          # Disable sync timer
-mtproxymax replication sync             # Trigger immediate sync
-mtproxymax replication test [host]      # Test SSH connectivity to slave(s)
-mtproxymax replication logs             # Show sync log
-mtproxymax replication reset            # Remove all replication config
-mtproxymax replication promote          # Promote slave to master (failover)
+mtproxymaxpy upstream add <name> <type> <host:port> [--user U] [--password P] [--weight W]
+mtproxymaxpy upstream list
+mtproxymaxpy upstream remove <name>
 ```
 
-</details>
-
-<details>
-<summary><b>Security & Routing</b></summary>
+### Telegram Bot
 
 ```bash
-mtproxymax geoblock add <CC>            # Block country
-mtproxymax geoblock remove <CC>         # Unblock country
-mtproxymax geoblock list                # List blocked countries
-mtproxymax upstream list                # List upstreams
-mtproxymax upstream add <name> <type> <host:port> [user] [pass] [weight]
-mtproxymax upstream remove <name>       # Remove upstream
-mtproxymax upstream test <name>         # Test connectivity
-mtproxymax sni-policy [mask|drop]      # Unknown SNI action (mask=permissive, drop=strict)
+mtproxymaxpy telegram-bot         # Run bot process (blocking, for systemd)
 ```
 
-</details>
-
-<details>
-<summary><b>Monitoring</b></summary>
-
-```bash
-mtproxymax traffic                      # Per-user traffic breakdown
-mtproxymax metrics                      # Engine metrics dashboard
-mtproxymax metrics live [seconds]       # Auto-refresh metrics (default: 5s)
-mtproxymax logs                         # Stream live logs
-mtproxymax health                       # Run diagnostics
-```
-
-</details>
-
-<details>
-<summary><b>Engine & Updates</b></summary>
-
-```bash
-mtproxymax engine status                # Show current engine version
-mtproxymax engine rebuild               # Force rebuild engine image
-mtproxymax rebuild                      # Force rebuild from source
-mtproxymax update                       # Check for script + engine updates
-```
-
-</details>
-
-<details>
-<summary><b>Telegram Bot</b></summary>
-
-```bash
-mtproxymax telegram setup               # Interactive bot setup
-mtproxymax telegram status              # Show bot status
-mtproxymax telegram test                # Send test message
-mtproxymax telegram disable             # Disable bot
-mtproxymax telegram remove              # Remove bot completely
-```
-
-</details>
+Bot token and chat ID are configured via TUI (Settings screen) or directly in `settings.toml`.
 
 ---
 
-## 💻 System Requirements
+## System Requirements
 
 | Requirement | Details |
 |-------------|---------|
-| **OS** | Ubuntu, Debian, CentOS, RHEL, Fedora, Rocky, AlmaLinux, Alpine |
-| **Docker** | Auto-installed if not present |
-| **RAM** | 256MB minimum |
+| **OS** | Ubuntu, Debian, CentOS, RHEL, Fedora, Rocky, AlmaLinux |
+| **Python** | 3.13+ |
+| **uv** | Auto-installed by `install.sh` |
+| **RAM** | 256 MB minimum |
 | **Access** | Root required |
-| **Bash** | 4.2+ |
 
 ---
 
-## 📁 Configuration Files
+## Configuration Files
+
+All files are stored under `/opt/mtproxymaxpy/` with mode `600`.
 
 | File | Purpose |
 |------|---------|
-| `/opt/mtproxymax/settings.conf` | Proxy settings (port, domain, limits) |
-| `/opt/mtproxymax/secrets.conf` | User keys, limits, expiry dates |
-| `/opt/mtproxymax/upstreams.conf` | Upstream routing rules |
-| `/opt/mtproxymax/mtproxy/config.toml` | Generated telemt engine config |
+| `settings.toml` | Proxy settings (port, domain, Telegram bot, etc.) |
+| `secrets.json` | User keys, limits, expiry dates |
+| `upstreams.json` | Upstream routing rules |
+| `instances.json` | Multi-port instance definitions |
+| `mtproxy/config.toml` | Auto-generated telemt engine config |
+
+### Legacy Config Migration
+
+If you were running the bash version of MTProxyMax, the first launch automatically detects `settings.conf`, `secrets.conf`, `upstreams.conf`, and `instances.conf` in `/opt/mtproxymaxpy/` and offers an interactive migration wizard to import them.
 
 ---
 
-## 📋 Changelog
+## Changelog
 
-### v1.0.5 — Clone, Bulk-Extend, Doctor, Stats & More
+### v1.0.0 — Python Rewrite
 
-- `secret clone <src> <new>` — duplicate a secret with all its limits
-- `secret bulk-extend <days>` — extend all secrets' expiry at once
-- `secret extend <label> <days>` — extend a single secret's expiry
-- `secret rename`, `secret export/import`, `secret disable-expired`, `secret sort`, `secret stats`
-- `connections` — live active connections per user
-- `doctor` — comprehensive diagnostics (port, TLS, secrets, disk, Telegram bot)
-- Auto-rotate secrets on domain change, startup warnings for expired/near-expiry secrets
-- QR code shown inline after `secret add` (if qrencode installed)
-- Fedora 41+ Docker install fix (dnf5 `--addrepo`, Fedora repo URL)
+Complete rewrite from Bash to Python 3.13:
 
-### v1.0.4 — Replication, Engine v3.3.39, Metrics Dashboard
-
-- Replication — master/slave sync via rsync+SSH with wizard, promote, and role guards
-- Engine v3.3.39 — Apple/XNU fixes, ME rewrite, conntrack control, TLS fronting fix, memory hard-bounds, bounded retries
-- Engine metrics dashboard — `mtproxymax metrics` / `mtproxymax metrics live`
-- Unknown SNI policy — configurable `mask` or `drop` ([#40](https://github.com/SamNet-dev/MTProxyMax/issues/40))
-- Reset traffic counters — `mtproxymax secret reset-traffic <label|all>`
-- Alpine fixes — broken pipe, double-input, SNI rejection ([#37](https://github.com/SamNet-dev/MTProxyMax/issues/37), [#38](https://github.com/SamNet-dev/MTProxyMax/issues/38))
-
-### v1.0.3 — Quota Enforcement, Multi-Port, Hot-Reload
-
-- Secret notes, expiry warnings, quota auto-disable at 100%
-- JSON status, connection log, backup & restore
-- Multi-port instances, hot-reload for secrets
-- Whitelist geo-blocking ([#29](https://github.com/SamNet-dev/MTProxyMax/issues/29))
-
-### v1.0.2 — Persistent Traffic
-
-- Traffic counters survive restarts, saved every 60s ([#13](https://github.com/SamNet-dev/MTProxyMax/issues/13))
-- Atomic writes with flock, pre-stop flush, batched stats loading
-
-### v1.0.1 — Batch Secrets
-
-- `secret add-batch` / `secret remove-batch` ([#12](https://github.com/SamNet-dev/MTProxyMax/issues/12))
-
-### v1.0.0 — Initial Release
-
-- telemt 3.x Rust engine, TUI + CLI, multi-user secrets, FakeTLS, Telegram bot, proxy chaining, geo-blocking
+- Replaced Bash + Docker stack with a native Python application managed by uv
+- **Textual TUI** — fully interactive menu-driven interface
+- **Pydantic models** — all config validated at load time, stored as TOML + JSON
+- **Native telemt binary** — no Docker required; binary downloaded from GitHub releases
+- **pyTelegramBotAPI** — Telegram bot with `/status`, `/users`, `/restart` and health monitoring
+- **Typer CLI** — `install`, `start`, `stop`, `restart`, `status`, `update`, `secret`, `upstream`
+- **Legacy migration** — auto-detects old bash configs on first run and offers import
+- Removed: replication (master-slave sync), Docker, iptables geo-blocking
 
 ---
 
-## 🙏 Credits
+## Credits
 
-Built on top of **telemt** — a high-performance MTProto proxy engine written in Rust/Tokio. All proxy protocol handling, FakeTLS, traffic masking, and per-user enforcement is powered by telemt.
-
----
-
-## 📖 Documentation & Guides
-
-For step-by-step tutorials with screenshots and detailed explanations, visit our guides on SamNet:
-
-- **[Complete MTProto Proxy Setup Guide](https://www.samnet.dev/learn/networking/mtproto-proxy-telegram/)** — Full walkthrough: install, multi-user management, FakeTLS, Telegram bot, proxy chaining, geo-blocking, replication, and ad-tag monetization.
-- **[3X-UI Panel Setup Guide](https://www.samnet.dev/learn/networking/xui-setup/)** — If you need VLESS/VMess/Reality/Trojan protocols alongside MTProto.
-- **[Server Hardening Guide](https://www.samnet.dev/learn/security/server-hardening/)** — Secure your proxy server: SSH hardening, firewall rules, fail2ban.
-- **[iptables Cheat Sheet](https://www.samnet.dev/learn/cheatsheets/iptables-guide/)** — Firewall rules reference for protecting your proxy.
-- **[VPN Leak Test](https://www.samnet.dev/tools/vpn-leak-test/)** — Verify your proxy is hiding your real IP.
-- **[Port Scanner](https://www.samnet.dev/tools/port-scanner/)** — Check if your proxy port is accessible from the internet.
+Built on top of **[telemt](https://github.com/telemt/telemt)** — a high-performance MTProto proxy engine written in Rust/Tokio. All proxy protocol handling, FakeTLS, traffic masking, and per-user enforcement is powered by telemt.
 
 ---
 
-## 💖 Donate
-
-If you find MTProxyMax useful, consider supporting its development:
-
-[**samnet.dev/donate**](https://www.samnet.dev/donate/)
-
----
-
-## 📄 License
+## License
 
 MIT License — see [LICENSE](LICENSE) for details.
 
-The **telemt engine** (included as a Docker image) is licensed under the [Telemt Public License 3 (TPL-3)](https://github.com/telemt/telemt/blob/main/LICENSE) — a permissive license that allows use, redistribution, and modification with attribution.
+The **telemt engine** binary is licensed under the [Telemt Public License 3 (TPL-3)](https://github.com/telemt/telemt/blob/main/LICENSE).
 
-Copyright (c) 2026 SamNet Technologies
+Copyright (c) 2026 xoste49
