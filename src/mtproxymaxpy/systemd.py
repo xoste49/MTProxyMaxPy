@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 import subprocess
 import sys
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 from mtproxymaxpy.constants import (
     BINARY_PATH,
@@ -85,11 +88,17 @@ def install(*, telegram: bool = False) -> None:
 
     _systemctl("daemon-reload")
     _systemctl("enable", SYSTEMD_SERVICE)
-    _systemctl("start", SYSTEMD_SERVICE)
+    try:
+        _systemctl("start", SYSTEMD_SERVICE)
+    except RuntimeError as exc:
+        logger.warning("Could not start %s: %s", SYSTEMD_SERVICE, exc)
 
     if telegram:
         _systemctl("enable", SYSTEMD_TELEGRAM_SERVICE)
-        _systemctl("start", SYSTEMD_TELEGRAM_SERVICE)
+        try:
+            _systemctl("start", SYSTEMD_TELEGRAM_SERVICE)
+        except RuntimeError as exc:
+            logger.warning("Could not start %s: %s", SYSTEMD_TELEGRAM_SERVICE, exc)
 
 
 def uninstall(*, telegram: bool = True) -> None:
@@ -105,7 +114,15 @@ def uninstall(*, telegram: bool = True) -> None:
 # ── Service control ────────────────────────────────────────────────────────────
 
 def _systemctl(*args: str, check: bool = True) -> subprocess.CompletedProcess:
-    return subprocess.run(["systemctl"] + list(args), check=check, capture_output=True)
+    try:
+        return subprocess.run(["systemctl"] + list(args), check=check, capture_output=True)
+    except FileNotFoundError:
+        raise RuntimeError("systemctl not found — systemd is not available on this system")
+    except subprocess.CalledProcessError as exc:
+        stderr = (exc.stderr or b"").decode(errors="replace").strip()
+        raise RuntimeError(
+            f"systemctl {' '.join(args)} failed (exit {exc.returncode}): {stderr}"
+        ) from exc
 
 
 def start_service(name: str = SYSTEMD_SERVICE) -> None:
