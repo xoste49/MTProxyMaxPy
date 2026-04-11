@@ -52,7 +52,7 @@ def install(
         except RuntimeError as exc:
             typer.echo(f"[!] systemd not available: {exc}", err=True)
 
-    typer.echo("[+] Installation complete. run 'mtproxymaxpyPy status' to verify.")
+    typer.echo("[+] Installation complete. Run 'mtproxymaxpy status' to verify.")
 
 
 # ── start / stop / restart ─────────────────────────────────────────────────────

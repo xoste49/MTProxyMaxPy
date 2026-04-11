@@ -31,9 +31,9 @@ Wants=network-online.target
 [Service]
 Type=forking
 PIDFile={INSTALL_DIR}/telemt.pid
-ExecStart={python_exe} -m MTProxyMaxPy start --no-tui
-ExecStop={python_exe} -m MTProxyMaxPy stop --no-tui
-ExecReload={python_exe} -m MTProxyMaxPy restart --no-tui
+ExecStart={python_exe} -m mtproxymaxpy start --no-tui
+ExecStop={python_exe} -m mtproxymaxpy stop --no-tui
+ExecReload={python_exe} -m mtproxymaxpy restart --no-tui
 Restart=on-failure
 RestartSec=10
 WorkingDirectory={INSTALL_DIR}
@@ -54,7 +54,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart={python_exe} -m MTProxyMaxPy telegram-bot --no-tui
+ExecStart={python_exe} -m mtproxymaxpy telegram-bot --no-tui
 Restart=on-failure
 RestartSec=30
 WorkingDirectory={INSTALL_DIR}

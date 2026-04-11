@@ -5,7 +5,6 @@ set -e
 
 REPO_URL="https://github.com/xoste49/MTProxyMaxPy.git"
 INSTALL_DIR="/opt/mtproxymaxpy"
-UV_BIN="$(command -v uv 2>/dev/null || true)"
 
 if [ "$(id -u)" -ne 0 ]; then
   echo "Error: run as root." >&2
@@ -13,11 +12,19 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 # ── Install uv if not present ────────────────────────────────────────────────
+# Check both PATH and the default install location
+UV_BIN="$(command -v uv 2>/dev/null || echo "")"
+if [ -z "$UV_BIN" ] && [ -x "$HOME/.local/bin/uv" ]; then
+  UV_BIN="$HOME/.local/bin/uv"
+fi
+
 if [ -z "$UV_BIN" ]; then
   echo "[*] Installing uv..."
   curl -LsSf https://astral.sh/uv/install.sh | sh
   export PATH="$HOME/.local/bin:$PATH"
   UV_BIN="$(command -v uv)"
+else
+  echo "[*] uv already installed: $($UV_BIN --version)"
 fi
 
 # ── Download / update the project ─────────────────────────────────────────────
@@ -34,8 +41,15 @@ echo "[*] Installing Python dependencies..."
 cd "$INSTALL_DIR"
 "$UV_BIN" sync --no-dev
 
+# ── Create global command symlink ─────────────────────────────────────────────
+VENV_BIN="$INSTALL_DIR/.venv/bin/mtproxymaxpy"
+if [ -f "$VENV_BIN" ]; then
+  ln -sf "$VENV_BIN" /usr/local/bin/mtproxymaxpy
+  echo "[+] Command 'mtproxymaxpy' linked to /usr/local/bin/mtproxymaxpy"
+fi
+
 # ── Run the installer wizard ───────────────────────────────────────────────────
 echo "[*] Running installer..."
 "$UV_BIN" run mtproxymaxpy install
 
-echo "[+] Done. Run 'mtproxymaxpy' to open the TUI."
+echo "[+] Done. Run 'mtproxymaxpy status' to check service status."
