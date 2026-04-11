@@ -38,6 +38,14 @@ LEGACY_BASH_SECRETS_FILE = LEGACY_BASH_DIR / "secrets.conf"
 LEGACY_BASH_UPSTREAMS_FILE = LEGACY_BASH_DIR / "upstreams.conf"
 LEGACY_BASH_INSTANCES_FILE = LEGACY_BASH_DIR / "instances.conf"
 
+# ── Self-update ────────────────────────────────────────────────────────────────
+GITHUB_REPO = "xoste49/MTProxyMaxPy"
+GITHUB_API_COMMITS = (
+    "https://api.github.com/repos/xoste49/MTProxyMaxPy/commits/main"
+)
+UPDATE_SHA_FILE = INSTALL_DIR / ".update_sha"
+UPDATE_BADGE_FILE = Path("/tmp/.mtproxymaxpy_update_available")
+
 # ── Telemt binary ──────────────────────────────────────────────────────────────
 BINARY_DIR = INSTALL_DIR / "bin"
 BINARY_NAME = "telemt"

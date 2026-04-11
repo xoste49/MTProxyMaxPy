@@ -64,6 +64,14 @@ def _header_panel() -> Panel:
     for p in parts:
         combined.append_text(p)
 
+    # Update badge
+    try:
+        from mtproxymaxpy.constants import UPDATE_BADGE_FILE
+        if UPDATE_BADGE_FILE.exists():
+            combined.append("  ⬆ Update available — select [9]", style="bold yellow")
+    except Exception:
+        pass
+
     title = f"[bold cyan]{APP_TITLE} v{VERSION}[/bold cyan]  [dim]Telegram MTProto Proxy Manager[/dim]"
     return Panel(combined, title=title, border_style="cyan", padding=(0, 2))
 
@@ -91,11 +99,46 @@ def _ask_choice(max_n: int, allow_zero: bool = True) -> int:
         console.print("  [red]Invalid choice[/red]")
 
 
+# ── Background update checker ─────────────────────────────────────────────────
+
+def _check_update_bg() -> None:
+    """Fire a background thread to compare GitHub HEAD SHA with stored baseline."""
+    import threading
+
+    def _worker() -> None:
+        try:
+            import httpx
+            from mtproxymaxpy.constants import GITHUB_API_COMMITS, UPDATE_BADGE_FILE, UPDATE_SHA_FILE
+            resp = httpx.get(
+                GITHUB_API_COMMITS,
+                headers={"Accept": "application/vnd.github.sha"},
+                timeout=10,
+                follow_redirects=True,
+            )
+            sha = resp.text.strip()[:40]
+            if len(sha) != 40 or not all(c in "0123456789abcdef" for c in sha):
+                return
+            stored = UPDATE_SHA_FILE.read_text().strip() if UPDATE_SHA_FILE.exists() else ""
+            if not stored:
+                UPDATE_SHA_FILE.write_text(sha)
+                UPDATE_BADGE_FILE.unlink(missing_ok=True)
+            elif sha != stored:
+                UPDATE_BADGE_FILE.write_text("new")
+            else:
+                UPDATE_BADGE_FILE.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+    threading.Thread(target=_worker, daemon=True).start()
+
+
 # ── Main Menu ──────────────────────────────────────────────────────────────────
 
 def run_tui() -> None:
     """Entry point: run the interactive menu (blocking)."""
     from mtproxymaxpy.constants import SETTINGS_FILE
+
+    _check_update_bg()
 
     if not SETTINGS_FILE.exists():
         # Check for legacy bash config first
@@ -133,6 +176,12 @@ def run_tui() -> None:
             n_secrets = n_upstreams = n_geo = 0
             tg_hint = cfg_hint = ""
 
+        try:
+            from mtproxymaxpy.constants import UPDATE_BADGE_FILE
+            update_hint = "[yellow]⬆ available![/yellow]" if UPDATE_BADGE_FILE.exists() else ""
+        except Exception:
+            update_hint = ""
+
         console.print(
             _choice(1, "Proxy Management"),
             _choice(2, "Secrets Management", f"{n_secrets} user(s)"),
@@ -142,8 +191,7 @@ def run_tui() -> None:
             _choice(6, "Security / Geo-blocking", f"{n_geo} country/ies"),
             _choice(7, "Backup & Restore"),
             _choice(8, "Telegram Bot", tg_hint),
-            _choice(9, "Update"),
-            _choice(0, "[red]Exit[/red]"),
+            _choice(9, "Update", update_hint),
             sep="\n",
         )
         choice = _ask_choice(9)
@@ -945,39 +993,86 @@ def _telegram_test() -> None:
 
 # ── Update screen ──────────────────────────────────────────────────────────────
 
-def _update_screen() -> None:
+def _update_screen() -> None:  # noqa: C901
     _clear()
     console.print(_header_panel())
     console.print(Rule("[cyan]Update[/cyan]"))
+
+    # ── 1. Self-update (MTProxyMaxPy package) ─────────────────────────────
+    console.print("\n  [bold]1. MTProxyMaxPy manager[/bold]")
+    self_updated = False
+    try:
+        import hashlib
+        import subprocess
+        import httpx
+        from mtproxymaxpy.constants import (
+            GITHUB_REPO, GITHUB_API_COMMITS, INSTALL_DIR,
+            UPDATE_SHA_FILE, UPDATE_BADGE_FILE, VERSION,
+        )
+
+        console.print("  Checking GitHub for manager updates…")
+        resp = httpx.get(
+            GITHUB_API_COMMITS,
+            headers={"Accept": "application/vnd.github.sha"},
+            timeout=15,
+            follow_redirects=True,
+        )
+        remote_sha = resp.text.strip()[:40]
+        stored = UPDATE_SHA_FILE.read_text().strip() if UPDATE_SHA_FILE.exists() else ""
+
+        if not stored or remote_sha == stored:
+            console.print("  [green]✓ Already up to date[/green]")
+        else:
+            console.print(f"  [yellow]⬆ New commits available on main[/yellow]")
+            console.print(f"  Stored SHA : [dim]{stored[:12]}…[/dim]")
+            console.print(f"  Remote SHA : [dim]{remote_sha[:12]}…[/dim]")
+            if Confirm.ask("  Update MTProxyMaxPy now?", console=console):
+                console.print("  Installing from GitHub…")
+                result = subprocess.run(
+                    ["pip", "install", "--upgrade",
+                     f"git+https://github.com/{GITHUB_REPO}.git@main"],
+                    capture_output=True, text=True,
+                )
+                if result.returncode == 0:
+                    UPDATE_SHA_FILE.write_text(remote_sha)
+                    UPDATE_BADGE_FILE.unlink(missing_ok=True)
+                    console.print("[green][+] Manager updated successfully.[/green]")
+                    console.print("[yellow]  Restart mtproxymaxpy to apply changes.[/yellow]")
+                    self_updated = True
+                else:
+                    console.print(f"[red][!] pip failed:\n{result.stderr.strip()}[/red]")
+    except Exception as exc:
+        console.print(f"  [red]Error checking manager update: {exc}[/red]")
+
+    # ── 2. Engine update (telemt binary) ─────────────────────────────────
+    console.print("\n  [bold]2. telemt engine[/bold]")
     try:
         from mtproxymaxpy import process_manager
         from mtproxymaxpy.constants import TELEMT_VERSION
 
-        console.print(f"  Current telemt version: [bold]{TELEMT_VERSION}[/bold]")
-        console.print("  Checking latest release on GitHub…")
+        console.print(f"  Current: [bold]{TELEMT_VERSION}[/bold]  Checking latest…")
         latest = process_manager.get_latest_version()
-        console.print(f"  Latest available:       [bold]{latest}[/bold]")
+        console.print(f"  Latest:  [bold]{latest}[/bold]")
 
         if latest == TELEMT_VERSION:
-            console.print("[green]  ✓ Already up to date[/green]")
-            _pause()
-            return
-
-        console.print(f"\n  [yellow]Update available: {TELEMT_VERSION} → {latest}[/yellow]")
-        if Confirm.ask("  Download and install update?", console=console):
-            was_running = process_manager.is_running()
-            if was_running:
-                process_manager.stop()
-            console.print(f"  Downloading telemt {latest}…")
-            process_manager.download_binary(version=latest, force=True)
-            console.print("[green][+] Binary updated[/green]")
-            if was_running:
-                from mtproxymaxpy.utils.network import get_public_ip
-                ip = get_public_ip() or ""
-                pid = process_manager.start(public_ip=ip)
-                console.print(f"[green][+] Proxy restarted (PID {pid})[/green]")
+            console.print("  [green]✓ Engine up to date[/green]")
+        else:
+            console.print(f"  [yellow]⬆ Engine update: {TELEMT_VERSION} → {latest}[/yellow]")
+            if Confirm.ask("  Download and install engine update?", console=console):
+                was_running = process_manager.is_running()
+                if was_running:
+                    process_manager.stop()
+                console.print(f"  Downloading telemt {latest}…")
+                process_manager.download_binary(version=latest, force=True)
+                console.print("[green][+] Engine updated[/green]")
+                if was_running:
+                    from mtproxymaxpy.utils.network import get_public_ip
+                    ip = get_public_ip() or ""
+                    pid = process_manager.start(public_ip=ip)
+                    console.print(f"[green][+] Proxy restarted (PID {pid})[/green]")
     except Exception as exc:
-        console.print(f"[red]Error: {exc}[/red]")
+        console.print(f"  [red]Error checking engine update: {exc}[/red]")
+
     _pause()
 
 
