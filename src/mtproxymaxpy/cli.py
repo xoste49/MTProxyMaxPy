@@ -36,9 +36,23 @@ def install(
     check_dependencies()
     typer.echo(f"[*] MTProxyMaxPy {VERSION} — installer")
 
-    settings = Settings(proxy_port=port, proxy_domain=domain)
-    save_settings(settings)
-    typer.echo("[+] Settings saved.")
+    # If legacy bash config exists, migrate it instead of using defaults
+    from mtproxymaxpy.constants import SETTINGS_FILE
+    from mtproxymaxpy.config.migration import detect_legacy, run_migration
+
+    legacy = detect_legacy()
+    if legacy and not SETTINGS_FILE.exists():
+        typer.echo(f"[*] Legacy MTProxyMax config detected: {', '.join(legacy)}")
+        typer.echo("[*] Migrating settings, secrets and upstreams…")
+        result = run_migration(legacy)
+        typer.echo(f"[+] Migration complete: "
+                   f"{result.secrets_count} secret(s), "
+                   f"{result.upstreams_count} upstream(s).")
+        settings = load_settings()
+    else:
+        settings = Settings(proxy_port=port, proxy_domain=domain)
+        save_settings(settings)
+        typer.echo("[+] Settings saved.")
 
     typer.echo("[*] Downloading telemt binary…")
     process_manager.download_binary()

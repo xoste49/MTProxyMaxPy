@@ -25,6 +25,10 @@ from mtproxymaxpy.constants import (
     LEGACY_SECRETS_FILE,
     LEGACY_SETTINGS_FILE,
     LEGACY_UPSTREAMS_FILE,
+    LEGACY_BASH_SETTINGS_FILE,
+    LEGACY_BASH_SECRETS_FILE,
+    LEGACY_BASH_UPSTREAMS_FILE,
+    LEGACY_BASH_INSTANCES_FILE,
     SETTINGS_FILE,
     SECRETS_FILE,
     UPSTREAMS_FILE,
@@ -222,14 +226,22 @@ def detect_legacy(install_dir: Path = INSTALL_DIR) -> dict[str, Path]:
 
     Keys are one of: 'settings', 'secrets', 'upstreams', 'instances'.
     Values are the resolved Path objects.
+    Checks both /opt/mtproxymaxpy/ (same-dir copy) and /opt/mtproxymax/ (original bash dir).
     """
-    candidates = {
-        "settings": LEGACY_SETTINGS_FILE,
-        "secrets": LEGACY_SECRETS_FILE,
-        "upstreams": LEGACY_UPSTREAMS_FILE,
-        "instances": LEGACY_INSTANCES_FILE,
+    # For each key, prefer the copy-in-place path, fall back to the original bash dir
+    candidates: dict[str, list[Path]] = {
+        "settings": [LEGACY_SETTINGS_FILE, LEGACY_BASH_SETTINGS_FILE],
+        "secrets":  [LEGACY_SECRETS_FILE,  LEGACY_BASH_SECRETS_FILE],
+        "upstreams": [LEGACY_UPSTREAMS_FILE, LEGACY_BASH_UPSTREAMS_FILE],
+        "instances": [LEGACY_INSTANCES_FILE, LEGACY_BASH_INSTANCES_FILE],
     }
-    return {k: v for k, v in candidates.items() if v.exists()}
+    result: dict[str, Path] = {}
+    for key, paths in candidates.items():
+        for p in paths:
+            if p.exists():
+                result[key] = p
+                break
+    return result
 
 
 def run_migration(

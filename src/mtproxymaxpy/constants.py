@@ -22,11 +22,21 @@ INSTANCES_FILE = INSTALL_DIR / "instances.json"
 TOML_CONFIG_FILE = CONFIG_DIR / "config.toml"
 CONNECTION_LOG = INSTALL_DIR / "connection.log"
 
-# Legacy bash config paths (used for migration detection)
+# Legacy bash MTProxyMax install dir (no 'py' suffix — original bash project)
+LEGACY_BASH_DIR = Path("/opt/mtproxymax")
+
+# Legacy bash config paths — check both possible locations:
+#   /opt/mtproxymaxpy/settings.conf  (if user copied files here)
+#   /opt/mtproxymax/settings.conf    (default bash install)
 LEGACY_SETTINGS_FILE = INSTALL_DIR / "settings.conf"
 LEGACY_SECRETS_FILE = INSTALL_DIR / "secrets.conf"
 LEGACY_UPSTREAMS_FILE = INSTALL_DIR / "upstreams.conf"
 LEGACY_INSTANCES_FILE = INSTALL_DIR / "instances.conf"
+
+LEGACY_BASH_SETTINGS_FILE = LEGACY_BASH_DIR / "settings.conf"
+LEGACY_BASH_SECRETS_FILE = LEGACY_BASH_DIR / "secrets.conf"
+LEGACY_BASH_UPSTREAMS_FILE = LEGACY_BASH_DIR / "upstreams.conf"
+LEGACY_BASH_INSTANCES_FILE = LEGACY_BASH_DIR / "instances.conf"
 
 # ── Telemt binary ──────────────────────────────────────────────────────────────
 BINARY_DIR = INSTALL_DIR / "bin"

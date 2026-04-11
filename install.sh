@@ -48,8 +48,15 @@ if [ -f "$VENV_BIN" ]; then
   echo "[+] Command 'mtproxymaxpy' linked to /usr/local/bin/mtproxymaxpy"
 fi
 
-# ── Run the installer wizard ───────────────────────────────────────────────────
+# ── Run the installer ──────────────────────────────────────────────────────────
 echo "[*] Running installer..."
-"$UV_BIN" run mtproxymaxpy install
+# If stdin is a TTY (interactive session) launch the full TUI wizard,
+# which handles both first-run setup and migration from the bash version.
+# In non-interactive mode (piped curl | bash) fall back to headless install.
+if [ -t 0 ] && [ -t 1 ]; then
+  "$UV_BIN" run mtproxymaxpy
+else
+  "$UV_BIN" run mtproxymaxpy install
+fi
 
 echo "[+] Done. Run 'mtproxymaxpy status' to check service status."
