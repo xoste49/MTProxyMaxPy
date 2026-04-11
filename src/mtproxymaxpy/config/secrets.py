@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 import os
 import secrets
 import tempfile
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -20,10 +22,10 @@ class Secret(BaseModel):
     key: str = Field(default_factory=lambda: secrets.token_hex(16))
     created: str = Field(default_factory=lambda: date.today().isoformat())
     enabled: bool = True
-    max_conns: int = Field(0, ge=0)   # 0 = unlimited
-    max_ips: int = Field(0, ge=0)     # 0 = unlimited
-    quota_bytes: int = Field(0, ge=0) # 0 = unlimited
-    expires: str = ""                  # YYYY-MM-DD or ""
+    max_conns: int = Field(0, ge=0)    # 0 = unlimited
+    max_ips: int = Field(0, ge=0)      # 0 = unlimited
+    quota_bytes: int = Field(0, ge=0)  # 0 = unlimited
+    expires: str = ""                   # YYYY-MM-DD or ""
     notes: str = ""
 
 
@@ -100,3 +102,218 @@ def rotate_secret(label: str, path: Path = SECRETS_FILE) -> Secret:
             save_secrets(items, path)
             return items[i]
     raise KeyError(f"Secret {label!r} not found")
+
+
+# ── Toggle ─────────────────────────────────────────────────────────────────────
+
+def enable_secret(label: str, path: Path = SECRETS_FILE) -> Secret:
+    """Enable a secret by label."""
+    return _set_field(label, "enabled", True, path)
+
+
+def disable_secret(label: str, path: Path = SECRETS_FILE) -> Secret:
+    """Disable a secret by label."""
+    return _set_field(label, "enabled", False, path)
+
+
+def _set_field(label: str, field: str, value, path: Path = SECRETS_FILE) -> Secret:
+    items = load_secrets(path)
+    for i, s in enumerate(items):
+        if s.label == label:
+            items[i] = s.model_copy(update={field: value})
+            save_secrets(items, path)
+            return items[i]
+    raise KeyError(f"Secret {label!r} not found")
+
+
+# ── Limits ─────────────────────────────────────────────────────────────────────
+
+def set_secret_limits(
+    label: str,
+    *,
+    max_conns: Optional[int] = None,
+    max_ips: Optional[int] = None,
+    quota_bytes: Optional[int] = None,
+    expires: Optional[str] = None,
+    path: Path = SECRETS_FILE,
+) -> Secret:
+    """Update per-user limit fields for an existing secret."""
+    items = load_secrets(path)
+    for i, s in enumerate(items):
+        if s.label == label:
+            updates: dict = {}
+            if max_conns is not None:
+                updates["max_conns"] = max_conns
+            if max_ips is not None:
+                updates["max_ips"] = max_ips
+            if quota_bytes is not None:
+                updates["quota_bytes"] = quota_bytes
+            if expires is not None:
+                updates["expires"] = expires
+            items[i] = s.model_copy(update=updates)
+            save_secrets(items, path)
+            return items[i]
+    raise KeyError(f"Secret {label!r} not found")
+
+
+# ── Extend expiry ──────────────────────────────────────────────────────────────
+
+def extend_secret(label: str, days: int, path: Path = SECRETS_FILE) -> Secret:
+    """Extend a secret's expiry by *days* days.
+
+    If the secret has no expiry, extends from today.
+    """
+    items = load_secrets(path)
+    for i, s in enumerate(items):
+        if s.label == label:
+            if s.expires:
+                base = date.fromisoformat(s.expires)
+            else:
+                base = date.today()
+            new_expires = (base + timedelta(days=days)).isoformat()
+            items[i] = s.model_copy(update={"expires": new_expires})
+            save_secrets(items, path)
+            return items[i]
+    raise KeyError(f"Secret {label!r} not found")
+
+
+def bulk_extend_secrets(days: int, path: Path = SECRETS_FILE) -> list[Secret]:
+    """Extend expiry of all secrets by *days* days."""
+    items = load_secrets(path)
+    updated = []
+    for i, s in enumerate(items):
+        base = date.fromisoformat(s.expires) if s.expires else date.today()
+        items[i] = s.model_copy(
+            update={"expires": (base + timedelta(days=days)).isoformat()}
+        )
+        updated.append(items[i])
+    save_secrets(items, path)
+    return updated
+
+
+# ── Note ───────────────────────────────────────────────────────────────────────
+
+def set_secret_note(label: str, text: str, path: Path = SECRETS_FILE) -> Secret:
+    """Set or clear the notes field for a secret."""
+    return _set_field(label, "notes", text, path)
+
+
+# ── Rename / clone ─────────────────────────────────────────────────────────────
+
+def rename_secret(old_label: str, new_label: str, path: Path = SECRETS_FILE) -> Secret:
+    """Rename a secret (label only; key unchanged)."""
+    items = load_secrets(path)
+    if any(s.label == new_label for s in items):
+        raise ValueError(f"Secret with label {new_label!r} already exists")
+    for i, s in enumerate(items):
+        if s.label == old_label:
+            items[i] = s.model_copy(update={"label": new_label})
+            save_secrets(items, path)
+            return items[i]
+    raise KeyError(f"Secret {old_label!r} not found")
+
+
+def clone_secret(src_label: str, new_label: str, path: Path = SECRETS_FILE) -> Secret:
+    """Clone a secret with a new label and a fresh random key."""
+    items = load_secrets(path)
+    if any(s.label == new_label for s in items):
+        raise ValueError(f"Secret with label {new_label!r} already exists")
+    for s in items:
+        if s.label == src_label:
+            new_s = s.model_copy(
+                update={
+                    "label": new_label,
+                    "key": secrets.token_hex(16),
+                    "created": date.today().isoformat(),
+                }
+            )
+            items.append(new_s)
+            save_secrets(items, path)
+            return new_s
+    raise KeyError(f"Secret {src_label!r} not found")
+
+
+# ── Expiry helpers ─────────────────────────────────────────────────────────────
+
+def get_expired_secrets(path: Path = SECRETS_FILE) -> list[Secret]:
+    """Return all secrets whose expiry date has passed."""
+    today = date.today().isoformat()
+    return [s for s in load_secrets(path) if s.expires and s.expires < today]
+
+
+def disable_expired_secrets(path: Path = SECRETS_FILE) -> list[Secret]:
+    """Disable all expired secrets. Returns the list of newly-disabled ones."""
+    items = load_secrets(path)
+    today = date.today().isoformat()
+    changed: list[Secret] = []
+    for i, s in enumerate(items):
+        if s.enabled and s.expires and s.expires < today:
+            items[i] = s.model_copy(update={"enabled": False})
+            changed.append(items[i])
+    if changed:
+        save_secrets(items, path)
+    return changed
+
+
+# ── Export / import ────────────────────────────────────────────────────────────
+
+_CSV_FIELDS = (
+    "label", "key", "created", "enabled",
+    "max_conns", "max_ips", "quota_bytes", "expires", "notes",
+)
+
+
+def export_secrets_csv(path: Path = SECRETS_FILE) -> str:
+    """Return a CSV string of all secrets suitable for saving or printing."""
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=list(_CSV_FIELDS))
+    writer.writeheader()
+    for s in load_secrets(path):
+        row = s.model_dump()
+        writer.writerow({k: row[k] for k in _CSV_FIELDS})
+    return buf.getvalue()
+
+
+def import_secrets_csv(
+    text: str,
+    path: Path = SECRETS_FILE,
+    overwrite: bool = False,
+) -> list[Secret]:
+    """Parse a CSV string and merge secrets into the store.
+
+    If *overwrite* is False, secrets with duplicate labels are skipped.
+    Returns a list of newly-added Secret objects.
+    """
+    existing = load_secrets(path)
+    existing_labels = {s.label for s in existing}
+    added: list[Secret] = []
+
+    reader = csv.DictReader(io.StringIO(text))
+    for row in reader:
+        label = row.get("label", "").strip()
+        if not label:
+            continue
+        if label in existing_labels and not overwrite:
+            continue
+        # Build Secret, falling back to defaults for missing fields
+        s = Secret(
+            label=label,
+            key=row.get("key") or secrets.token_hex(16),
+            created=row.get("created") or date.today().isoformat(),
+            enabled=(row.get("enabled", "true").lower() in ("1", "true", "yes")),
+            max_conns=int(row.get("max_conns") or 0),
+            max_ips=int(row.get("max_ips") or 0),
+            quota_bytes=int(row.get("quota_bytes") or 0),
+            expires=row.get("expires", ""),
+            notes=row.get("notes", ""),
+        )
+        if label in existing_labels:
+            # Replace existing
+            existing = [s if s2.label != label else s for s2 in existing]
+        else:
+            existing.append(s)
+        existing_labels.add(label)
+        added.append(s)
+
+    save_secrets(existing, path)
+    return added

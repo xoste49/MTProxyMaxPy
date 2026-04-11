@@ -16,6 +16,15 @@ echo "[+] repo cloned"
 uv sync --no-dev
 echo "[+] deps synced"
 
+# Symlink
+VENV_BIN="/opt/mtproxymaxpy/.venv/bin/mtproxymaxpy"
+ln -sf "$VENV_BIN" /usr/local/bin/mtproxymaxpy
+echo "[+] symlink created"
+
+# Check command is available
+mtproxymaxpy --help | head -5
+
+# Test download_binary
 uv run python - <<'PYEOF'
 import logging, os, stat
 logging.basicConfig(level=logging.INFO)
@@ -29,3 +38,7 @@ import subprocess
 result = subprocess.run([str(BINARY_PATH), "--version"], capture_output=True, text=True)
 print(f"[+] Version check: {(result.stdout or result.stderr).strip()}")
 PYEOF
+
+# Test uv already installed (second run should skip)
+echo "[+] Testing uv already-installed detection..."
+bash /test.sh 2>&1 | grep -E "uv already installed|Installing uv" | head -2

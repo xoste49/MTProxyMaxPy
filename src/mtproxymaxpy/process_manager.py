@@ -87,13 +87,38 @@ def _build_toml_config(
             f'  trusted_cidrs = [{", ".join(repr(c) for c in settings.proxy_protocol_trusted_cidrs.split(",") if c)}]',
         ]
 
-    # Users / secrets
+    # Users / secrets — one [[users]] entry per active user
     active = [s for s in secrets if s.enabled]
     if active:
         lines.append("")
-        lines.append("[[users]]")
         for s in active:
-            lines.append(f'  secret = "{s.key}"  # {s.label}')
+            lines += [
+                "[[users]]",
+                f'  secret = "{s.key}"  # {s.label}',
+            ]
+
+    # Per-user limit sections
+    max_conns = {s.key: s.max_conns for s in active if s.max_conns > 0}
+    max_ips = {s.key: s.max_ips for s in active if s.max_ips > 0}
+    quota = {s.key: s.quota_bytes for s in active if s.quota_bytes > 0}
+    expires = {s.key: s.expires for s in active if s.expires}
+
+    if max_conns:
+        lines += ["", "[access.user_max_tcp_conns]"]
+        for key, val in max_conns.items():
+            lines.append(f'  "{key}" = {val}')
+    if max_ips:
+        lines += ["", "[access.user_max_unique_ips]"]
+        for key, val in max_ips.items():
+            lines.append(f'  "{key}" = {val}')
+    if quota:
+        lines += ["", "[access.user_data_quota]"]
+        for key, val in quota.items():
+            lines.append(f'  "{key}" = {val}')
+    if expires:
+        lines += ["", "[access.user_expirations]"]
+        for key, val in expires.items():
+            lines.append(f'  "{key}" = "{val}"')
 
     # Upstreams
     active_ups = [u for u in upstreams if u.enabled and u.type != "direct"]
@@ -264,7 +289,7 @@ def start(*, regenerate_config: bool = True, public_ip: str = "") -> int:
 
     if not is_binary_present():
         raise FileNotFoundError(
-            f"telemt binary not found at {BINARY_PATH}. run 'mtproxymaxpyPy install' first."
+            f"telemt binary not found at {BINARY_PATH}. Run 'mtproxymaxpy install' first."
         )
 
     if regenerate_config:
@@ -324,11 +349,35 @@ def restart(**start_kwargs) -> int:
     return start(**start_kwargs)
 
 
+def reload_config() -> None:
+    """Send SIGHUP to the running telemt process to reload config without restart."""
+    pid = _read_pid()
+    if pid is None or not is_running():
+        raise RuntimeError("telemt is not running")
+    try:
+        os.kill(pid, signal.SIGHUP)
+        logger.info("Sent SIGHUP to telemt (PID %s)", pid)
+    except ProcessLookupError:
+        _clear_pid()
+        raise RuntimeError("telemt process not found")
+
+
 def status() -> dict:
     """Return a status dict: running, pid, binary_present, config_exists."""
+    pid = get_pid()
+    uptime_sec: int | None = None
+    if pid:
+        try:
+            import time as _time
+            import psutil  # type: ignore[import]
+            p = psutil.Process(pid)
+            uptime_sec = int(_time.time() - p.create_time())
+        except Exception:
+            pass
     return {
         "running": is_running(),
-        "pid": get_pid(),
+        "pid": pid,
         "binary_present": is_binary_present(),
         "config_exists": TOML_CONFIG_FILE.exists(),
+        "uptime_sec": uptime_sec,
     }
