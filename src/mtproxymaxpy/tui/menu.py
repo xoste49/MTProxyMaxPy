@@ -1028,11 +1028,20 @@ def _update_screen() -> None:  # noqa: C901
             if Confirm.ask("  Update MTProxyMaxPy now?", console=console):
                 import shutil as _shutil
                 import subprocess as _sp
+                from pathlib import Path as _Path
                 git = _shutil.which("git")
-                uv = _shutil.which("uv") or str(INSTALL_DIR / ".venv" / "bin" / "uv")
+                # uv is a system tool — check common locations
+                uv = (
+                    _shutil.which("uv")
+                    or (_Path.home() / ".local" / "bin" / "uv" if (_Path.home() / ".local" / "bin" / "uv").exists() else None)
+                    or (_Path("/usr/local/bin/uv") if _Path("/usr/local/bin/uv").exists() else None)
+                )
                 if not git:
                     console.print("[red][!] git not found in PATH[/red]")
+                elif not uv:
+                    console.print("[red][!] uv not found. Install from https://astral.sh/uv[/red]")
                 else:
+                    uv = str(uv)
                     console.print("  Pulling latest code…")
                     r1 = _sp.run(
                         [git, "-C", str(INSTALL_DIR), "pull", "--ff-only"],
@@ -1051,7 +1060,7 @@ def _update_screen() -> None:  # noqa: C901
                             UPDATE_SHA_FILE.write_text(remote_sha)
                             UPDATE_BADGE_FILE.unlink(missing_ok=True)
                             console.print("[green][+] Manager updated successfully.[/green]")
-                            console.print("[yellow]  Restart mtproxymaxpy to apply changes.[/yellow]")
+                            console.print("[bold yellow]  Exit and run 'mtproxymaxpy' again to apply changes.[/bold yellow]")
                             self_updated = True
                         else:
                             console.print(f"[red][!] uv sync failed:\n{r2.stderr.strip()}[/red]")
