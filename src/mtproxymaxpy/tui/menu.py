@@ -95,16 +95,22 @@ def _ask_choice(max_n: int, allow_zero: bool = True) -> int:
 
 def run_tui() -> None:
     """Entry point: run the interactive menu (blocking)."""
-    # Migration check on first run
-    try:
-        from mtproxymaxpy.config.migration import detect_legacy
-        from mtproxymaxpy.constants import SETTINGS_FILE
+    from mtproxymaxpy.constants import SETTINGS_FILE
 
-        legacy = detect_legacy()
-        if legacy and not SETTINGS_FILE.exists():
-            _migration_screen(legacy)
-    except Exception:
-        pass
+    if not SETTINGS_FILE.exists():
+        # Check for legacy bash config first
+        migrated = False
+        try:
+            from mtproxymaxpy.config.migration import detect_legacy
+            legacy = detect_legacy()
+            if legacy:
+                _migration_screen(legacy)
+                migrated = True
+        except Exception:
+            pass
+        # Fresh install — run setup wizard
+        if not migrated:
+            _setup_wizard()
 
     while True:
         _clear()
@@ -856,6 +862,177 @@ def _update_screen() -> None:
                 console.print(f"[green][+] Proxy restarted (PID {pid})[/green]")
     except Exception as exc:
         console.print(f"[red]Error: {exc}[/red]")
+    _pause()
+
+
+# ── First-run setup wizard ────────────────────────────────────────────────────
+
+FAKETLS_DOMAINS = [
+    "cloudflare.com",
+    "www.google.com",
+    "www.microsoft.com",
+    "www.apple.com",
+    "(custom)",
+]
+
+
+def _setup_wizard() -> None:  # noqa: C901
+    """Interactive first-run configuration wizard."""
+    _clear()
+    console.print(Panel(
+        "[bold cyan]Welcome to MTProxyMaxPy![/bold cyan]\n\n"
+        "No configuration found. Let's set up your proxy.",
+        title="[bold]First-Run Setup[/bold]",
+        border_style="cyan",
+        padding=(1, 4),
+    ))
+    console.print()
+
+    # ── 1. Port ────────────────────────────────────────────────────────────────
+    console.print(Rule("[cyan]1/6  Listen Port[/cyan]"))
+    port = IntPrompt.ask(
+        "  Proxy listen port",
+        default=443,
+        console=console,
+    )
+
+    # ── 2. Server IP ───────────────────────────────────────────────────────────
+    console.print()
+    console.print(Rule("[cyan]2/6  Server IP[/cyan]"))
+    detected_ip = ""
+    try:
+        from mtproxymaxpy.utils.network import get_public_ip
+        with console.status("  Detecting public IP…"):
+            detected_ip = get_public_ip() or ""
+    except Exception:
+        pass
+    if detected_ip:
+        console.print(f"  Detected: [green]{detected_ip}[/green]")
+    raw_ip = Prompt.ask(
+        "  Server IP or hostname",
+        default=detected_ip or "",
+        console=console,
+    ).strip()
+    custom_ip = raw_ip if raw_ip and raw_ip != detected_ip else ""
+
+    # ── 3. FakeTLS domain ──────────────────────────────────────────────────────
+    console.print()
+    console.print(Rule("[cyan]3/6  FakeTLS Domain[/cyan]"))
+    for i, d in enumerate(FAKETLS_DOMAINS, 1):
+        console.print(f"    {i}) {d}")
+    dom_choice = IntPrompt.ask(
+        "  Choose domain",
+        default=1,
+        console=console,
+    )
+    if dom_choice == len(FAKETLS_DOMAINS):  # custom
+        proxy_domain = Prompt.ask("  Enter custom domain", console=console).strip()
+    else:
+        proxy_domain = FAKETLS_DOMAINS[max(0, dom_choice - 1)]
+
+    # ── 4. Traffic masking ─────────────────────────────────────────────────────
+    console.print()
+    console.print(Rule("[cyan]4/6  Traffic Masking[/cyan]"))
+    console.print("  Forward DPI probes to the real FakeTLS site (recommended).")
+    masking_enabled = Confirm.ask("  Enable traffic masking?", default=True, console=console)
+
+    # ── 5. Ad-tag (optional) ───────────────────────────────────────────────────
+    console.print()
+    console.print(Rule("[cyan]5/6  Telegram Ad-tag (optional)[/cyan]"))
+    console.print("  Earn revenue from Telegram sponsored channels.")
+    ad_tag = ""
+    if Confirm.ask("  Set an ad-tag?", default=False, console=console):
+        ad_tag = Prompt.ask("  Ad-tag (32 hex chars)", console=console).strip()
+
+    # ── 6. First secret ────────────────────────────────────────────────────────
+    console.print()
+    console.print(Rule("[cyan]6/6  First User Secret[/cyan]"))
+    secret_label = Prompt.ask(
+        "  Label for first user",
+        default="default",
+        console=console,
+    ).strip() or "default"
+
+    # ── Save settings ──────────────────────────────────────────────────────────
+    console.print()
+    console.print(Rule())
+    console.print("  [bold]Saving configuration…[/bold]")
+    try:
+        from mtproxymaxpy.config.settings import Settings, save_settings
+        from mtproxymaxpy.config.secrets import add_secret
+
+        s = Settings(
+            proxy_port=port,
+            proxy_domain=proxy_domain,
+            custom_ip=custom_ip,
+            masking_enabled=masking_enabled,
+            masking_host=proxy_domain if masking_enabled else "cloudflare.com",
+            ad_tag=ad_tag,
+        )
+        save_settings(s)
+        secret = add_secret(secret_label)
+        console.print(f"  [green][+] Settings saved[/green]")
+        console.print(f"  [green][+] Secret '{secret.label}' created: {secret.key}[/green]")
+    except Exception as exc:
+        console.print(f"  [red][!] Failed to save config: {exc}[/red]")
+        _pause()
+        return
+
+    # ── Download binary ────────────────────────────────────────────────────────
+    from mtproxymaxpy.constants import BINARY_PATH
+    if not BINARY_PATH.exists():
+        console.print("  [bold]Downloading telemt binary…[/bold]")
+        try:
+            from mtproxymaxpy import process_manager
+            with console.status("  Downloading…"):
+                process_manager.download_binary()
+            console.print("  [green][+] Binary downloaded[/green]")
+        except Exception as exc:
+            console.print(f"  [red][!] Download failed: {exc}[/red]")
+            console.print("  [dim]Run 'mtproxymaxpy install' to retry.[/dim]")
+            _pause()
+            return
+
+    # ── Start proxy ────────────────────────────────────────────────────────────
+    console.print("  [bold]Starting proxy…[/bold]")
+    try:
+        from mtproxymaxpy import process_manager
+        srv_ip = custom_ip or detected_ip or ""
+        pid = process_manager.start(public_ip=srv_ip)
+        console.print(f"  [green][+] Proxy started (PID {pid})[/green]")
+    except Exception as exc:
+        console.print(f"  [red][!] Start failed: {exc}[/red]")
+
+    # ── Install systemd ────────────────────────────────────────────────────────
+    try:
+        from mtproxymaxpy import systemd
+        systemd.install()
+        console.print("  [green][+] systemd service installed[/green]")
+    except Exception:
+        pass
+
+    # ── Show proxy links ───────────────────────────────────────────────────────
+    console.print()
+    try:
+        from mtproxymaxpy.utils.proxy_link import build_proxy_links
+        srv_ip = custom_ip or detected_ip or "YOUR_IP"
+        tg_link, web_link = build_proxy_links(secret.key, proxy_domain, srv_ip, port)
+        console.print(Panel(
+            f"[bold]Your proxy link:[/bold]\n\n"
+            f"[cyan]{tg_link}[/cyan]\n\n"
+            f"[dim]{web_link}[/dim]",
+            title="[green]Installation Complete[/green]",
+            border_style="green",
+            padding=(1, 4),
+        ))
+    except Exception:
+        console.print("  [green][+] Installation complete![/green]")
+
+    # ── Telegram bot setup (optional) ─────────────────────────────────────────
+    console.print()
+    if Confirm.ask("  Set up Telegram bot for notifications?", default=False, console=console):
+        _telegram_setup_wizard()
+
     _pause()
 
 
