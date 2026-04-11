@@ -1028,11 +1028,16 @@ def _update_screen() -> None:  # noqa: C901
             console.print(f"  Remote SHA : [dim]{remote_sha[:12]}…[/dim]")
             if Confirm.ask("  Update MTProxyMaxPy now?", console=console):
                 console.print("  Installing from GitHub…")
-                result = subprocess.run(
-                    ["pip", "install", "--upgrade",
-                     f"git+https://github.com/{GITHUB_REPO}.git@main"],
-                    capture_output=True, text=True,
-                )
+                import shutil as _shutil
+                import sys as _sys
+                uv = _shutil.which("uv")
+                if uv:
+                    cmd = [uv, "pip", "install", "--upgrade",
+                           f"git+https://github.com/{GITHUB_REPO}.git@main"]
+                else:
+                    cmd = [_sys.executable, "-m", "pip", "install", "--upgrade",
+                           f"git+https://github.com/{GITHUB_REPO}.git@main"]
+                result = subprocess.run(cmd, capture_output=True, text=True)
                 if result.returncode == 0:
                     UPDATE_SHA_FILE.write_text(remote_sha)
                     UPDATE_BADGE_FILE.unlink(missing_ok=True)
@@ -1040,7 +1045,7 @@ def _update_screen() -> None:  # noqa: C901
                     console.print("[yellow]  Restart mtproxymaxpy to apply changes.[/yellow]")
                     self_updated = True
                 else:
-                    console.print(f"[red][!] pip failed:\n{result.stderr.strip()}[/red]")
+                    console.print(f"[red][!] Install failed:\n{result.stderr.strip()}[/red]")
     except Exception as exc:
         console.print(f"  [red]Error checking manager update: {exc}[/red]")
 
