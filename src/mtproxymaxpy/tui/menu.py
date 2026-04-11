@@ -134,7 +134,7 @@ def run_tui() -> None:
             tg_hint = cfg_hint = ""
 
         console.print(
-            _choice(1, "Status & Monitoring"),
+            _choice(1, "Proxy Management"),
             _choice(2, "Secrets Management", f"{n_secrets} user(s)"),
             _choice(3, "Upstream Proxies", f"{n_upstreams} upstream(s)"),
             _choice(4, "Configuration", cfg_hint),
@@ -148,7 +148,7 @@ def run_tui() -> None:
         )
         choice = _ask_choice(9)
         {
-            1: _status_screen,
+            1: _proxy_menu,
             2: _secrets_menu,
             3: _upstreams_menu,
             4: _settings_menu,
@@ -163,6 +163,122 @@ def run_tui() -> None:
             break
 
     console.print("\n[dim]Goodbye.[/dim]\n")
+
+
+# ── Logs screen ───────────────────────────────────────────────────────────────
+
+def _logs_screen() -> None:
+    _clear()
+    console.print(_header_panel())
+    console.print(Rule("[cyan]Proxy Logs (last 50 lines)[/cyan]"))
+    try:
+        from mtproxymaxpy.constants import INSTALL_DIR
+        log_file = INSTALL_DIR / "telemt.log"
+        if log_file.exists():
+            lines = log_file.read_text(errors="replace").splitlines()
+            for line in lines[-50:]:
+                console.print(f"  {line}")
+        else:
+            console.print("  [dim]Log file not found.[/dim]")
+    except Exception as exc:
+        console.print(f"[red]Error: {exc}[/red]")
+    _pause()
+
+
+# ── Health check screen ───────────────────────────────────────────────────────
+
+def _health_screen() -> None:
+    _clear()
+    console.print(_header_panel())
+    console.print(Rule("[cyan]Health Check[/cyan]"))
+    try:
+        from mtproxymaxpy import doctor
+        results = doctor.run_full_doctor()
+        tbl = Table(show_header=True, box=None, padding=(0, 2))
+        tbl.add_column("Check", style="bold", width=26)
+        tbl.add_column("Status", width=8)
+        tbl.add_column("Details")
+        for r in results:
+            ok = r.get("ok")
+            if ok is True:
+                status = "[green]PASS[/green]"
+            elif ok is False:
+                status = "[red]FAIL[/red]"
+            else:
+                status = "[dim]SKIP[/dim]"
+            extra = {k: v for k, v in r.items() if k not in ("name", "ok")}
+            details = "  ".join(f"{k}={v}" for k, v in extra.items()) if extra else ""
+            tbl.add_row(r["name"], status, details)
+        console.print(tbl)
+    except Exception as exc:
+        console.print(f"[red]Error: {exc}[/red]")
+    _pause()
+
+
+# ── Proxy Management menu ─────────────────────────────────────────────────────
+
+def _proxy_menu() -> None:
+    while True:
+        _clear()
+        console.print(_header_panel())
+        console.print()
+
+        running = False
+        try:
+            from mtproxymaxpy import process_manager as _pm
+            running = _pm.is_running()
+        except Exception:
+            pass
+
+        if running:
+            console.print(_choice(1, "[red]Stop proxy[/red]"))
+            console.print(_choice(2, "Restart proxy"))
+        else:
+            console.print(_choice(1, "[green]Start proxy[/green]"))
+            console.print(_choice(2, "[dim]Restart proxy[/dim] (not running)"))
+
+        console.print(
+            _choice(3, "View logs"),
+            _choice(4, "Health check"),
+            _choice(5, "Status & Monitoring"),
+            _choice(0, "Back"),
+            sep="\n",
+        )
+        choice = _ask_choice(5)
+
+        if choice == 0:
+            return
+
+        if choice in (1, 2):
+            try:
+                from mtproxymaxpy import process_manager as _pm2
+                from mtproxymaxpy.utils.network import get_public_ip as _gip
+                ip = _gip() or ""
+                if running:
+                    if choice == 1:
+                        _pm2.stop()
+                        console.print("[green][+] Proxy stopped.[/green]")
+                    else:
+                        pid = _pm2.restart(public_ip=ip)
+                        console.print(f"[green][+] Proxy restarted (PID {pid})[/green]")
+                else:
+                    if choice == 1:
+                        pid = _pm2.start(public_ip=ip)
+                        console.print(f"[green][+] Proxy started (PID {pid})[/green]")
+                    else:
+                        console.print("[yellow][!] Proxy is not running.[/yellow]")
+            except Exception as exc:
+                console.print(f"[red][!] {exc}[/red]")
+            _pause()
+
+        elif choice == 3:
+            _logs_screen()
+
+        elif choice == 4:
+            _health_screen()
+
+        elif choice == 5:
+            _status_screen()
 
 
 # ── Status screen ──────────────────────────────────────────────────────────────
