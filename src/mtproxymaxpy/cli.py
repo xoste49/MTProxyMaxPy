@@ -39,6 +39,7 @@ def install(
     # If legacy bash config exists, migrate it instead of using defaults
     from mtproxymaxpy.constants import SETTINGS_FILE
     from mtproxymaxpy.config.migration import detect_legacy, run_migration
+    from mtproxymaxpy.config.settings import load_settings
 
     legacy = detect_legacy()
     if legacy and not SETTINGS_FILE.exists():
