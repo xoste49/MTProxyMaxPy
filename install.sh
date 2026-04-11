@@ -28,11 +28,13 @@ else
 fi
 
 # ── Download / update the project ─────────────────────────────────────────────
+IS_UPDATE=false
 if [ -d "$INSTALL_DIR/.git" ]; then
-  echo "[*] Updating MTProxyMax..."
+  echo "[*] Updating MTProxyMaxPy..."
   git -C "$INSTALL_DIR" pull --ff-only
+  IS_UPDATE=true
 else
-  echo "[*] Cloning MTProxyMax..."
+  echo "[*] Cloning MTProxyMaxPy..."
   git clone --depth=1 "$REPO_URL" "$INSTALL_DIR"
 fi
 
@@ -48,15 +50,18 @@ if [ -f "$VENV_BIN" ]; then
   echo "[+] Command 'mtproxymaxpy' linked to /usr/local/bin/mtproxymaxpy"
 fi
 
-# ── Run the installer ──────────────────────────────────────────────────────────
-echo "[*] Running installer..."
-# If stdin is a TTY (interactive session) launch the full TUI wizard,
-# which handles both first-run setup and migration from the bash version.
-# In non-interactive mode (piped curl | bash) fall back to headless install.
-if [ -t 0 ] && [ -t 1 ]; then
-  "$UV_BIN" run mtproxymaxpy
+# ── Run the installer (first install only) ────────────────────────────────────
+if [ "$IS_UPDATE" = true ]; then
+  echo "[+] Update complete. Run 'mtproxymaxpy' to open the manager."
 else
-  "$UV_BIN" run mtproxymaxpy install
+  echo "[*] Starting setup wizard..."
+  # If stdin is a TTY (interactive session) launch the full TUI wizard.
+  # In non-interactive mode (piped curl | bash) fall back to headless install.
+  if [ -t 0 ] && [ -t 1 ]; then
+    "$UV_BIN" run mtproxymaxpy
+  else
+    "$UV_BIN" run mtproxymaxpy install
+  fi
 fi
 
 echo "[+] Done. Run 'mtproxymaxpy status' to check service status."

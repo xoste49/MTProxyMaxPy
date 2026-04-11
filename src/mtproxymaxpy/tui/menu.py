@@ -1002,7 +1002,6 @@ def _update_screen() -> None:  # noqa: C901
     console.print("\n  [bold]1. MTProxyMaxPy manager[/bold]")
     self_updated = False
     try:
-        import hashlib
         import subprocess
         import httpx
         from mtproxymaxpy.constants import (
@@ -1027,25 +1026,35 @@ def _update_screen() -> None:  # noqa: C901
             console.print(f"  Stored SHA : [dim]{stored[:12]}…[/dim]")
             console.print(f"  Remote SHA : [dim]{remote_sha[:12]}…[/dim]")
             if Confirm.ask("  Update MTProxyMaxPy now?", console=console):
-                console.print("  Installing from GitHub…")
                 import shutil as _shutil
-                import sys as _sys
-                uv = _shutil.which("uv")
-                if uv:
-                    cmd = [uv, "pip", "install", "--upgrade",
-                           f"git+https://github.com/{GITHUB_REPO}.git@main"]
+                import subprocess as _sp
+                git = _shutil.which("git")
+                uv = _shutil.which("uv") or str(INSTALL_DIR / ".venv" / "bin" / "uv")
+                if not git:
+                    console.print("[red][!] git not found in PATH[/red]")
                 else:
-                    cmd = [_sys.executable, "-m", "pip", "install", "--upgrade",
-                           f"git+https://github.com/{GITHUB_REPO}.git@main"]
-                result = subprocess.run(cmd, capture_output=True, text=True)
-                if result.returncode == 0:
-                    UPDATE_SHA_FILE.write_text(remote_sha)
-                    UPDATE_BADGE_FILE.unlink(missing_ok=True)
-                    console.print("[green][+] Manager updated successfully.[/green]")
-                    console.print("[yellow]  Restart mtproxymaxpy to apply changes.[/yellow]")
-                    self_updated = True
-                else:
-                    console.print(f"[red][!] Install failed:\n{result.stderr.strip()}[/red]")
+                    console.print("  Pulling latest code…")
+                    r1 = _sp.run(
+                        [git, "-C", str(INSTALL_DIR), "pull", "--ff-only"],
+                        capture_output=True, text=True,
+                    )
+                    console.print(f"  {r1.stdout.strip() or r1.stderr.strip()}")
+                    if r1.returncode != 0:
+                        console.print(f"[red][!] git pull failed[/red]")
+                    else:
+                        console.print("  Syncing dependencies…")
+                        r2 = _sp.run(
+                            [uv, "sync", "--no-dev"],
+                            capture_output=True, text=True, cwd=str(INSTALL_DIR),
+                        )
+                        if r2.returncode == 0:
+                            UPDATE_SHA_FILE.write_text(remote_sha)
+                            UPDATE_BADGE_FILE.unlink(missing_ok=True)
+                            console.print("[green][+] Manager updated successfully.[/green]")
+                            console.print("[yellow]  Restart mtproxymaxpy to apply changes.[/yellow]")
+                            self_updated = True
+                        else:
+                            console.print(f"[red][!] uv sync failed:\n{r2.stderr.strip()}[/red]")
     except Exception as exc:
         console.print(f"  [red]Error checking manager update: {exc}[/red]")
 
