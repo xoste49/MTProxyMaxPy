@@ -149,7 +149,7 @@ def _parse_secrets_conf(path: Path) -> list[Secret]:
                 max_conns=int(max_conns.strip() or 0),
                 max_ips=int(max_ips.strip() or 0),
                 quota_bytes=int(quota.strip() or 0),
-                expires=expires.strip(),
+                expires=expires.strip() if expires.strip() not in ("", "0") else "",
                 notes=notes.strip(),
             ))
         except Exception:

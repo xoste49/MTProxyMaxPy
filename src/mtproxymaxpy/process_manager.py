@@ -161,6 +161,9 @@ def _build_toml_config(
     if expires:
         lines += ["", "[access.user_expirations]"]
         for label, val in expires.items():
+            # telemt requires RFC 3339 datetime; convert bare YYYY-MM-DD dates
+            if len(val) == 10 and "T" not in val:
+                val = val + "T23:59:59Z"
             lines.append(f'"{label}" = "{val}"')
 
     # [[upstreams]]
