@@ -1073,17 +1073,6 @@ def _restart_if_running() -> None:
             process_manager.write_toml_config()
         except Exception:
             pass
-ormat_bytes(stats['bytes_in'])}")
-    typer.echo(f"  bytes_out:          {format_bytes(stats['bytes_out'])}")
-    typer.echo(f"  active_connections: {stats['active_connections']}")
-    typer.echo(f"  total_connections:  {stats['total_connections']}")
-    user_stats = stats.get("user_stats", {})
-    if user_stats:
-        typer.echo("\n  Per-user:")
-        for key, us in user_stats.items():
-            typer.echo(f"    {key[:12]}…  ↑{format_bytes(us.get('bytes_out', 0))}  "
-                       f"↓{format_bytes(us.get('bytes_in', 0))}  "
-                       f"active={int(us.get('active', 0))}")
 
 
 # ── traffic (alias of metrics) ─────────────────────────────────────────────────
