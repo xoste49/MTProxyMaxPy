@@ -77,15 +77,15 @@ def check_dependencies() -> list[str]:
 def get_arch() -> str:
     """Return the architecture string used in telemt binary filenames.
 
-    Returns 'amd64' or 'arm64'; raises RuntimeError for unsupported arches.
+    Returns 'x86_64' or 'aarch64'; raises RuntimeError for unsupported arches.
     """
     import platform
     machine = platform.machine().lower()
     mapping = {
-        "x86_64": "amd64",
-        "amd64": "amd64",
-        "aarch64": "arm64",
-        "arm64": "arm64",
+        "x86_64": "x86_64",
+        "amd64": "x86_64",
+        "aarch64": "aarch64",
+        "arm64": "aarch64",
     }
     if machine not in mapping:
         raise RuntimeError(f"Unsupported architecture: {machine}")

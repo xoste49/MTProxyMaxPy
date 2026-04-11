@@ -10,11 +10,13 @@ Responsibilities
 
 from __future__ import annotations
 
+import io
 import json
 import logging
 import os
 import signal
 import subprocess
+import tarfile
 import tempfile
 import textwrap
 import time
@@ -175,7 +177,7 @@ def is_binary_present() -> bool:
 
 
 def download_binary(version: str = TELEMT_VERSION, force: bool = False) -> None:
-    """Download the telemt binary. Skips if already present and *force* is False."""
+    """Download and extract the telemt binary. Skips if already present and *force* is False."""
     if is_binary_present() and not force:
         logger.info("telemt binary already present at %s", BINARY_PATH)
         return
@@ -184,19 +186,37 @@ def download_binary(version: str = TELEMT_VERSION, force: bool = False) -> None:
     url = _resolve_download_url(version)
     logger.info("Downloading telemt %s from %s …", version, url)
 
-    tmp_path = BINARY_DIR / (BINARY_NAME + ".tmp")
+    tar_tmp = BINARY_DIR / (BINARY_NAME + ".tar.gz.tmp")
+    bin_tmp = BINARY_DIR / (BINARY_NAME + ".tmp")
     try:
-        with httpx.stream("GET", url, timeout=60, follow_redirects=True) as resp:
+        with httpx.stream("GET", url, timeout=120, follow_redirects=True) as resp:
             resp.raise_for_status()
-            with open(tmp_path, "wb") as fh:
+            with open(tar_tmp, "wb") as fh:
                 for chunk in resp.iter_bytes(chunk_size=65536):
                     fh.write(chunk)
-        os.chmod(tmp_path, 0o755)
-        os.replace(tmp_path, BINARY_PATH)
+
+        # Extract the 'telemt' binary from the archive
+        with tarfile.open(tar_tmp, "r:gz") as tf:
+            member = next(
+                (m for m in tf.getmembers() if m.name.endswith(BINARY_NAME) or m.name == BINARY_NAME),
+                None,
+            )
+            if member is None:
+                raise RuntimeError(f"Could not find '{BINARY_NAME}' in downloaded archive")
+            src = tf.extractfile(member)
+            if src is None:
+                raise RuntimeError(f"Failed to read '{BINARY_NAME}' from archive")
+            with open(bin_tmp, "wb") as fh:
+                fh.write(src.read())
+
+        tar_tmp.unlink(missing_ok=True)
+        os.chmod(bin_tmp, 0o755)
+        os.replace(bin_tmp, BINARY_PATH)
         logger.info("telemt saved to %s", BINARY_PATH)
     except Exception:
         try:
-            tmp_path.unlink(missing_ok=True)
+            tar_tmp.unlink(missing_ok=True)
+            bin_tmp.unlink(missing_ok=True)
         except OSError:
             pass
         raise

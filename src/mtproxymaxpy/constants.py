@@ -41,9 +41,10 @@ TELEMT_GITHUB_API = (
 )
 
 # Fallback download URL template: {version} and {arch} are substituted at runtime
+# Assets are named e.g. telemt-x86_64-linux-gnu.tar.gz (no 'v' prefix on tag)
 TELEMT_DOWNLOAD_URL_TEMPLATE = (
     "https://github.com/telemt/telemt/releases/download"
-    "/v{version}/telemt-{arch}-linux"
+    "/{version}/telemt-{arch}-linux-gnu.tar.gz"
 )
 
 # ── Defaults ───────────────────────────────────────────────────────────────────
