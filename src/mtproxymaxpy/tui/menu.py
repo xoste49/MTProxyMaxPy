@@ -134,6 +134,24 @@ def _check_update_bg() -> None:
     """Fire a background thread to compare GitHub HEAD SHA with stored baseline."""
     import threading
 
+    def _read_local_manager_sha() -> str:
+        try:
+            import subprocess
+            from mtproxymaxpy.constants import INSTALL_DIR, UPDATE_SHA_FILE
+
+            res = subprocess.run(
+                ["git", "-C", str(INSTALL_DIR), "rev-parse", "HEAD"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            sha = (res.stdout or "").strip().lower()
+            if res.returncode == 0 and len(sha) == 40 and all(c in "0123456789abcdef" for c in sha):
+                return sha
+            return UPDATE_SHA_FILE.read_text().strip().lower() if UPDATE_SHA_FILE.exists() else ""
+        except Exception:
+            return ""
+
     def _worker() -> None:
         try:
             import httpx
@@ -145,14 +163,24 @@ def _check_update_bg() -> None:
                 timeout=10,
                 follow_redirects=True,
             )
-            sha = resp.text.strip()[:40]
-            if len(sha) != 40 or not all(c in "0123456789abcdef" for c in sha):
+            remote_sha = resp.text.strip()[:40].lower()
+            if len(remote_sha) != 40 or not all(c in "0123456789abcdef" for c in remote_sha):
                 return
-            stored = UPDATE_SHA_FILE.read_text().strip() if UPDATE_SHA_FILE.exists() else ""
-            if not stored:
-                UPDATE_SHA_FILE.write_text(sha)
-                UPDATE_BADGE_FILE.unlink(missing_ok=True)
-            elif sha != stored:
+
+            local_sha = _read_local_manager_sha()
+            if not local_sha:
+                # Fallback for non-git installs: keep baseline behavior from .update_sha.
+                stored = UPDATE_SHA_FILE.read_text().strip().lower() if UPDATE_SHA_FILE.exists() else ""
+                if not stored:
+                    UPDATE_SHA_FILE.write_text(remote_sha)
+                    UPDATE_BADGE_FILE.unlink(missing_ok=True)
+                elif remote_sha != stored:
+                    UPDATE_BADGE_FILE.write_text("new")
+                else:
+                    UPDATE_BADGE_FILE.unlink(missing_ok=True)
+                return
+
+            if remote_sha != local_sha:
                 UPDATE_BADGE_FILE.write_text("new")
             else:
                 UPDATE_BADGE_FILE.unlink(missing_ok=True)
@@ -1372,6 +1400,23 @@ def _update_screen() -> None:  # noqa: C901
             VERSION,
         )
 
+        local_sha = ""
+        try:
+            r_local = subprocess.run(
+                ["git", "-C", str(INSTALL_DIR), "rev-parse", "HEAD"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            candidate = (r_local.stdout or "").strip().lower()
+            if r_local.returncode == 0 and len(candidate) == 40 and all(c in "0123456789abcdef" for c in candidate):
+                local_sha = candidate
+        except Exception:
+            pass
+
+        if not local_sha:
+            local_sha = UPDATE_SHA_FILE.read_text().strip().lower() if UPDATE_SHA_FILE.exists() else ""
+
         console.print("  Checking GitHub for manager updates…")
         resp = httpx.get(
             GITHUB_API_COMMITS,
@@ -1379,14 +1424,15 @@ def _update_screen() -> None:  # noqa: C901
             timeout=15,
             follow_redirects=True,
         )
-        remote_sha = resp.text.strip()[:40]
-        stored = UPDATE_SHA_FILE.read_text().strip() if UPDATE_SHA_FILE.exists() else ""
+        remote_sha = resp.text.strip()[:40].lower()
 
-        if not stored or remote_sha == stored:
+        if local_sha and remote_sha == local_sha:
             console.print("  [green]✓ Already up to date[/green]")
+            UPDATE_BADGE_FILE.unlink(missing_ok=True)
         else:
             console.print(f"  [yellow]⬆ New commits available on main[/yellow]")
-            console.print(f"  Stored SHA : [dim]{stored[:12]}…[/dim]")
+            if local_sha:
+                console.print(f"  Local SHA  : [dim]{local_sha[:12]}…[/dim]")
             console.print(f"  Remote SHA : [dim]{remote_sha[:12]}…[/dim]")
             if Confirm.ask("  Update MTProxyMaxPy now?", console=console):
                 import shutil as _shutil
