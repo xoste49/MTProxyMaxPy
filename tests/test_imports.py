@@ -7,7 +7,6 @@ that surfaced during development (e.g. missing 'load_settings' import in cli.py)
 from __future__ import annotations
 
 import importlib
-import importlib.util
 import sys
 from pathlib import Path
 from typing import Generator
@@ -28,6 +27,9 @@ def _module_names() -> list[str]:
         # skip __pycache__ and compiled artefacts
         if "__pycache__" in mod:
             continue
+        # Legacy Textual modules are no longer used by the Rich TUI.
+        if mod.startswith("mtproxymaxpy.tui.screens.") or mod.startswith("mtproxymaxpy.tui.widgets."):
+            continue
         names.append(mod)
     return names
 
@@ -35,10 +37,6 @@ def _module_names() -> list[str]:
 @pytest.mark.parametrize("module", _module_names())
 def test_module_imports(module: str) -> None:
     """Each module must be importable (no SyntaxError / NameError at import time)."""
-    if (
-        module.startswith("mtproxymaxpy.tui.screens.") or module.startswith("mtproxymaxpy.tui.widgets.")
-    ) and importlib.util.find_spec("textual") is None:
-        pytest.skip("textual is not installed; skipping legacy Textual screen imports")
     importlib.import_module(module)
 
 

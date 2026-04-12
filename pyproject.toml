@@ -28,12 +28,32 @@ packages = ["src/mtproxymaxpy"]
 dev = [
     "pre-commit>=3.8",
     "pytest>=8",
+    "pytest-cov>=5",
     "pytest-mock>=3.14",
     "ruff>=0.15",
 ]
 
 [tool.pytest.ini_options]
+minversion = "8.0"
+addopts = [
+    "-ra",
+    "--cov=mtproxymaxpy",
+    "--cov-report=term-missing",
+    "--cov-branch",
+]
 testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["src/mtproxymaxpy"]
+omit = [
+    "tests/*",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+precision = 2
 
 [tool.ruff]
 target-version = "py313"
