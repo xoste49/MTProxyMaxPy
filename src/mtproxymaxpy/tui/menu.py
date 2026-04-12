@@ -130,8 +130,13 @@ def _ask_choice(max_n: int, allow_zero: bool = True) -> int:
 # ── Background update checker ─────────────────────────────────────────────────
 
 
-def _check_update_bg() -> None:
-    """Fire a background thread to compare GitHub HEAD SHA with stored baseline."""
+def _check_update_bg(wait_timeout: float = 3.0) -> None:
+    """Fire a background thread to compare GitHub HEAD SHA with stored baseline.
+
+    Args:
+        wait_timeout: Maximum seconds to wait for the check to complete before returning (default: 3.0).
+                      Prevents blocking the TUI startup while still ensuring the badge is set on first run.
+    """
     import threading
 
     def _read_local_manager_sha() -> str:
@@ -187,7 +192,12 @@ def _check_update_bg() -> None:
         except Exception:
             pass
 
-    threading.Thread(target=_worker, daemon=True).start()
+    thread = threading.Thread(target=_worker, daemon=True)
+    thread.start()
+    # Wait up to wait_timeout seconds for the check to complete to ensure
+    # the badge file is set on first menu render, avoiding the race condition
+    # where the menu displays before the background check finishes.
+    thread.join(timeout=wait_timeout)
 
 
 # ── Main Menu ──────────────────────────────────────────────────────────────────
