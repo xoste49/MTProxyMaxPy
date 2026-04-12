@@ -187,7 +187,7 @@ def run_tui() -> None:
             _choice(2, "Secrets Management", f"{n_secrets} user(s)"),
             _choice(3, "Upstream Proxies", f"{n_upstreams} upstream(s)"),
             _choice(4, "Configuration", cfg_hint),
-            _choice(5, "Traffic & Metrics"),
+            _choice(5, "Logs & Traffic"),
             _choice(6, "Security / Geo-blocking", f"{n_geo} country/ies"),
             _choice(7, "Backup & Restore"),
             _choice(8, "Telegram Bot", tg_hint),
@@ -200,7 +200,7 @@ def run_tui() -> None:
             2: _secrets_menu,
             3: _upstreams_menu,
             4: _settings_menu,
-            5: _metrics_screen,
+            5: _logs_traffic_screen,
             6: _geoblock_menu,
             7: _backup_menu,
             8: _telegram_menu,
@@ -788,6 +788,183 @@ def _metrics_screen() -> None:
     except Exception as exc:
         console.print(f"[red]Error: {exc}[/red]")
     _pause()
+
+
+def _stream_live_logs_screen() -> None:
+    """Continuously refresh and show the latest proxy log lines until Ctrl+C."""
+    try:
+        from mtproxymaxpy.constants import INSTALL_DIR
+
+        log_file = INSTALL_DIR / "telemt.log"
+        if not log_file.exists():
+            console.print("  [dim]Log file not found.[/dim]")
+            _pause()
+            return
+
+        while True:
+            _clear()
+            console.print(_header_panel())
+            console.print(Rule("[cyan]Live Proxy Logs[/cyan]"))
+            console.print("  [dim][live - refreshing every 2s, Ctrl+C to stop][/dim]\n")
+            lines = log_file.read_text(errors="replace").splitlines()
+            for line in lines[-30:]:
+                console.print(f"  {line}")
+            time.sleep(2)
+    except KeyboardInterrupt:
+        pass
+
+
+def _connection_log_screen() -> None:
+    """Show recent lines from connection.log."""
+    _clear()
+    console.print(_header_panel())
+    console.print(Rule("[cyan]Connection Log[/cyan]"))
+    try:
+        from mtproxymaxpy.constants import CONNECTION_LOG
+
+        if CONNECTION_LOG.exists() and CONNECTION_LOG.stat().st_size > 0:
+            lines = CONNECTION_LOG.read_text(errors="replace").splitlines()
+            for line in lines[-50:]:
+                console.print(f"  {line}")
+        else:
+            console.print("  [dim]Connection log is empty.[/dim]")
+    except Exception as exc:
+        console.print(f"[red]Error: {exc}[/red]")
+    _pause()
+
+
+def _active_connections_screen() -> None:
+    """Show active connection counters globally and per user."""
+    _clear()
+    console.print(_header_panel())
+    console.print(Rule("[cyan]Active Connections[/cyan]"))
+    try:
+        from mtproxymaxpy import metrics as _metrics
+
+        stats = _metrics.get_stats()
+        if not stats.get("available"):
+            console.print(f"  [yellow][!] Metrics endpoint unavailable: {stats.get('error', 'unknown')}[/yellow]")
+            _pause()
+            return
+
+        console.print(f"  Global active connections: [bold]{stats['active_connections']}[/bold]\n")
+        user_stats: dict = stats.get("user_stats", {})
+        active_rows = [
+            (key, int(us.get("active", 0)))
+            for key, us in user_stats.items()
+            if int(us.get("active", 0)) > 0
+        ]
+        if not active_rows:
+            console.print("  [dim]No active per-user connections right now.[/dim]")
+        else:
+            tbl = Table(show_header=True, box=None, padding=(0, 1))
+            tbl.add_column("Key (prefix)", style="dim", width=14)
+            tbl.add_column("Active", width=8)
+            for key, active in active_rows:
+                tbl.add_row(key[:12] + "…", str(active))
+            console.print(tbl)
+    except Exception as exc:
+        console.print(f"[red]Error: {exc}[/red]")
+    _pause()
+
+
+def _metrics_live_screen() -> None:
+    """Continuously refresh metrics screen until Ctrl+C."""
+    try:
+        while True:
+            _clear()
+            console.print(_header_panel())
+            console.print(Rule("[cyan]Engine Metrics (live)[/cyan]"))
+            from mtproxymaxpy import metrics as _metrics
+            from mtproxymaxpy.utils.formatting import format_bytes
+
+            stats = _metrics.get_stats()
+            if not stats.get("available"):
+                console.print(f"  [yellow][!] Metrics endpoint unavailable: {stats.get('error', 'unknown')}[/yellow]")
+            else:
+                tbl = Table(show_header=False, box=None, padding=(0, 2))
+                tbl.add_column("Key", style="dim", width=24)
+                tbl.add_column("Value")
+                tbl.add_row("Bytes in (total)", format_bytes(stats["bytes_in"]))
+                tbl.add_row("Bytes out (total)", format_bytes(stats["bytes_out"]))
+                tbl.add_row("Active connections", str(stats["active_connections"]))
+                tbl.add_row("Total connections", str(stats["total_connections"]))
+                console.print(tbl)
+            console.print("\n  [dim][live - refreshing every 5s, Ctrl+C to stop][/dim]")
+            time.sleep(5)
+    except KeyboardInterrupt:
+        pass
+
+
+def _logs_traffic_screen() -> None:
+    """Bash-parity Logs & Traffic screen with summary and actions."""
+    _clear()
+    console.print(_header_panel())
+    console.print(Rule("[cyan]Logs & Traffic[/cyan]"))
+
+    try:
+        from mtproxymaxpy import process_manager, metrics as _metrics
+        from mtproxymaxpy.config.secrets import load_secrets
+        from mtproxymaxpy.utils.formatting import format_bytes
+
+        if not process_manager.is_running():
+            console.print("\n  [dim]Proxy is not running[/dim]")
+            _pause()
+            return
+
+        stats = _metrics.get_stats()
+        if not stats.get("available"):
+            console.print(f"  [yellow][!] Metrics endpoint unavailable: {stats.get('error', 'unknown')}[/yellow]")
+            t_in = t_out = conns = 0
+            user_stats = {}
+        else:
+            t_in = int(stats.get("bytes_in", 0))
+            t_out = int(stats.get("bytes_out", 0))
+            conns = int(stats.get("active_connections", 0))
+            user_stats = stats.get("user_stats", {})
+
+        console.print("\n  [bold]Total Traffic[/bold]")
+        console.print(f"  Download: {format_bytes(t_in)}")
+        console.print(f"  Upload:   {format_bytes(t_out)}")
+        console.print(f"  Active Connections: {conns}")
+
+        console.print("\n  [bold]Per-User Breakdown[/bold]")
+        enabled = [s for s in load_secrets() if s.enabled]
+        if not enabled:
+            console.print("  [dim]No enabled users.[/dim]")
+        else:
+            for s in enabled:
+                us = user_stats.get(s.key, {})
+                u_in = int(us.get("bytes_in", 0))
+                u_out = int(us.get("bytes_out", 0))
+                u_active = int(us.get("active", 0))
+                console.print(f"  [green]✓[/green] [bold]{s.label}[/bold]")
+                console.print(f"    ↓ {format_bytes(u_in)}  ↑ {format_bytes(u_out)}  conns: {u_active}")
+
+        console.print()
+        console.print(
+            _choice(1, "Stream live logs"),
+            _choice(2, "Connection log"),
+            _choice(3, "Engine metrics"),
+            _choice(4, "Engine metrics (live)"),
+            _choice(5, "Active connections"),
+            _choice(0, "Back"),
+            sep="\n",
+        )
+        choice = _ask_choice(5)
+        if choice == 1:
+            _stream_live_logs_screen()
+        elif choice == 2:
+            _connection_log_screen()
+        elif choice == 3:
+            _metrics_screen()
+        elif choice == 4:
+            _metrics_live_screen()
+        elif choice == 5:
+            _active_connections_screen()
+    except Exception as exc:
+        console.print(f"[red]Error: {exc}[/red]")
+        _pause()
 
 
 # ── Geo-blocking menu ──────────────────────────────────────────────────────────
