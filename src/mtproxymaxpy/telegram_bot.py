@@ -556,7 +556,6 @@ def _register_handlers(bot: telebot.TeleBot, chat_id: str) -> None:  # noqa: C90
 
 def _send_startup_notification(bot: telebot.TeleBot, chat_id: str) -> None:
     """Send a startup notification with proxy links."""
-    from mtproxymaxpy import process_manager
     from mtproxymaxpy.config.settings import load_settings as ls
     from mtproxymaxpy.utils.network import get_public_ip
     from mtproxymaxpy.utils.proxy_link import build_proxy_links
@@ -567,11 +566,24 @@ def _send_startup_notification(bot: telebot.TeleBot, chat_id: str) -> None:
         secrets = load_secrets()
         enabled = [s for s in secrets if s.enabled]
 
-        lines = [f"🚀 *{_md(settings.telegram_server_label)}* started"]
-        if enabled and srv != "?":
-            _, web = build_proxy_links(enabled[0].key, settings.proxy_domain, srv, settings.proxy_port)
+        lines = [f"🚀 *{_md(settings.telegram_server_label)}* started", ""]
+        if not enabled:
+            lines.append("No enabled secrets\\.")
+            _send(bot, chat_id, "\n".join(lines))
+            return
+        if srv == "?":
+            lines.append("Could not detect server IP/domain for links\\.")
+            _send(bot, chat_id, "\n".join(lines))
+            return
+
+        for s in enabled:
+            _, web = build_proxy_links(s.key, settings.proxy_domain, srv, settings.proxy_port)
+            lines.append(f"🏷 *{_md(s.label)}*")
             lines.append(f"`{_md(web)}`")
-        _send(bot, chat_id, "\n".join(lines))
+            lines.append("")
+
+        lines.append(f"Domain: `{_md(settings.proxy_domain)}`")
+        _send_chunked(bot, chat_id, lines)
     except Exception as exc:
         logger.debug("Startup notification failed: %s", exc)
 
