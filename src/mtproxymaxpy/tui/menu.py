@@ -1394,8 +1394,21 @@ def _update_screen() -> None:  # noqa: C901
                             UPDATE_SHA_FILE.write_text(remote_sha)
                             UPDATE_BADGE_FILE.unlink(missing_ok=True)
                             console.print("[green][+] Manager updated successfully.[/green]")
+
+                            # If Telegram bot runs as a dedicated systemd service,
+                            # restart it so it picks up freshly updated code.
+                            try:
+                                from mtproxymaxpy import systemd as _svc
+                                from mtproxymaxpy.constants import SYSTEMD_TELEGRAM_SERVICE
+
+                                if _svc.is_active(SYSTEMD_TELEGRAM_SERVICE):
+                                    _svc.restart_service(SYSTEMD_TELEGRAM_SERVICE)
+                                    console.print("[green][+] Telegram bot service restarted.[/green]")
+                            except Exception as exc:
+                                console.print(f"[yellow][!] Telegram bot service restart skipped: {exc}[/yellow]")
+
                             console.print(
-                                "[bold yellow]  Exit and run 'mtproxymaxpy' again to apply changes.[/bold yellow]"
+                                "[bold yellow]  App will now close. Start 'mtproxymaxpy' again.[/bold yellow]"
                             )
                             self_updated = True
                         else:
@@ -1433,6 +1446,8 @@ def _update_screen() -> None:  # noqa: C901
     except Exception as exc:
         console.print(f"  [red]Error checking engine update: {exc}[/red]")
 
+    if self_updated:
+        raise SystemExit(0)
     _pause()
 
 
