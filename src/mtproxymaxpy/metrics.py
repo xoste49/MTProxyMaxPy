@@ -7,10 +7,14 @@ into a structured stats dict suitable for display in the TUI and CLI.
 
 from __future__ import annotations
 
+import time
 import re
 from typing import Any
 
 import httpx
+
+
+_stats_cache: tuple[dict[str, Any], float] | None = None
 
 
 # ── Prometheus text-format parser ─────────────────────────────────────────────
@@ -85,13 +89,20 @@ def _first(samples: list[dict], *names: str, **label_filter: str) -> float:
 # ── Public API ─────────────────────────────────────────────────────────────────
 
 
-def get_stats() -> dict[str, Any]:
+def get_stats(*, timeout: float = 5.0, max_age: float = 0.0) -> dict[str, Any]:
     """Return a structured stats dict from the live Prometheus endpoint.
 
     Always returns a dict; ``available`` key indicates success.
     """
+    global _stats_cache
+
+    if max_age > 0 and _stats_cache is not None:
+        cached, ts = _stats_cache
+        if time.monotonic() - ts <= max_age:
+            return cached
+
     try:
-        raw = fetch_raw()
+        raw = fetch_raw(timeout=timeout)
         samples = parse_metrics(raw)
 
         bytes_in = _first(
@@ -134,7 +145,7 @@ def get_stats() -> dict[str, Any]:
             elif "active" in n or "current" in n:
                 user_stats[user]["active"] += s["value"]
 
-        return {
+        result = {
             "available": True,
             "bytes_in": int(bytes_in),
             "bytes_out": int(bytes_out),
@@ -142,6 +153,9 @@ def get_stats() -> dict[str, Any]:
             "total_connections": int(total_conns),
             "user_stats": user_stats,
         }
+        if max_age > 0:
+            _stats_cache = (result, time.monotonic())
+        return result
     except Exception as exc:
         return {"available": False, "error": str(exc)}
 

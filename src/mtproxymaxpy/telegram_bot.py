@@ -23,7 +23,7 @@ import time
 from typing import Optional
 
 import telebot
-from telebot.types import Message
+from telebot.types import BotCommand, Message
 
 from mtproxymaxpy.config.settings import load_settings
 from mtproxymaxpy.config.secrets import load_secrets
@@ -56,6 +56,33 @@ def _send(bot: telebot.TeleBot, chat_id: str, text: str) -> None:
 
 def _md(text: str) -> str:
     return escape_md(text)
+
+
+def _register_bot_commands(bot: telebot.TeleBot) -> None:
+    """Publish command list so Telegram clients show the slash-command menu."""
+    commands = [
+        BotCommand("status", "proxy status"),
+        BotCommand("users", "list users"),
+        BotCommand("restart", "restart proxy"),
+        BotCommand("mp_health", "full diagnostics"),
+        BotCommand("mp_secrets", "secrets with traffic stats"),
+        BotCommand("mp_link", "proxy link and QR"),
+        BotCommand("mp_traffic", "traffic statistics"),
+        BotCommand("mp_upstreams", "list upstreams"),
+        BotCommand("mp_add", "add secret"),
+        BotCommand("mp_remove", "remove secret"),
+        BotCommand("mp_rotate", "rotate key"),
+        BotCommand("mp_enable", "enable secret"),
+        BotCommand("mp_disable", "disable secret"),
+        BotCommand("mp_limits", "show limits"),
+        BotCommand("mp_setlimit", "set limit value"),
+        BotCommand("mp_update", "update telemt binary"),
+        BotCommand("mp_help", "show help"),
+    ]
+    try:
+        bot.set_my_commands(commands)
+    except Exception as exc:
+        logger.warning("Failed to register Telegram commands menu: %s", exc)
 
 
 # ── Status text builders ───────────────────────────────────────────────────────
@@ -211,18 +238,26 @@ def _register_handlers(bot: telebot.TeleBot, chat_id: str) -> None:  # noqa: C90
             return
         from mtproxymaxpy import metrics as _metrics
 
-        secrets = load_secrets()
-        mst = _metrics.get_stats()
-        user_stats = mst.get("user_stats", {}) if mst.get("available") else {}
-        lines = ["*Secrets:*", ""]
-        for s in secrets:
-            flag = "✅" if s.enabled else "❌"
-            us = user_stats.get(s.key, {})
-            bi = format_bytes(us.get("bytes_in", 0)) if us else "—"
-            bo = format_bytes(us.get("bytes_out", 0)) if us else "—"
-            conns = str(int(us.get("active", 0))) if us else "—"
-            lines.append(f"{flag} `{_md(s.label)}`\n    ↑{_md(bo)} ↓{_md(bi)} conns={conns}")
-        _send(bot, chat_id, "\n".join(lines))
+        _send(bot, chat_id, "⏳ Collecting secrets stats…")
+
+        def _render_and_send() -> None:
+            try:
+                secrets = load_secrets()
+                mst = _metrics.get_stats(timeout=2.0, max_age=5.0)
+                user_stats = mst.get("user_stats", {}) if mst.get("available") else {}
+                lines = ["*Secrets:*", ""]
+                for s in secrets:
+                    flag = "✅" if s.enabled else "❌"
+                    us = user_stats.get(s.key, {})
+                    bi = format_bytes(us.get("bytes_in", 0)) if us else "—"
+                    bo = format_bytes(us.get("bytes_out", 0)) if us else "—"
+                    conns = str(int(us.get("active", 0))) if us else "—"
+                    lines.append(f"{flag} `{_md(s.label)}`\n    ↑{_md(bo)} ↓{_md(bi)} conns={conns}")
+                _send(bot, chat_id, "\n".join(lines))
+            except Exception as exc:
+                _send(bot, chat_id, f"❌ Failed to collect stats: `{_md(str(exc))}`")
+
+        threading.Thread(target=_render_and_send, daemon=True, name="tg-mp-secrets").start()
 
     # /mp_link [label]
     @bot.message_handler(commands=["mp_link"])
@@ -544,6 +579,7 @@ def start() -> None:
     chat_id = settings.telegram_chat_id
 
     _register_handlers(bot, chat_id)
+    _register_bot_commands(bot)
 
     # Polling thread
     poll_thread = threading.Thread(
