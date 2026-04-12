@@ -4,7 +4,15 @@ import sys
 import pytest
 from pathlib import Path
 
-from mtproxymaxpy.config.upstreams import Upstream, load_upstreams, save_upstreams
+from mtproxymaxpy.config.upstreams import (
+    Upstream,
+    add_upstream,
+    disable_upstream,
+    enable_upstream,
+    load_upstreams,
+    remove_upstream,
+    save_upstreams,
+)
 
 
 def test_save_load_round_trip(tmp_path: Path) -> None:
@@ -20,8 +28,12 @@ def test_save_load_round_trip(tmp_path: Path) -> None:
     assert loaded[1].weight == 80
 
 
-def test_missing_returns_empty(tmp_path: Path) -> None:
-    assert load_upstreams(tmp_path / "none.json") == []
+def test_missing_returns_default_direct(tmp_path: Path) -> None:
+    items = load_upstreams(tmp_path / "none.json")
+    assert len(items) == 1
+    assert items[0].name == "direct"
+    assert items[0].type == "direct"
+    assert items[0].enabled is True
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Unix permissions not supported on Windows")
@@ -35,3 +47,35 @@ def test_file_mode_600(tmp_path: Path) -> None:
 def test_invalid_type_raises() -> None:
     with pytest.raises(Exception):
         Upstream(name="bad", type="ftp")  # type: ignore[arg-type]
+
+
+def test_cannot_disable_last_enabled_upstream(tmp_path: Path) -> None:
+    path = tmp_path / "upstreams.json"
+    save_upstreams([Upstream(name="direct", type="direct", enabled=True)], path)
+    with pytest.raises(ValueError, match="last enabled"):
+        disable_upstream("direct", path)
+
+
+def test_cannot_remove_last_enabled_upstream(tmp_path: Path) -> None:
+    path = tmp_path / "upstreams.json"
+    save_upstreams([Upstream(name="direct", type="direct", enabled=True)], path)
+    with pytest.raises(ValueError, match="last upstream"):
+        remove_upstream("direct", path)
+
+
+def test_add_upstream_validates_addr_and_name(tmp_path: Path) -> None:
+    path = tmp_path / "upstreams.json"
+    with pytest.raises(ValueError, match=r"Address \(host:port\) is required"):
+        add_upstream("node1", type_="socks5", addr="", path=path)
+    with pytest.raises(ValueError, match="Name must match"):
+        add_upstream("bad name", type_="direct", path=path)
+
+
+def test_add_and_remove_flow_with_guards(tmp_path: Path) -> None:
+    path = tmp_path / "upstreams.json"
+    add_upstream("node1", type_="socks5", addr="127.0.0.1:1080", path=path)
+    enable_upstream("node1", path)
+    remove_upstream("direct", path)
+    loaded = load_upstreams(path)
+    assert len(loaded) == 1
+    assert loaded[0].name == "node1"

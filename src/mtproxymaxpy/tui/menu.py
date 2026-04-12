@@ -614,28 +614,21 @@ def _upstreams_menu() -> None:
 
 def _upstreams_action(ch: int, ups) -> None:
     if ch == 1:
-        from mtproxymaxpy.config.upstreams import Upstream, load_upstreams, save_upstreams
+        from mtproxymaxpy.config.upstreams import add_upstream
         name = Prompt.ask("  Name", console=console)
         utype = Prompt.ask("  Type", choices=["socks5", "socks4", "direct"], default="socks5", console=console)
         addr = Prompt.ask("  Address (host:port)", default="", console=console)
         user = Prompt.ask("  Username (optional)", default="", console=console)
         pwd = Prompt.ask("  Password (optional)", default="", password=True, console=console)
-        weight = IntPrompt.ask("  Weight (1-100)", default=100, console=console)
-        items = load_upstreams()
-        items.append(Upstream(name=name, type=utype, addr=addr, user=user, password=pwd, weight=weight))  # type: ignore
-        save_upstreams(items)
+        weight = IntPrompt.ask("  Weight (1-100)", default=10, console=console)
+        add_upstream(name, type_=utype, addr=addr, user=user, password=pwd, weight=weight)
         console.print(f"[green][+] Added '{name}'[/green]")
         _pause()
     elif ch == 2:
         name = Prompt.ask("  Name to remove", console=console)
-        from mtproxymaxpy.config.upstreams import load_upstreams, save_upstreams
-        items = load_upstreams()
-        new = [u for u in items if u.name != name]
-        if len(new) == len(items):
-            console.print(f"[red][!] Not found: '{name}'[/red]")
-        else:
-            save_upstreams(new)
-            console.print(f"[green][+] Removed '{name}'[/green]")
+        from mtproxymaxpy.config.upstreams import remove_upstream
+        remove_upstream(name)
+        console.print(f"[green][+] Removed '{name}'[/green]")
         _pause()
     elif ch == 3:
         name = Prompt.ask("  Name", console=console)
