@@ -8,11 +8,11 @@ import json
 import os
 import secrets
 import tempfile
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from mtproxymaxpy.constants import SECRETS_FILE
 
@@ -25,8 +25,31 @@ class Secret(BaseModel):
     max_conns: int = Field(0, ge=0)    # 0 = unlimited
     max_ips: int = Field(0, ge=0)      # 0 = unlimited
     quota_bytes: int = Field(0, ge=0)  # 0 = unlimited
-    expires: str = ""                   # YYYY-MM-DD or ""
+    expires: str = ""                   # normalized to YYYY-MM-DD or ""
     notes: str = ""
+
+    @field_validator("expires", mode="before")
+    @classmethod
+    def _normalize_expires(cls, value: object) -> str:
+        # Accept legacy values (e.g. "0") and normalize to a single internal format.
+        if value is None:
+            return ""
+        raw = str(value).strip()
+        if raw in ("", "0"):
+            return ""
+
+        # Primary format used by UI/CLI.
+        try:
+            return date.fromisoformat(raw).isoformat()
+        except ValueError:
+            pass
+
+        # Accept datetime-like input (including RFC 3339 "Z") and reduce to date.
+        dt_raw = raw[:-1] + "+00:00" if raw.endswith("Z") else raw
+        try:
+            return datetime.fromisoformat(dt_raw).date().isoformat()
+        except ValueError:
+            return ""
 
 
 def load_secrets(path: Path = SECRETS_FILE) -> list[Secret]:

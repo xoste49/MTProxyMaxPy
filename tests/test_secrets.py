@@ -15,6 +15,8 @@ from mtproxymaxpy.config.secrets import (
     rotate_secret,
     save_secrets,
 )
+from mtproxymaxpy.process_manager import _build_toml_config
+from mtproxymaxpy.config.settings import Settings
 
 
 def test_save_and_load_round_trip(tmp_path: Path) -> None:
@@ -91,3 +93,27 @@ def test_order_preserved_after_remove(tmp_path: Path) -> None:
     remove_secret("b", path)
     labels = [s.label for s in load_secrets(path)]
     assert labels == ["a", "c", "d"]
+
+
+def test_secret_normalizes_legacy_zero_expiry() -> None:
+    s = Secret(label="alice", key="a" * 32, expires="0")
+    assert s.expires == ""
+
+
+def test_secret_normalizes_datetime_expiry_to_date() -> None:
+    s = Secret(label="alice", key="a" * 32, expires="2026-04-12T10:11:12Z")
+    assert s.expires == "2026-04-12"
+
+
+def test_build_toml_skips_invalid_expiry_and_keeps_valid() -> None:
+    settings = Settings()
+    secrets = [
+        Secret(label="good", key="a" * 32, enabled=True, expires="2026-04-12"),
+        Secret(label="legacy", key="b" * 32, enabled=True, expires="0"),
+        Secret(label="bad", key="c" * 32, enabled=True, expires="not-a-date"),
+    ]
+    toml_text = _build_toml_config(settings, secrets, [], "")
+    exp_section = toml_text.split("[access.user_expirations]", 1)[1]
+    assert '"good" = "2026-04-12T23:59:59Z"' in exp_section
+    assert '"legacy" =' not in exp_section
+    assert '"bad" =' not in exp_section

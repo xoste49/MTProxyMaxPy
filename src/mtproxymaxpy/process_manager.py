@@ -20,6 +20,7 @@ import tarfile
 import tempfile
 import textwrap
 import time
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -46,6 +47,31 @@ logger = logging.getLogger(__name__)
 PID_FILE = INSTALL_DIR / "telemt.pid"
 
 
+def _to_rfc3339_expiration(value: str) -> Optional[str]:
+    """Convert secret expiry to an RFC 3339 timestamp expected by telemt."""
+    raw = value.strip()
+    if raw in ("", "0"):
+        return None
+
+    # Internal canonical format is YYYY-MM-DD.
+    try:
+        d = date.fromisoformat(raw)
+        return f"{d.isoformat()}T23:59:59Z"
+    except ValueError:
+        pass
+
+    # Allow datetime input and normalize timezone to RFC 3339.
+    dt_raw = raw[:-1] + "+00:00" if raw.endswith("Z") else raw
+    try:
+        dt = datetime.fromisoformat(dt_raw)
+    except ValueError:
+        return None
+
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.isoformat().replace("+00:00", "Z")
+
+
 # ── Config generation ─────────────────────────────────────────────────────────
 
 def _build_toml_config(
@@ -55,8 +81,6 @@ def _build_toml_config(
     public_ip: str = "",
 ) -> str:
     """Return a config.toml string for telemt matching the bash-generated format."""
-    from datetime import datetime, timezone
-
     active = [s for s in secrets if s.enabled]
 
     lines: list[str] = [
@@ -144,7 +168,13 @@ def _build_toml_config(
     max_conns = {s.label: s.max_conns for s in active if s.max_conns > 0}
     max_ips = {s.label: s.max_ips for s in active if s.max_ips > 0}
     quota = {s.label: s.quota_bytes for s in active if s.quota_bytes > 0}
-    expires = {s.label: s.expires for s in active if s.expires}
+    expires: dict[str, str] = {}
+    for s in active:
+        exp = _to_rfc3339_expiration(s.expires)
+        if exp:
+            expires[s.label] = exp
+        elif s.expires.strip() not in ("", "0"):
+            logger.warning("Skipping invalid expiry for secret label=%s: %r", s.label, s.expires)
 
     if max_conns:
         lines += ["", "[access.user_max_tcp_conns]"]
@@ -161,9 +191,6 @@ def _build_toml_config(
     if expires:
         lines += ["", "[access.user_expirations]"]
         for label, val in expires.items():
-            # telemt requires RFC 3339 datetime; convert bare YYYY-MM-DD dates
-            if len(val) == 10 and "T" not in val:
-                val = val + "T23:59:59Z"
             lines.append(f'"{label}" = "{val}"')
 
     # [[upstreams]]
