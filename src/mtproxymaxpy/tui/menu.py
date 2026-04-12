@@ -68,7 +68,7 @@ def _header_panel() -> Panel:
     try:
         from mtproxymaxpy.constants import UPDATE_BADGE_FILE
         if UPDATE_BADGE_FILE.exists():
-            combined.append("  ⬆ Update available — select [9]", style="bold yellow")
+            combined.append("  ⬆ Update available — select [10]", style="bold yellow")
     except Exception:
         pass
 
@@ -185,26 +185,28 @@ def run_tui() -> None:
         console.print(
             _choice(1, "Proxy Management"),
             _choice(2, "Secrets Management", f"{n_secrets} user(s)"),
-            _choice(3, "Upstream Proxies", f"{n_upstreams} upstream(s)"),
-            _choice(4, "Configuration", cfg_hint),
-            _choice(5, "Logs & Traffic"),
-            _choice(6, "Security / Geo-blocking", f"{n_geo} country/ies"),
-            _choice(7, "Backup & Restore"),
-            _choice(8, "Telegram Bot", tg_hint),
-            _choice(9, "Update", update_hint),
+            _choice(3, "Share Links & QR"),
+            _choice(4, "Upstream Proxies", f"{n_upstreams} upstream(s)"),
+            _choice(5, "Configuration", cfg_hint),
+            _choice(6, "Logs & Traffic"),
+            _choice(7, "Security / Geo-blocking", f"{n_geo} country/ies"),
+            _choice(8, "Backup & Restore"),
+            _choice(9, "Telegram Bot", tg_hint),
+            _choice(10, "Update", update_hint),
             sep="\n",
         )
-        choice = _ask_choice(9)
+        choice = _ask_choice(10)
         {
             1: _proxy_menu,
             2: _secrets_menu,
-            3: _upstreams_menu,
-            4: _settings_menu,
-            5: _logs_traffic_screen,
-            6: _geoblock_menu,
-            7: _backup_menu,
-            8: _telegram_menu,
-            9: _update_screen,
+            3: _links_menu,
+            4: _upstreams_menu,
+            5: _settings_menu,
+            6: _logs_traffic_screen,
+            7: _geoblock_menu,
+            8: _backup_menu,
+            9: _telegram_menu,
+            10: _update_screen,
         }.get(choice, lambda: None)()
 
         if choice == 0:
@@ -569,6 +571,70 @@ def _secret_show_link(secs) -> None:
     if qr:
         console.print(qr)
     _pause()
+
+
+def _links_menu() -> None:
+    """Dedicated Share Links & QR screen, matching bash main-menu flow."""
+    while True:
+        _clear()
+        console.print(_header_panel())
+        console.print(Rule("[cyan]Share Links & QR[/cyan]"))
+
+        try:
+            from mtproxymaxpy.config.secrets import load_secrets
+            secs = load_secrets()
+        except Exception:
+            secs = []
+
+        enabled = [s for s in secs if s.enabled]
+        console.print(f"  Enabled secrets: [bold]{len(enabled)}[/bold]")
+        console.print()
+        console.print(
+            _choice(1, "Show all enabled links + QR"),
+            _choice(2, "Show link + QR by label"),
+            _choice(0, "Back"),
+            sep="\n",
+        )
+        ch = _ask_choice(2)
+        if ch == 0:
+            return
+        if ch == 2:
+            _secret_show_link(secs)
+            continue
+
+        _clear()
+        console.print(_header_panel())
+        console.print(Rule("[cyan]Share Links & QR[/cyan]"))
+        if not enabled:
+            console.print("  [dim]No enabled secrets found.[/dim]")
+            _pause()
+            continue
+
+        try:
+            from mtproxymaxpy.config.settings import load_settings
+            from mtproxymaxpy.utils.network import get_public_ip
+            from mtproxymaxpy.utils.proxy_link import build_proxy_links, render_qr_terminal
+
+            settings = load_settings()
+            ip = settings.custom_ip or get_public_ip()
+            if not ip:
+                console.print("  [red][!] Cannot detect server IP[/red]")
+                _pause()
+                continue
+
+            for s in enabled:
+                tg_link, web_link = build_proxy_links(s.key, settings.proxy_domain, ip, settings.proxy_port)
+                console.print()
+                console.print(f"  [bold green]{s.label}[/bold green]")
+                console.print("  [dim]" + "-" * 40 + "[/dim]")
+                console.print(f"  [bold]TG Link:[/bold]  [cyan]{tg_link}[/cyan]")
+                console.print(f"  [bold]Web Link:[/bold] [cyan]{web_link}[/cyan]")
+                qr = render_qr_terminal(web_link)
+                if qr:
+                    console.print(qr)
+        except Exception as exc:
+            console.print(f"[red]Error:[/red] {exc}")
+        _pause()
 
 
 # ── Upstreams menu ─────────────────────────────────────────────────────────────
