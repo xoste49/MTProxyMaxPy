@@ -12,6 +12,7 @@ from mtproxymaxpy.config.upstreams import (
     load_upstreams,
     remove_upstream,
     save_upstreams,
+    toggle_upstream,
 )
 
 
@@ -79,3 +80,15 @@ def test_add_and_remove_flow_with_guards(tmp_path: Path) -> None:
     loaded = load_upstreams(path)
     assert len(loaded) == 1
     assert loaded[0].name == "node1"
+
+
+def test_toggle_upstream_changes_state(tmp_path: Path) -> None:
+    path = tmp_path / "upstreams.json"
+    save_upstreams([
+        Upstream(name="direct", type="direct", enabled=True),
+        Upstream(name="node1", type="socks5", addr="127.0.0.1:1080", enabled=True),
+    ], path)
+    updated = toggle_upstream("node1", path)
+    assert updated.enabled is False
+    updated = toggle_upstream("node1", path)
+    assert updated.enabled is True

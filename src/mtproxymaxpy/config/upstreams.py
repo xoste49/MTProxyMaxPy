@@ -198,6 +198,14 @@ def disable_upstream(name: str, path: Path = UPSTREAMS_FILE) -> Upstream:
     return set_upstream_enabled(name, False, path)
 
 
+def toggle_upstream(name: str, path: Path = UPSTREAMS_FILE) -> Upstream:
+    items = load_upstreams(path)
+    current = next((u for u in items if u.name == name), None)
+    if current is None:
+        raise KeyError(f"Upstream {name!r} not found")
+    return set_upstream_enabled(name, not current.enabled, path)
+
+
 def test_upstream(name: str, timeout: float = 10.0) -> dict:
     """Test connectivity through an upstream proxy.
 

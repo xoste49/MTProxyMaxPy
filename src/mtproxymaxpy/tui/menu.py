@@ -612,6 +612,17 @@ def _upstreams_menu() -> None:
             _pause()
 
 
+def _restart_proxy_if_running() -> None:
+    from mtproxymaxpy import process_manager
+
+    if process_manager.is_running():
+        from mtproxymaxpy.utils.network import get_public_ip
+
+        ip = get_public_ip() or ""
+        pid = process_manager.restart(public_ip=ip)
+        console.print(f"[green][+] Proxy restarted (PID {pid})[/green]")
+
+
 def _upstreams_action(ch: int, ups) -> None:
     if ch == 1:
         from mtproxymaxpy.config.upstreams import add_upstream
@@ -623,20 +634,22 @@ def _upstreams_action(ch: int, ups) -> None:
         weight = IntPrompt.ask("  Weight (1-100)", default=10, console=console)
         add_upstream(name, type_=utype, addr=addr, user=user, password=pwd, weight=weight)
         console.print(f"[green][+] Added '{name}'[/green]")
+        _restart_proxy_if_running()
         _pause()
     elif ch == 2:
         name = Prompt.ask("  Name to remove", console=console)
         from mtproxymaxpy.config.upstreams import remove_upstream
         remove_upstream(name)
         console.print(f"[green][+] Removed '{name}'[/green]")
+        _restart_proxy_if_running()
         _pause()
     elif ch == 3:
-        name = Prompt.ask("  Name", console=console)
-        action = Prompt.ask("  Action", choices=["enable", "disable"], default="enable", console=console)
-        from mtproxymaxpy.config.upstreams import enable_upstream, disable_upstream
-        fn = enable_upstream if action == "enable" else disable_upstream
-        fn(name)
-        console.print(f"[green][+] {action.capitalize()}d '{name}'[/green]")
+        name = Prompt.ask("  Name to toggle", console=console)
+        from mtproxymaxpy.config.upstreams import toggle_upstream
+        updated = toggle_upstream(name)
+        state = "enabled" if updated.enabled else "disabled"
+        console.print(f"[green][+] Upstream '{name}' is now {state}[/green]")
+        _restart_proxy_if_running()
         _pause()
     elif ch == 4:
         name = Prompt.ask("  Name to test", console=console)
