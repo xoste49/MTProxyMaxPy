@@ -54,6 +54,23 @@ def _send(bot: telebot.TeleBot, chat_id: str, text: str) -> None:
         logger.warning("Telegram send failed: %s", exc)
 
 
+def _send_chunked(bot: telebot.TeleBot, chat_id: str, lines: list[str], *, limit: int = 3500) -> None:
+    """Send long Markdown messages in chunks to stay below Telegram size limits."""
+    chunk: list[str] = []
+    chunk_len = 0
+    for line in lines:
+        line_len = len(line) + 1
+        if chunk and chunk_len + line_len > limit:
+            _send(bot, chat_id, "\n".join(chunk))
+            chunk = [line]
+            chunk_len = line_len
+        else:
+            chunk.append(line)
+            chunk_len += line_len
+    if chunk:
+        _send(bot, chat_id, "\n".join(chunk))
+
+
 def _md(text: str) -> str:
     return escape_md(text)
 
@@ -246,6 +263,10 @@ def _register_handlers(bot: telebot.TeleBot, chat_id: str) -> None:  # noqa: C90
                 mst = _metrics.get_stats(timeout=2.0, max_age=5.0)
                 user_stats = mst.get("user_stats", {}) if mst.get("available") else {}
                 lines = ["*Secrets:*", ""]
+                if not mst.get("available"):
+                    err = _md(str(mst.get("error", "metrics unavailable")))
+                    lines.append(f"[metrics unavailable: `{err}`]")
+                    lines.append("")
                 for s in secrets:
                     flag = "✅" if s.enabled else "❌"
                     us = user_stats.get(s.key, {})
@@ -253,7 +274,7 @@ def _register_handlers(bot: telebot.TeleBot, chat_id: str) -> None:  # noqa: C90
                     bo = format_bytes(us.get("bytes_out", 0)) if us else "—"
                     conns = str(int(us.get("active", 0))) if us else "—"
                     lines.append(f"{flag} `{_md(s.label)}`\n    ↑{_md(bo)} ↓{_md(bi)} conns={conns}")
-                _send(bot, chat_id, "\n".join(lines))
+                _send_chunked(bot, chat_id, lines)
             except Exception as exc:
                 _send(bot, chat_id, f"❌ Failed to collect stats: `{_md(str(exc))}`")
 
