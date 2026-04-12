@@ -37,7 +37,7 @@ def _pause() -> None:
 
 def _header_panel() -> Panel:
     """Build the status header shown at the top of every screen."""
-    tg_line = Text("TG bot: unknown", style="dim")
+    tg_line = Text("○ TG UNKNOWN", style="dim")
     try:
         from mtproxymaxpy import process_manager
 
@@ -63,23 +63,23 @@ def _header_panel() -> Panel:
         if st["pid"]:
             parts.append(Text(f"  PID: {st['pid']}", style="dim"))
 
-        tg_line = Text("TG bot: ", style="dim")
+        tg_line = Text()
         if not settings.telegram_enabled:
-            tg_line.append("disabled", style="red")
+            tg_line.append("○ TG DISABLED", style="bold red")
         else:
             service_unit = SYSTEMD_UNIT_DIR / f"{SYSTEMD_TELEGRAM_SERVICE}.service"
             if not service_unit.exists():
-                tg_line.append("enabled, service not installed", style="yellow")
+                tg_line.append("◐ TG NOT INSTALLED", style="bold yellow")
             else:
                 try:
                     from mtproxymaxpy import systemd as _systemd
 
                     if _systemd.is_active(SYSTEMD_TELEGRAM_SERVICE):
-                        tg_line.append("running", style="green")
+                        tg_line.append("● TG RUNNING", style="bold green")
                     else:
-                        tg_line.append("stopped", style="red")
+                        tg_line.append("○ TG STOPPED", style="bold red")
                 except Exception:
-                    tg_line.append("state unknown", style="dim")
+                    tg_line.append("○ TG UNKNOWN", style="dim")
     except Exception:
         status_txt = Text("○ UNKNOWN", style="dim")
         parts = [status_txt]
