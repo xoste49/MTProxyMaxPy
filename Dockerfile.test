@@ -1,0 +1,18 @@
+FROM debian:trixie-slim
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    UV_PROJECT_ENVIRONMENT=/tmp/mtproxymaxpy-venv \
+    HOME=/tmp/mtproxymaxpy-home
+
+WORKDIR /work
+
+RUN apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 update -qq \
+    && apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y -qq \
+       curl ca-certificates python3 python3-venv \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p "$HOME"
+
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:${PATH}"
+
+CMD ["bash", "-lc", "uv sync --dev && uv run pytest --maxfail=1 --cov=src/mtproxymaxpy --cov-report=term-missing:skip-covered"]

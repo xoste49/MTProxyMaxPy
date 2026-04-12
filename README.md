@@ -278,6 +278,22 @@ If you were running the bash version of MTProxyMax, the first launch automatical
 
 ## Development
 
+### Run Tests In Debian (Docker)
+
+To validate Linux-specific behavior (for example file permission checks), run tests in the dedicated Debian 13 test container:
+
+```bash
+make test
+```
+
+Equivalent direct command:
+
+```bash
+docker compose run --rm test
+```
+
+This command works the same on Linux/macOS/Windows and runs `pytest` with coverage inside Debian 13 (`debian:trixie-slim`).
+
 ### Pre-commit
 
 This project uses `pre-commit` for lightweight checks and Ruff lint/format hooks.
