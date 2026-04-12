@@ -22,7 +22,7 @@ from mtproxymaxpy.constants import INSTALL_DIR
 logger = logging.getLogger(__name__)
 
 GEO_CACHE_DIR = INSTALL_DIR / "geo"
-GEO_CACHE_TTL = 86400          # 24 h
+GEO_CACHE_TTL = 86400  # 24 h
 IPSET_PREFIX = "mtproxymaxpy"
 IPDENY_URL = "https://www.ipdeny.com/ipblocks/data/aggregated/{cc}-aggregated.zone"
 GEO_STATE_FILE = INSTALL_DIR / "geoblock.json"
@@ -30,15 +30,14 @@ GEO_STATE_FILE = INSTALL_DIR / "geoblock.json"
 
 # ── Internal helpers ───────────────────────────────────────────────────────────
 
+
 def _run(*cmd: str, check: bool = True) -> subprocess.CompletedProcess:
     try:
         return subprocess.run(list(cmd), check=check, capture_output=True, text=True)
     except FileNotFoundError:
         raise RuntimeError(f"Command not found: {cmd[0]}")
     except subprocess.CalledProcessError as exc:
-        raise RuntimeError(
-            f"{' '.join(cmd)} failed (exit {exc.returncode}): {exc.stderr.strip()}"
-        ) from exc
+        raise RuntimeError(f"{' '.join(cmd)} failed (exit {exc.returncode}): {exc.stderr.strip()}") from exc
 
 
 def _require_tools() -> None:
@@ -103,6 +102,7 @@ def _save_state(state: dict) -> None:
 
 # ── Public API ─────────────────────────────────────────────────────────────────
 
+
 def add_country(cc: str) -> int:
     """Add a country to the geo-block list and apply iptables rules.
 
@@ -129,8 +129,16 @@ def add_country(cc: str) -> int:
     )
     if probe.returncode != 0:
         _run(
-            "iptables", "-I", "INPUT",
-            "-m", "set", "--match-set", setname, "src", "-j", "DROP",
+            "iptables",
+            "-I",
+            "INPUT",
+            "-m",
+            "set",
+            "--match-set",
+            setname,
+            "src",
+            "-j",
+            "DROP",
         )
 
     state = _load_state()
@@ -149,8 +157,16 @@ def remove_country(cc: str) -> None:
     setname = _ipset_name(cc)
 
     _run(
-        "iptables", "-D", "INPUT",
-        "-m", "set", "--match-set", setname, "src", "-j", "DROP",
+        "iptables",
+        "-D",
+        "INPUT",
+        "-m",
+        "set",
+        "--match-set",
+        setname,
+        "src",
+        "-j",
+        "DROP",
         check=False,
     )
     _run("ipset", "destroy", setname, check=False)

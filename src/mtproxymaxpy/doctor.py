@@ -15,6 +15,7 @@ from typing import Any, Dict, List
 
 # ── Individual checks ──────────────────────────────────────────────────────────
 
+
 def check_binary() -> dict[str, Any]:
     from mtproxymaxpy.constants import BINARY_PATH
 
@@ -48,7 +49,9 @@ def check_port_listening(port: int) -> dict[str, Any]:
         try:
             res = subprocess.run(
                 ["ss", "-tlnp"],
-                capture_output=True, text=True, timeout=5,
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             listening = f":{port}" in res.stdout or f" {port} " in res.stdout
             return {"ok": listening, "tool": "ss"}
@@ -59,7 +62,9 @@ def check_port_listening(port: int) -> dict[str, Any]:
         try:
             res = subprocess.run(
                 ["netstat", "-tlnp"],
-                capture_output=True, text=True, timeout=5,
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             listening = f":{port}" in res.stdout
             return {"ok": listening, "tool": "netstat"}
@@ -82,7 +87,10 @@ def check_tls_handshake(host: str, port: int, domain: str = "") -> dict[str, Any
         cmd += ["-servername", domain]
     try:
         proc = subprocess.run(
-            cmd, input=b"", capture_output=True, timeout=10,
+            cmd,
+            input=b"",
+            capture_output=True,
+            timeout=10,
         )
         ok = proc.returncode == 0 or b"Protocol" in proc.stdout
         return {"ok": ok, "output": (proc.stdout + proc.stderr)[:200].decode(errors="replace")}
@@ -132,12 +140,14 @@ def check_telegram_service() -> dict[str, Any]:
         return {"ok": True, "note": "disabled"}
     if shutil.which("systemctl"):
         from mtproxymaxpy import systemd
+
         active = systemd.is_active(SYSTEMD_TELEGRAM_SERVICE)
         return {"ok": active, "service": SYSTEMD_TELEGRAM_SERVICE}
     return {"ok": None, "note": "systemctl not available"}
 
 
 # ── Full doctor run ────────────────────────────────────────────────────────────
+
 
 def run_full_doctor() -> list[dict[str, Any]]:
     """Run all diagnostic checks.

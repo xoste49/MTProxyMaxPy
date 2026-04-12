@@ -21,6 +21,7 @@ from mtproxymaxpy.constants import (
 
 # ── Unit file templates ────────────────────────────────────────────────────────
 
+
 def _proxy_unit(python_exe: str) -> str:
     return f"""\
 [Unit]
@@ -68,6 +69,7 @@ WantedBy=multi-user.target
 
 # ── Install / uninstall ────────────────────────────────────────────────────────
 
+
 def _python_exe() -> str:
     return sys.executable
 
@@ -103,7 +105,7 @@ def install(*, telegram: bool = False) -> None:
 
 def uninstall(*, telegram: bool = True) -> None:
     """Stop and remove unit files."""
-    for svc in ([SYSTEMD_SERVICE] + ([SYSTEMD_TELEGRAM_SERVICE] if telegram else [])):
+    for svc in [SYSTEMD_SERVICE] + ([SYSTEMD_TELEGRAM_SERVICE] if telegram else []):
         _systemctl("stop", svc, check=False)
         _systemctl("disable", svc, check=False)
         unit = SYSTEMD_UNIT_DIR / f"{svc}.service"
@@ -113,6 +115,7 @@ def uninstall(*, telegram: bool = True) -> None:
 
 # ── Service control ────────────────────────────────────────────────────────────
 
+
 def _systemctl(*args: str, check: bool = True) -> subprocess.CompletedProcess:
     try:
         return subprocess.run(["systemctl"] + list(args), check=check, capture_output=True)
@@ -120,9 +123,7 @@ def _systemctl(*args: str, check: bool = True) -> subprocess.CompletedProcess:
         raise RuntimeError("systemctl not found — systemd is not available on this system")
     except subprocess.CalledProcessError as exc:
         stderr = (exc.stderr or b"").decode(errors="replace").strip()
-        raise RuntimeError(
-            f"systemctl {' '.join(args)} failed (exit {exc.returncode}): {stderr}"
-        ) from exc
+        raise RuntimeError(f"systemctl {' '.join(args)} failed (exit {exc.returncode}): {stderr}") from exc
 
 
 def start_service(name: str = SYSTEMD_SERVICE) -> None:

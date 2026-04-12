@@ -25,7 +25,7 @@ install.sh              — installer: git clone + uv sync; on update: no TUI
 tests/test_imports.py   — 100 smoke tests (imports, CLI --help, CSV round-trip)
 ```
 
-Install location: `/opt/mtproxymaxpy/`  
+Install location: `/opt/mtproxymaxpy/`
 Legacy bash dir: `/opt/mtproxymax/` (no `py` suffix)
 
 ## Tech Stack

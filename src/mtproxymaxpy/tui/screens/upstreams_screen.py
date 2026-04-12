@@ -60,6 +60,7 @@ class UpstreamsScreen(Screen):
                 self.notify("Name is required.", severity="warning")
                 return
             from mtproxymaxpy.config.upstreams import Upstream, load_upstreams, save_upstreams
+
             items = load_upstreams()
             if any(u.name == name for u in items):
                 self.notify(f"'{name}' already exists.", severity="error")
@@ -74,6 +75,7 @@ class UpstreamsScreen(Screen):
             row = table.get_row_at(table.cursor_row)
             name = str(row[0])
             from mtproxymaxpy.config.upstreams import load_upstreams, save_upstreams
+
             items = [u for u in load_upstreams() if u.name != name]
             save_upstreams(items)
             self._reload_table()

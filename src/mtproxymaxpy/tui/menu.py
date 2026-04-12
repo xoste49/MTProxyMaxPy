@@ -26,6 +26,7 @@ console = Console(highlight=False)
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
+
 def _clear() -> None:
     console.clear()
 
@@ -38,8 +39,10 @@ def _header_panel() -> Panel:
     """Build the status header shown at the top of every screen."""
     try:
         from mtproxymaxpy import process_manager
+
         st = process_manager.status()
         from mtproxymaxpy.config.settings import load_settings
+
         settings = load_settings()
 
         if st["running"]:
@@ -53,6 +56,7 @@ def _header_panel() -> Panel:
         ]
         if st.get("uptime_sec") is not None:
             from mtproxymaxpy.utils.formatting import format_duration
+
             parts.append(Text(f"  Uptime: {format_duration(st['uptime_sec'])}", style="yellow"))
         if st["pid"]:
             parts.append(Text(f"  PID: {st['pid']}", style="dim"))
@@ -67,6 +71,7 @@ def _header_panel() -> Panel:
     # Update badge
     try:
         from mtproxymaxpy.constants import UPDATE_BADGE_FILE
+
         if UPDATE_BADGE_FILE.exists():
             combined.append("  ⬆ Update available — select [10]", style="bold yellow")
     except Exception:
@@ -101,6 +106,7 @@ def _ask_choice(max_n: int, allow_zero: bool = True) -> int:
 
 # ── Background update checker ─────────────────────────────────────────────────
 
+
 def _check_update_bg() -> None:
     """Fire a background thread to compare GitHub HEAD SHA with stored baseline."""
     import threading
@@ -109,6 +115,7 @@ def _check_update_bg() -> None:
         try:
             import httpx
             from mtproxymaxpy.constants import GITHUB_API_COMMITS, UPDATE_BADGE_FILE, UPDATE_SHA_FILE
+
             resp = httpx.get(
                 GITHUB_API_COMMITS,
                 headers={"Accept": "application/vnd.github.sha"},
@@ -134,6 +141,7 @@ def _check_update_bg() -> None:
 
 # ── Main Menu ──────────────────────────────────────────────────────────────────
 
+
 def run_tui() -> None:
     """Entry point: run the interactive menu (blocking)."""
     from mtproxymaxpy.constants import SETTINGS_FILE
@@ -145,6 +153,7 @@ def run_tui() -> None:
         migrated = False
         try:
             from mtproxymaxpy.config.migration import detect_legacy
+
             legacy = detect_legacy()
             if legacy:
                 _migration_screen(legacy)
@@ -178,6 +187,7 @@ def run_tui() -> None:
 
         try:
             from mtproxymaxpy.constants import UPDATE_BADGE_FILE
+
             update_hint = "[yellow]⬆ available![/yellow]" if UPDATE_BADGE_FILE.exists() else ""
         except Exception:
             update_hint = ""
@@ -217,12 +227,14 @@ def run_tui() -> None:
 
 # ── Logs screen ───────────────────────────────────────────────────────────────
 
+
 def _logs_screen() -> None:
     _clear()
     console.print(_header_panel())
     console.print(Rule("[cyan]Proxy Logs (last 50 lines)[/cyan]"))
     try:
         from mtproxymaxpy.constants import INSTALL_DIR
+
         log_file = INSTALL_DIR / "telemt.log"
         if log_file.exists():
             lines = log_file.read_text(errors="replace").splitlines()
@@ -237,12 +249,14 @@ def _logs_screen() -> None:
 
 # ── Health check screen ───────────────────────────────────────────────────────
 
+
 def _health_screen() -> None:
     _clear()
     console.print(_header_panel())
     console.print(Rule("[cyan]Health Check[/cyan]"))
     try:
         from mtproxymaxpy import doctor
+
         results = doctor.run_full_doctor()
         tbl = Table(show_header=True, box=None, padding=(0, 2))
         tbl.add_column("Check", style="bold", width=26)
@@ -267,6 +281,7 @@ def _health_screen() -> None:
 
 # ── Proxy Management menu ─────────────────────────────────────────────────────
 
+
 def _proxy_menu() -> None:
     while True:
         _clear()
@@ -276,6 +291,7 @@ def _proxy_menu() -> None:
         running = False
         try:
             from mtproxymaxpy import process_manager as _pm
+
             running = _pm.is_running()
         except Exception:
             pass
@@ -303,6 +319,7 @@ def _proxy_menu() -> None:
             try:
                 from mtproxymaxpy import process_manager as _pm2
                 from mtproxymaxpy.utils.network import get_public_ip as _gip
+
                 ip = _gip() or ""
                 if running:
                     if choice == 1:
@@ -332,6 +349,7 @@ def _proxy_menu() -> None:
 
 
 # ── Status screen ──────────────────────────────────────────────────────────────
+
 
 def _status_screen() -> None:
     _clear()
@@ -395,12 +413,14 @@ def _status_screen() -> None:
 
 # ── Secrets menu ───────────────────────────────────────────────────────────────
 
+
 def _secrets_menu() -> None:
     while True:
         _clear()
         console.print(_header_panel())
         try:
             from mtproxymaxpy.config.secrets import load_secrets
+
             secs = load_secrets()
         except Exception:
             secs = []
@@ -457,6 +477,7 @@ def _secrets_action(ch: int, secs) -> None:
     elif ch == 2:
         label = Prompt.ask("  Label to remove", console=console)
         from mtproxymaxpy.config.secrets import remove_secret
+
         if remove_secret(label):
             console.print(f"[green][+] Removed '{label}'[/green]")
         else:
@@ -465,6 +486,7 @@ def _secrets_action(ch: int, secs) -> None:
     elif ch == 3:
         label = Prompt.ask("  Label to rotate", console=console)
         from mtproxymaxpy.config.secrets import rotate_secret
+
         s = rotate_secret(label)
         console.print(f"[green][+] New key: {s.key}[/green]")
         _pause()
@@ -472,6 +494,7 @@ def _secrets_action(ch: int, secs) -> None:
         label = Prompt.ask("  Label", console=console)
         action = Prompt.ask("  Action", choices=["enable", "disable"], default="enable", console=console)
         from mtproxymaxpy.config.secrets import enable_secret, disable_secret
+
         fn = enable_secret if action == "enable" else disable_secret
         fn(label)
         console.print(f"[green][+] {action.capitalize()}d '{label}'[/green]")
@@ -483,16 +506,17 @@ def _secrets_action(ch: int, secs) -> None:
         qb_str = Prompt.ask("  Quota (e.g. 5G, 0=unlimited)", default="0", console=console)
         from mtproxymaxpy.utils.validation import parse_human_bytes
         from mtproxymaxpy.config.secrets import set_secret_limits
+
         qb = parse_human_bytes(qb_str) if qb_str != "0" else 0
         exp = Prompt.ask("  Expires (YYYY-MM-DD or blank)", default="", console=console)
-        set_secret_limits(label, max_conns=mc, max_ips=mi, quota_bytes=qb,
-                          expires=exp if exp else None)
+        set_secret_limits(label, max_conns=mc, max_ips=mi, quota_bytes=qb, expires=exp if exp else None)
         console.print("[green][+] Limits updated[/green]")
         _pause()
     elif ch == 6:
         label = Prompt.ask("  Label", console=console)
         days = IntPrompt.ask("  Extend by days", default=30, console=console)
         from mtproxymaxpy.config.secrets import extend_secret
+
         s = extend_secret(label, days)
         console.print(f"[green][+] New expiry: {s.expires}[/green]")
         _pause()
@@ -502,9 +526,11 @@ def _secrets_action(ch: int, secs) -> None:
         new = Prompt.ask("  New label", console=console)
         if action == "rename":
             from mtproxymaxpy.config.secrets import rename_secret
+
             rename_secret(old, new)
         else:
             from mtproxymaxpy.config.secrets import clone_secret
+
             clone_secret(old, new)
         console.print(f"[green][+] Done[/green]")
         _pause()
@@ -512,6 +538,7 @@ def _secrets_action(ch: int, secs) -> None:
         label = Prompt.ask("  Label", console=console)
         text = Prompt.ask("  Note text (blank to clear)", default="", console=console)
         from mtproxymaxpy.config.secrets import set_secret_note
+
         set_secret_note(label, text)
         console.print("[green][+] Note updated[/green]")
         _pause()
@@ -519,11 +546,13 @@ def _secrets_action(ch: int, secs) -> None:
         _secret_show_link(secs)
     elif ch == 10:
         from mtproxymaxpy.config.secrets import export_secrets_csv
+
         csv_text = export_secrets_csv()
         console.print(csv_text)
         _pause()
     elif ch == 11:
         from mtproxymaxpy.config.secrets import disable_expired_secrets
+
         changed = disable_expired_secrets()
         console.print(f"[green][+] Disabled {len(changed)} expired secret(s)[/green]")
         _pause()
@@ -561,12 +590,12 @@ def _secret_show_link(secs) -> None:
     tg_link, web_link = build_proxy_links(target.key, settings.proxy_domain, ip, settings.proxy_port)
 
     console.print()
-    console.print(Panel(
-        f"[bold]{target.label}[/bold]\n\n"
-        f"[dim]tg://[/dim]\n{tg_link}\n\n"
-        f"[dim]https[/dim]\n{web_link}",
-        border_style="cyan",
-    ))
+    console.print(
+        Panel(
+            f"[bold]{target.label}[/bold]\n\n[dim]tg://[/dim]\n{tg_link}\n\n[dim]https[/dim]\n{web_link}",
+            border_style="cyan",
+        )
+    )
     qr = render_qr_terminal(web_link)
     if qr:
         console.print(qr)
@@ -582,6 +611,7 @@ def _links_menu() -> None:
 
         try:
             from mtproxymaxpy.config.secrets import load_secrets
+
             secs = load_secrets()
         except Exception:
             secs = []
@@ -639,11 +669,13 @@ def _links_menu() -> None:
 
 # ── Upstreams menu ─────────────────────────────────────────────────────────────
 
+
 def _upstreams_menu() -> None:
     while True:
         _clear()
         console.print(_header_panel())
         from mtproxymaxpy.config.upstreams import load_upstreams
+
         ups = load_upstreams()
 
         tbl = Table(show_header=True, box=None, padding=(0, 1))
@@ -692,6 +724,7 @@ def _restart_proxy_if_running() -> None:
 def _upstreams_action(ch: int, ups) -> None:
     if ch == 1:
         from mtproxymaxpy.config.upstreams import add_upstream
+
         name = Prompt.ask("  Name", console=console)
         utype = Prompt.ask("  Type", choices=["socks5", "socks4", "direct"], default="socks5", console=console)
         addr = Prompt.ask("  Address (host:port)", default="", console=console)
@@ -705,6 +738,7 @@ def _upstreams_action(ch: int, ups) -> None:
     elif ch == 2:
         name = Prompt.ask("  Name to remove", console=console)
         from mtproxymaxpy.config.upstreams import remove_upstream
+
         remove_upstream(name)
         console.print(f"[green][+] Removed '{name}'[/green]")
         _restart_proxy_if_running()
@@ -712,6 +746,7 @@ def _upstreams_action(ch: int, ups) -> None:
     elif ch == 3:
         name = Prompt.ask("  Name to toggle", console=console)
         from mtproxymaxpy.config.upstreams import toggle_upstream
+
         updated = toggle_upstream(name)
         state = "enabled" if updated.enabled else "disabled"
         console.print(f"[green][+] Upstream '{name}' is now {state}[/green]")
@@ -721,6 +756,7 @@ def _upstreams_action(ch: int, ups) -> None:
         name = Prompt.ask("  Name to test", console=console)
         console.print("  Testing…")
         from mtproxymaxpy.config.upstreams import test_upstream
+
         result = test_upstream(name)
         if result.get("ok"):
             lat = result.get("latency_ms")
@@ -732,11 +768,13 @@ def _upstreams_action(ch: int, ups) -> None:
 
 # ── Settings menu ──────────────────────────────────────────────────────────────
 
+
 def _settings_menu() -> None:
     while True:
         _clear()
         console.print(_header_panel())
         from mtproxymaxpy.config.settings import load_settings, save_settings
+
         settings = load_settings()
 
         tbl = Table(show_header=False, box=None, padding=(0, 2))
@@ -758,7 +796,12 @@ def _settings_menu() -> None:
             ("13 auto_update_enabled", str(settings.auto_update_enabled)),
             ("14 geoblock_mode", settings.geoblock_mode),
             ("15 telegram_enabled", str(settings.telegram_enabled)),
-            ("16 telegram_bot_token", ("*" * 8 + settings.telegram_bot_token[-4:]) if len(settings.telegram_bot_token) > 4 else settings.telegram_bot_token or "(not set)"),
+            (
+                "16 telegram_bot_token",
+                ("*" * 8 + settings.telegram_bot_token[-4:])
+                if len(settings.telegram_bot_token) > 4
+                else settings.telegram_bot_token or "(not set)",
+            ),
             ("17 telegram_chat_id", settings.telegram_chat_id or "(not set)"),
             ("18 telegram_interval (h)", str(settings.telegram_interval)),
             ("19 telegram_server_label", settings.telegram_server_label),
@@ -811,6 +854,7 @@ def _settings_menu() -> None:
 
 
 # ── Metrics screen ─────────────────────────────────────────────────────────────
+
 
 def _metrics_screen() -> None:
     _clear()
@@ -916,9 +960,7 @@ def _active_connections_screen() -> None:
         console.print(f"  Global active connections: [bold]{stats['active_connections']}[/bold]\n")
         user_stats: dict = stats.get("user_stats", {})
         active_rows = [
-            (key, int(us.get("active", 0)))
-            for key, us in user_stats.items()
-            if int(us.get("active", 0)) > 0
+            (key, int(us.get("active", 0))) for key, us in user_stats.items() if int(us.get("active", 0)) > 0
         ]
         if not active_rows:
             console.print("  [dim]No active per-user connections right now.[/dim]")
@@ -1035,11 +1077,13 @@ def _logs_traffic_screen() -> None:
 
 # ── Geo-blocking menu ──────────────────────────────────────────────────────────
 
+
 def _geoblock_menu() -> None:
     while True:
         _clear()
         console.print(_header_panel())
         from mtproxymaxpy import geoblock
+
         countries = geoblock.list_countries()
 
         console.print(Rule("[cyan]Security / Geo-blocking[/cyan]"))
@@ -1088,6 +1132,7 @@ def _geoblock_menu() -> None:
 
 # ── Backup menu ────────────────────────────────────────────────────────────────
 
+
 def _backup_menu() -> None:
     while True:
         _clear()
@@ -1127,6 +1172,7 @@ def _backup_menu() -> None:
             elif ch == 2:
                 name = Prompt.ask("  Filename (from list above)", console=console)
                 from mtproxymaxpy.constants import BACKUP_DIR
+
                 path = BACKUP_DIR / name
                 if Confirm.ask(f"  Restore from '{name}'? (current config will be backed up)", console=console):
                     meta = backup.restore_backup(path)
@@ -1139,11 +1185,13 @@ def _backup_menu() -> None:
 
 # ── Telegram menu ──────────────────────────────────────────────────────────────
 
+
 def _telegram_menu() -> None:
     while True:
         _clear()
         console.print(_header_panel())
         from mtproxymaxpy.config.settings import load_settings, save_settings
+
         settings = load_settings()
 
         console.print(Rule("[cyan]Telegram Bot[/cyan]"))
@@ -1151,7 +1199,12 @@ def _telegram_menu() -> None:
         tbl.add_column("Key", style="dim", width=26)
         tbl.add_column("Value")
         tbl.add_row("Enabled", "[green]yes[/green]" if settings.telegram_enabled else "[red]no[/red]")
-        tbl.add_row("Bot token", ("*" * 8 + settings.telegram_bot_token[-4:]) if len(settings.telegram_bot_token) > 4 else settings.telegram_bot_token or "(not set)")
+        tbl.add_row(
+            "Bot token",
+            ("*" * 8 + settings.telegram_bot_token[-4:])
+            if len(settings.telegram_bot_token) > 4
+            else settings.telegram_bot_token or "(not set)",
+        )
         tbl.add_row("Chat ID", settings.telegram_chat_id or "(not set)")
         tbl.add_row("Report interval (h)", str(settings.telegram_interval))
         tbl.add_row("Alerts enabled", str(settings.telegram_alerts_enabled))
@@ -1211,12 +1264,14 @@ def _telegram_setup_wizard() -> None:
     token = Prompt.ask("  Bot token", default=settings.telegram_bot_token, console=console)
     chat_id = Prompt.ask("  Chat ID", default=settings.telegram_chat_id, console=console)
     label = Prompt.ask("  Server label", default=settings.telegram_server_label, console=console)
-    updated = settings.model_copy(update={
-        "telegram_enabled": True,
-        "telegram_bot_token": token,
-        "telegram_chat_id": chat_id,
-        "telegram_server_label": label,
-    })
+    updated = settings.model_copy(
+        update={
+            "telegram_enabled": True,
+            "telegram_bot_token": token,
+            "telegram_chat_id": chat_id,
+            "telegram_server_label": label,
+        }
+    )
     save_settings(updated)
     console.print("[green][+] Telegram bot configured and enabled[/green]")
     _pause()
@@ -1232,6 +1287,7 @@ def _telegram_test() -> None:
         return
     try:
         import telebot
+
         bot = telebot.TeleBot(settings.telegram_bot_token)
         bot.send_message(settings.telegram_chat_id, "✅ MTProxyMaxPy test message — bot is working!")
         console.print("[green][+] Test message sent[/green]")
@@ -1241,6 +1297,7 @@ def _telegram_test() -> None:
 
 
 # ── Update screen ──────────────────────────────────────────────────────────────
+
 
 def _update_screen() -> None:  # noqa: C901
     _clear()
@@ -1254,8 +1311,12 @@ def _update_screen() -> None:  # noqa: C901
         import subprocess
         import httpx
         from mtproxymaxpy.constants import (
-            GITHUB_REPO, GITHUB_API_COMMITS, INSTALL_DIR,
-            UPDATE_SHA_FILE, UPDATE_BADGE_FILE, VERSION,
+            GITHUB_REPO,
+            GITHUB_API_COMMITS,
+            INSTALL_DIR,
+            UPDATE_SHA_FILE,
+            UPDATE_BADGE_FILE,
+            VERSION,
         )
 
         console.print("  Checking GitHub for manager updates…")
@@ -1278,11 +1339,16 @@ def _update_screen() -> None:  # noqa: C901
                 import shutil as _shutil
                 import subprocess as _sp
                 from pathlib import Path as _Path
+
                 git = _shutil.which("git")
                 # uv is a system tool — check common locations
                 uv = (
                     _shutil.which("uv")
-                    or (_Path.home() / ".local" / "bin" / "uv" if (_Path.home() / ".local" / "bin" / "uv").exists() else None)
+                    or (
+                        _Path.home() / ".local" / "bin" / "uv"
+                        if (_Path.home() / ".local" / "bin" / "uv").exists()
+                        else None
+                    )
                     or (_Path("/usr/local/bin/uv") if _Path("/usr/local/bin/uv").exists() else None)
                 )
                 if not git:
@@ -1296,17 +1362,20 @@ def _update_screen() -> None:  # noqa: C901
                     # so that --ff-only pull is not blocked by a dirty tree.
                     _sp.run(
                         [git, "-C", str(INSTALL_DIR), "stash", "--quiet"],
-                        capture_output=True, text=True,
+                        capture_output=True,
+                        text=True,
                     )
                     r1 = _sp.run(
                         [git, "-C", str(INSTALL_DIR), "pull", "--ff-only"],
-                        capture_output=True, text=True,
+                        capture_output=True,
+                        text=True,
                     )
                     # Always drop any stash created above — generated files
                     # (uv.lock etc.) will be recreated by uv sync anyway.
                     _sp.run(
                         [git, "-C", str(INSTALL_DIR), "stash", "drop", "--quiet"],
-                        capture_output=True, text=True,
+                        capture_output=True,
+                        text=True,
                     )
                     out = "\n".join(filter(None, [r1.stdout.strip(), r1.stderr.strip()]))
                     if out:
@@ -1317,13 +1386,17 @@ def _update_screen() -> None:  # noqa: C901
                         console.print("  Syncing dependencies…")
                         r2 = _sp.run(
                             [uv, "sync", "--no-dev"],
-                            capture_output=True, text=True, cwd=str(INSTALL_DIR),
+                            capture_output=True,
+                            text=True,
+                            cwd=str(INSTALL_DIR),
                         )
                         if r2.returncode == 0:
                             UPDATE_SHA_FILE.write_text(remote_sha)
                             UPDATE_BADGE_FILE.unlink(missing_ok=True)
                             console.print("[green][+] Manager updated successfully.[/green]")
-                            console.print("[bold yellow]  Exit and run 'mtproxymaxpy' again to apply changes.[/bold yellow]")
+                            console.print(
+                                "[bold yellow]  Exit and run 'mtproxymaxpy' again to apply changes.[/bold yellow]"
+                            )
                             self_updated = True
                         else:
                             console.print(f"[red][!] uv sync failed:\n{r2.stderr.strip()}[/red]")
@@ -1353,6 +1426,7 @@ def _update_screen() -> None:  # noqa: C901
                 console.print("[green][+] Engine updated[/green]")
                 if was_running:
                     from mtproxymaxpy.utils.network import get_public_ip
+
                     ip = get_public_ip() or ""
                     pid = process_manager.start(public_ip=ip)
                     console.print(f"[green][+] Proxy restarted (PID {pid})[/green]")
@@ -1376,13 +1450,14 @@ FAKETLS_DOMAINS = [
 def _setup_wizard() -> None:  # noqa: C901
     """Interactive first-run configuration wizard."""
     _clear()
-    console.print(Panel(
-        "[bold cyan]Welcome to MTProxyMaxPy![/bold cyan]\n\n"
-        "No configuration found. Let's set up your proxy.",
-        title="[bold]First-Run Setup[/bold]",
-        border_style="cyan",
-        padding=(1, 4),
-    ))
+    console.print(
+        Panel(
+            "[bold cyan]Welcome to MTProxyMaxPy![/bold cyan]\n\nNo configuration found. Let's set up your proxy.",
+            title="[bold]First-Run Setup[/bold]",
+            border_style="cyan",
+            padding=(1, 4),
+        )
+    )
     console.print()
 
     # ── 1. Port ────────────────────────────────────────────────────────────────
@@ -1399,6 +1474,7 @@ def _setup_wizard() -> None:  # noqa: C901
     detected_ip = ""
     try:
         from mtproxymaxpy.utils.network import get_public_ip
+
         with console.status("  Detecting public IP…"):
             detected_ip = get_public_ip() or ""
     except Exception:
@@ -1444,11 +1520,14 @@ def _setup_wizard() -> None:  # noqa: C901
     # ── 6. First secret ────────────────────────────────────────────────────────
     console.print()
     console.print(Rule("[cyan]6/6  First User Secret[/cyan]"))
-    secret_label = Prompt.ask(
-        "  Label for first user",
-        default="default",
-        console=console,
-    ).strip() or "default"
+    secret_label = (
+        Prompt.ask(
+            "  Label for first user",
+            default="default",
+            console=console,
+        ).strip()
+        or "default"
+    )
 
     # ── Save settings ──────────────────────────────────────────────────────────
     console.print()
@@ -1477,10 +1556,12 @@ def _setup_wizard() -> None:  # noqa: C901
 
     # ── Download binary ────────────────────────────────────────────────────────
     from mtproxymaxpy.constants import BINARY_PATH
+
     if not BINARY_PATH.exists():
         console.print("  [bold]Downloading telemt binary…[/bold]")
         try:
             from mtproxymaxpy import process_manager
+
             with console.status("  Downloading…"):
                 process_manager.download_binary()
             console.print("  [green][+] Binary downloaded[/green]")
@@ -1494,6 +1575,7 @@ def _setup_wizard() -> None:  # noqa: C901
     console.print("  [bold]Starting proxy…[/bold]")
     try:
         from mtproxymaxpy import process_manager
+
         srv_ip = custom_ip or detected_ip or ""
         pid = process_manager.start(public_ip=srv_ip)
         console.print(f"  [green][+] Proxy started (PID {pid})[/green]")
@@ -1503,6 +1585,7 @@ def _setup_wizard() -> None:  # noqa: C901
     # ── Install systemd ────────────────────────────────────────────────────────
     try:
         from mtproxymaxpy import systemd
+
         systemd.install()
         console.print("  [green][+] systemd service installed[/green]")
     except Exception:
@@ -1512,16 +1595,17 @@ def _setup_wizard() -> None:  # noqa: C901
     console.print()
     try:
         from mtproxymaxpy.utils.proxy_link import build_proxy_links
+
         srv_ip = custom_ip or detected_ip or "YOUR_IP"
         tg_link, web_link = build_proxy_links(secret.key, proxy_domain, srv_ip, port)
-        console.print(Panel(
-            f"[bold]Your proxy link:[/bold]\n\n"
-            f"[cyan]{tg_link}[/cyan]\n\n"
-            f"[dim]{web_link}[/dim]",
-            title="[green]Installation Complete[/green]",
-            border_style="green",
-            padding=(1, 4),
-        ))
+        console.print(
+            Panel(
+                f"[bold]Your proxy link:[/bold]\n\n[cyan]{tg_link}[/cyan]\n\n[dim]{web_link}[/dim]",
+                title="[green]Installation Complete[/green]",
+                border_style="green",
+                padding=(1, 4),
+            )
+        )
     except Exception:
         console.print("  [green][+] Installation complete![/green]")
 
@@ -1535,20 +1619,24 @@ def _setup_wizard() -> None:  # noqa: C901
 
 # ── Migration screen ───────────────────────────────────────────────────────────
 
+
 def _migration_screen(legacy: dict) -> None:
     _clear()
-    console.print(Panel(
-        "[bold yellow]Legacy bash configuration detected![/bold yellow]\n\n"
-        "MTProxyMaxPy can import your existing settings, secrets, upstreams and instances.\n"
-        "Original files will NOT be modified.",
-        title="[bold]Migration from MTProxyMax (bash)[/bold]",
-        border_style="yellow",
-    ))
+    console.print(
+        Panel(
+            "[bold yellow]Legacy bash configuration detected![/bold yellow]\n\n"
+            "MTProxyMaxPy can import your existing settings, secrets, upstreams and instances.\n"
+            "Original files will NOT be modified.",
+            title="[bold]Migration from MTProxyMax (bash)[/bold]",
+            border_style="yellow",
+        )
+    )
     files = "\n".join(f"  • {p}" for p in legacy.values() if p)
     console.print(f"\nDetected files:\n{files}\n")
     if Confirm.ask("  Import now?", default=True, console=console):
         try:
             from mtproxymaxpy.config.migration import run_migration
+
             result = run_migration(legacy)
             console.print(f"[green][+] Migration complete: {result}[/green]")
         except Exception as exc:

@@ -74,6 +74,7 @@ def _to_rfc3339_expiration(value: str) -> Optional[str]:
 
 # ── Config generation ─────────────────────────────────────────────────────────
 
+
 def _build_toml_config(
     settings: Settings,
     secrets: list[Secret],
@@ -252,8 +253,10 @@ def write_toml_config(
 
 # ── Binary management ──────────────────────────────────────────────────────────
 
+
 def _detect_arch() -> str:
     from mtproxymaxpy.utils.system import get_arch
+
     return get_arch()
 
 
@@ -325,6 +328,7 @@ def download_binary(version: str = TELEMT_VERSION, force: bool = False) -> None:
 
 # ── Process lifecycle ──────────────────────────────────────────────────────────
 
+
 def _read_pid() -> Optional[int]:
     try:
         return int(PID_FILE.read_text().strip())
@@ -364,9 +368,7 @@ def start(*, regenerate_config: bool = True, public_ip: str = "") -> int:
         return pid  # type: ignore[return-value]
 
     if not is_binary_present():
-        raise FileNotFoundError(
-            f"telemt binary not found at {BINARY_PATH}. Run 'mtproxymaxpy install' first."
-        )
+        raise FileNotFoundError(f"telemt binary not found at {BINARY_PATH}. Run 'mtproxymaxpy install' first.")
 
     if regenerate_config:
         write_toml_config(public_ip=public_ip)
@@ -446,6 +448,7 @@ def status() -> dict:
         try:
             import time as _time
             import psutil  # type: ignore[import]
+
             p = psutil.Process(pid)
             uptime_sec = int(_time.time() - p.create_time())
         except Exception:

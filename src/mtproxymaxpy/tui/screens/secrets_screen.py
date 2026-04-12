@@ -55,6 +55,7 @@ class SecretsScreen(Screen):
                 self.notify("Enter a label first.", severity="warning")
                 return
             from mtproxymaxpy.config.secrets import add_secret
+
             try:
                 add_secret(label)
                 self.query_one("#new-label", Input).value = ""
@@ -74,11 +75,13 @@ class SecretsScreen(Screen):
 
             if event.button.id == "btn-remove":
                 from mtproxymaxpy.config.secrets import remove_secret
+
                 remove_secret(label)
                 self._reload_table()
                 self.notify(f"Secret '{label}' removed.")
             else:
                 from mtproxymaxpy.config.secrets import rotate_secret
+
                 try:
                     s = rotate_secret(label)
                     self._reload_table()

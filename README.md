@@ -276,6 +276,35 @@ If you were running the bash version of MTProxyMax, the first launch automatical
 
 ---
 
+## Development
+
+### Pre-commit
+
+This project uses `pre-commit` for lightweight checks and Ruff lint/format hooks.
+
+```bash
+uv run pre-commit install
+uv run pre-commit run --all-files
+```
+
+### Ruff
+
+Run lint checks:
+
+```bash
+uv run ruff check .
+uv run ruff check . --fix
+```
+
+Run formatter:
+
+```bash
+uv run ruff format .
+uv run ruff format --check .
+```
+
+---
+
 ## Changelog
 
 ### v1.0.0 — Python Rewrite

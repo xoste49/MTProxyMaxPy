@@ -141,17 +141,19 @@ def _parse_secrets_conf(path: Path) -> list[Secret]:
         cols += [""] * (9 - len(cols))
         label, key, created_ts, enabled, max_conns, max_ips, quota, expires, notes = cols[:9]
         try:
-            items.append(Secret(
-                label=label.strip(),
-                key=key.strip(),
-                created=_ts_to_date(created_ts.strip()) or created_ts.strip(),
-                enabled=_parse_bool(enabled.strip()) if enabled.strip() else True,
-                max_conns=int(max_conns.strip() or 0),
-                max_ips=int(max_ips.strip() or 0),
-                quota_bytes=int(quota.strip() or 0),
-                expires=expires.strip() if expires.strip() not in ("", "0") else "",
-                notes=notes.strip(),
-            ))
+            items.append(
+                Secret(
+                    label=label.strip(),
+                    key=key.strip(),
+                    created=_ts_to_date(created_ts.strip()) or created_ts.strip(),
+                    enabled=_parse_bool(enabled.strip()) if enabled.strip() else True,
+                    max_conns=int(max_conns.strip() or 0),
+                    max_ips=int(max_ips.strip() or 0),
+                    quota_bytes=int(quota.strip() or 0),
+                    expires=expires.strip() if expires.strip() not in ("", "0") else "",
+                    notes=notes.strip(),
+                )
+            )
         except Exception:
             continue
     return items
@@ -170,16 +172,18 @@ def _parse_upstreams_conf(path: Path) -> list[Upstream]:
         cols += [""] * (8 - len(cols))
         name, utype, addr, user, password, weight, iface, enabled = cols[:8]
         try:
-            items.append(Upstream(
-                name=name.strip(),
-                type=utype.strip() or "direct",  # type: ignore[arg-type]
-                addr=addr.strip(),
-                user=user.strip(),
-                password=password.strip(),
-                weight=int(weight.strip() or 100),
-                iface=iface.strip(),
-                enabled=_parse_bool(enabled.strip()) if enabled.strip() else True,
-            ))
+            items.append(
+                Upstream(
+                    name=name.strip(),
+                    type=utype.strip() or "direct",  # type: ignore[arg-type]
+                    addr=addr.strip(),
+                    user=user.strip(),
+                    password=password.strip(),
+                    weight=int(weight.strip() or 100),
+                    iface=iface.strip(),
+                    enabled=_parse_bool(enabled.strip()) if enabled.strip() else True,
+                )
+            )
         except Exception:
             continue
     return items
@@ -198,18 +202,21 @@ def _parse_instances_conf(path: Path) -> list[Instance]:
         cols += [""] * (4 - len(cols))
         name, port, enabled, notes = cols[:4]
         try:
-            items.append(Instance(
-                name=name.strip(),
-                port=int(port.strip()),
-                enabled=_parse_bool(enabled.strip()) if enabled.strip() else True,
-                notes=notes.strip(),
-            ))
+            items.append(
+                Instance(
+                    name=name.strip(),
+                    port=int(port.strip()),
+                    enabled=_parse_bool(enabled.strip()) if enabled.strip() else True,
+                    notes=notes.strip(),
+                )
+            )
         except Exception:
             continue
     return items
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
+
 
 @dataclass
 class MigrationResult:
@@ -231,7 +238,7 @@ def detect_legacy(install_dir: Path = INSTALL_DIR) -> dict[str, Path]:
     # For each key, prefer the copy-in-place path, fall back to the original bash dir
     candidates: dict[str, list[Path]] = {
         "settings": [LEGACY_SETTINGS_FILE, LEGACY_BASH_SETTINGS_FILE],
-        "secrets":  [LEGACY_SECRETS_FILE,  LEGACY_BASH_SECRETS_FILE],
+        "secrets": [LEGACY_SECRETS_FILE, LEGACY_BASH_SECRETS_FILE],
         "upstreams": [LEGACY_UPSTREAMS_FILE, LEGACY_BASH_UPSTREAMS_FILE],
         "instances": [LEGACY_INSTANCES_FILE, LEGACY_BASH_INSTANCES_FILE],
     }

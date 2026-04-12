@@ -18,11 +18,12 @@ import pytest
 
 _SRC_ROOT = Path(__file__).parent.parent / "src" / "mtproxymaxpy"
 
+
 # Collect every .py file under src/mtproxymaxpy/, convert to dotted module names.
 def _module_names() -> list[str]:
     names: list[str] = []
     for path in sorted(_SRC_ROOT.rglob("*.py")):
-        rel = path.relative_to(_SRC_ROOT.parent)           # mtproxymaxpy/...
+        rel = path.relative_to(_SRC_ROOT.parent)  # mtproxymaxpy/...
         mod = str(rel.with_suffix("")).replace("/", ".").replace("\\", ".")
         # skip __pycache__ and compiled artefacts
         if "__pycache__" in mod:
@@ -35,8 +36,7 @@ def _module_names() -> list[str]:
 def test_module_imports(module: str) -> None:
     """Each module must be importable (no SyntaxError / NameError at import time)."""
     if (
-        module.startswith("mtproxymaxpy.tui.screens.")
-        or module.startswith("mtproxymaxpy.tui.widgets.")
+        module.startswith("mtproxymaxpy.tui.screens.") or module.startswith("mtproxymaxpy.tui.widgets.")
     ) and importlib.util.find_spec("textual") is None:
         pytest.skip("textual is not installed; skipping legacy Textual screen imports")
     importlib.import_module(module)
@@ -44,11 +44,13 @@ def test_module_imports(module: str) -> None:
 
 # ── 2. CLI top-level app object is importable ─────────────────────────────────
 
+
 def test_cli_app_importable() -> None:
     from mtproxymaxpy.cli import app  # noqa: F401  — must not raise
 
 
 # ── 3. Every CLI command responds to --help without error ─────────────────────
+
 
 def _cli_commands() -> list[str]:
     """Return the names of all registered top-level Typer commands via Click."""
@@ -58,7 +60,8 @@ def _cli_commands() -> list[str]:
     click_app = typer.main.get_command(app)
     # Only include actual commands (not groups that are sub-apps)
     return [
-        name for name, cmd in click_app.commands.items()  # type: ignore[attr-defined]
+        name
+        for name, cmd in click_app.commands.items()  # type: ignore[attr-defined]
         if not hasattr(cmd, "commands")  # skip sub-groups like 'secret', 'upstream' etc.
     ]
 
@@ -91,9 +94,7 @@ def test_top_level_help(command: str) -> None:
 
     runner = CliRunner()
     result = runner.invoke(app, [command, "--help"])
-    assert result.exit_code == 0, (
-        f"'{command} --help' exited {result.exit_code}:\n{result.output}"
-    )
+    assert result.exit_code == 0, f"'{command} --help' exited {result.exit_code}:\n{result.output}"
 
 
 @pytest.mark.parametrize("group,command", _cli_groups())
@@ -104,12 +105,11 @@ def test_subcommand_help(group: str, command: str) -> None:
 
     runner = CliRunner()
     result = runner.invoke(app, [group, command, "--help"])
-    assert result.exit_code == 0, (
-        f"'{group} {command} --help' exited {result.exit_code}:\n{result.output}"
-    )
+    assert result.exit_code == 0, f"'{group} {command} --help' exited {result.exit_code}:\n{result.output}"
 
 
 # ── 4. CLI install command runs migration without NameError ───────────────────
+
 
 def test_install_runs_migration_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """install() migrates legacy config when settings.toml absent — no NameError."""
@@ -130,12 +130,9 @@ def test_install_runs_migration_path(tmp_path: Path, monkeypatch: pytest.MonkeyP
     (legacy_bash / "secrets.conf").write_text("testuser|" + "a" * 32 + "|0|1|0|0|0||\n")
 
     import mtproxymaxpy.config.migration as _mig
-    monkeypatch.setattr(
-        _mig, "LEGACY_BASH_SETTINGS_FILE", legacy_bash / "settings.conf"
-    )
-    monkeypatch.setattr(
-        _mig, "LEGACY_BASH_SECRETS_FILE", legacy_bash / "secrets.conf"
-    )
+
+    monkeypatch.setattr(_mig, "LEGACY_BASH_SETTINGS_FILE", legacy_bash / "settings.conf")
+    monkeypatch.setattr(_mig, "LEGACY_BASH_SECRETS_FILE", legacy_bash / "secrets.conf")
     monkeypatch.setattr(_mig, "LEGACY_BASH_UPSTREAMS_FILE", tmp_path / "no.conf")
     monkeypatch.setattr(_mig, "LEGACY_BASH_INSTANCES_FILE", tmp_path / "no.conf")
     monkeypatch.setattr(_mig, "LEGACY_SETTINGS_FILE", tmp_path / "no.conf")
@@ -148,17 +145,21 @@ def test_install_runs_migration_path(tmp_path: Path, monkeypatch: pytest.MonkeyP
     monkeypatch.setattr(_mig, "INSTANCES_FILE", tmp_path / "instances.json")
 
     import mtproxymaxpy.config.settings as _s
+
     monkeypatch.setattr(_s, "SETTINGS_FILE", tmp_path / "settings.toml")
 
     # Patch away external calls (root check, deps check, binary download, systemd)
     from mtproxymaxpy.utils import system as _sys_utils
+
     monkeypatch.setattr(_sys_utils, "check_root", lambda: None)
     monkeypatch.setattr(_sys_utils, "check_dependencies", lambda: None)
 
     import mtproxymaxpy.process_manager as _pm
+
     monkeypatch.setattr(_pm, "download_binary", lambda **kw: None)
 
     import mtproxymaxpy.systemd as _sd
+
     monkeypatch.setattr(_sd, "install", lambda **kw: None)
 
     from typer.testing import CliRunner
@@ -173,9 +174,13 @@ def test_install_runs_migration_path(tmp_path: Path, monkeypatch: pytest.MonkeyP
 
 # ── 5. secret export / import CSV round-trip ─────────────────────────────────
 
+
 def test_secret_csv_round_trip(tmp_path: Path) -> None:
     from mtproxymaxpy.config.secrets import (
-        add_secret, export_secrets_csv, import_secrets_csv, load_secrets,
+        add_secret,
+        export_secrets_csv,
+        import_secrets_csv,
+        load_secrets,
     )
 
     secrets_file = tmp_path / "secrets.json"
@@ -191,6 +196,7 @@ def test_secret_csv_round_trip(tmp_path: Path) -> None:
 
 
 # ── 6. FakeTLS proxy link format ─────────────────────────────────────────────
+
 
 def test_faketls_secret_format() -> None:
     from mtproxymaxpy.utils.proxy_link import build_faketls_secret, build_proxy_links

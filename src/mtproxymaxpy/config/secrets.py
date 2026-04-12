@@ -22,10 +22,10 @@ class Secret(BaseModel):
     key: str = Field(default_factory=lambda: secrets.token_hex(16))
     created: str = Field(default_factory=lambda: date.today().isoformat())
     enabled: bool = True
-    max_conns: int = Field(0, ge=0)    # 0 = unlimited
-    max_ips: int = Field(0, ge=0)      # 0 = unlimited
+    max_conns: int = Field(0, ge=0)  # 0 = unlimited
+    max_ips: int = Field(0, ge=0)  # 0 = unlimited
     quota_bytes: int = Field(0, ge=0)  # 0 = unlimited
-    expires: str = ""                   # normalized to YYYY-MM-DD or ""
+    expires: str = ""  # normalized to YYYY-MM-DD or ""
     notes: str = ""
 
     @field_validator("expires", mode="before")
@@ -129,6 +129,7 @@ def rotate_secret(label: str, path: Path = SECRETS_FILE) -> Secret:
 
 # ── Toggle ─────────────────────────────────────────────────────────────────────
 
+
 def enable_secret(label: str, path: Path = SECRETS_FILE) -> Secret:
     """Enable a secret by label."""
     return _set_field(label, "enabled", True, path)
@@ -150,6 +151,7 @@ def _set_field(label: str, field: str, value, path: Path = SECRETS_FILE) -> Secr
 
 
 # ── Limits ─────────────────────────────────────────────────────────────────────
+
 
 def set_secret_limits(
     label: str,
@@ -181,6 +183,7 @@ def set_secret_limits(
 
 # ── Extend expiry ──────────────────────────────────────────────────────────────
 
+
 def extend_secret(label: str, days: int, path: Path = SECRETS_FILE) -> Secret:
     """Extend a secret's expiry by *days* days.
 
@@ -206,9 +209,7 @@ def bulk_extend_secrets(days: int, path: Path = SECRETS_FILE) -> list[Secret]:
     updated = []
     for i, s in enumerate(items):
         base = date.fromisoformat(s.expires) if s.expires else date.today()
-        items[i] = s.model_copy(
-            update={"expires": (base + timedelta(days=days)).isoformat()}
-        )
+        items[i] = s.model_copy(update={"expires": (base + timedelta(days=days)).isoformat()})
         updated.append(items[i])
     save_secrets(items, path)
     return updated
@@ -216,12 +217,14 @@ def bulk_extend_secrets(days: int, path: Path = SECRETS_FILE) -> list[Secret]:
 
 # ── Note ───────────────────────────────────────────────────────────────────────
 
+
 def set_secret_note(label: str, text: str, path: Path = SECRETS_FILE) -> Secret:
     """Set or clear the notes field for a secret."""
     return _set_field(label, "notes", text, path)
 
 
 # ── Rename / clone ─────────────────────────────────────────────────────────────
+
 
 def rename_secret(old_label: str, new_label: str, path: Path = SECRETS_FILE) -> Secret:
     """Rename a secret (label only; key unchanged)."""
@@ -258,6 +261,7 @@ def clone_secret(src_label: str, new_label: str, path: Path = SECRETS_FILE) -> S
 
 # ── Expiry helpers ─────────────────────────────────────────────────────────────
 
+
 def get_expired_secrets(path: Path = SECRETS_FILE) -> list[Secret]:
     """Return all secrets whose expiry date has passed."""
     today = date.today().isoformat()
@@ -281,8 +285,15 @@ def disable_expired_secrets(path: Path = SECRETS_FILE) -> list[Secret]:
 # ── Export / import ────────────────────────────────────────────────────────────
 
 _CSV_FIELDS = (
-    "label", "key", "created", "enabled",
-    "max_conns", "max_ips", "quota_bytes", "expires", "notes",
+    "label",
+    "key",
+    "created",
+    "enabled",
+    "max_conns",
+    "max_ips",
+    "quota_bytes",
+    "expires",
+    "notes",
 )
 
 

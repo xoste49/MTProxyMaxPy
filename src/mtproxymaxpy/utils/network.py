@@ -31,6 +31,7 @@ def get_public_ip(timeout: float = 5.0) -> Optional[str]:
             # ipify returns JSON {"ip": "..."}
             if text.startswith("{"):
                 import json
+
                 text = json.loads(text).get("ip", "")
             if text:
                 _ip_cache = (text, now)

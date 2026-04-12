@@ -65,10 +65,7 @@ def check_dependencies() -> list[str]:
             capture_output=True,
         )
         # Re-check after install
-        still_missing = [
-            cmd for cmd in (required + ["ss"])
-            if not shutil.which(cmd)
-        ]
+        still_missing = [cmd for cmd in (required + ["ss"]) if not shutil.which(cmd)]
         return still_missing
     except subprocess.CalledProcessError:
         return missing
@@ -80,6 +77,7 @@ def get_arch() -> str:
     Returns 'x86_64' or 'aarch64'; raises RuntimeError for unsupported arches.
     """
     import platform
+
     machine = platform.machine().lower()
     mapping = {
         "x86_64": "x86_64",

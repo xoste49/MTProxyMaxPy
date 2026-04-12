@@ -39,11 +39,13 @@ _report_thread: Optional[threading.Thread] = None
 
 # ── Auth guard ─────────────────────────────────────────────────────────────────
 
+
 def _is_authorised(msg: Message, chat_id: str) -> bool:
     return str(msg.chat.id) == chat_id
 
 
 # ── Message helpers ────────────────────────────────────────────────────────────
+
 
 def _send(bot: telebot.TeleBot, chat_id: str, text: str) -> None:
     try:
@@ -57,6 +59,7 @@ def _md(text: str) -> str:
 
 
 # ── Status text builders ───────────────────────────────────────────────────────
+
 
 def _get_stats_text() -> str:
     from mtproxymaxpy import process_manager, metrics as _metrics
@@ -123,6 +126,7 @@ def _get_health_text() -> str:
 
 # ── Periodic reporting ─────────────────────────────────────────────────────────
 
+
 def _report_loop(bot: telebot.TeleBot, chat_id: str, interval_hours: int) -> None:
     interval_sec = interval_hours * 3600
     while not _stop_event.wait(timeout=interval_sec):
@@ -130,6 +134,7 @@ def _report_loop(bot: telebot.TeleBot, chat_id: str, interval_hours: int) -> Non
 
 
 # ── Health monitor ─────────────────────────────────────────────────────────────
+
 
 def _health_loop(bot: telebot.TeleBot, chat_id: str) -> None:
     from mtproxymaxpy import process_manager
@@ -147,6 +152,7 @@ def _health_loop(bot: telebot.TeleBot, chat_id: str) -> None:
 
 
 # ── Bot command handlers ───────────────────────────────────────────────────────
+
 
 def _register_handlers(bot: telebot.TeleBot, chat_id: str) -> None:  # noqa: C901
 
@@ -215,10 +221,7 @@ def _register_handlers(bot: telebot.TeleBot, chat_id: str) -> None:  # noqa: C90
             bi = format_bytes(us.get("bytes_in", 0)) if us else "—"
             bo = format_bytes(us.get("bytes_out", 0)) if us else "—"
             conns = str(int(us.get("active", 0))) if us else "—"
-            lines.append(
-                f"{flag} `{_md(s.label)}`\n"
-                f"    ↑{_md(bo)} ↓{_md(bi)} conns={conns}"
-            )
+            lines.append(f"{flag} `{_md(s.label)}`\n    ↑{_md(bo)} ↓{_md(bi)} conns={conns}")
         _send(bot, chat_id, "\n".join(lines))
 
     # /mp_link [label]
@@ -380,6 +383,7 @@ def _register_handlers(bot: telebot.TeleBot, chat_id: str) -> None:  # noqa: C90
             process_manager.download_binary(version=latest, force=True)
             if was_running:
                 from mtproxymaxpy.utils.network import get_public_ip
+
                 pid = process_manager.start(public_ip=get_public_ip() or "")
                 _send(bot, chat_id, f"✅ Updated and restarted \\(PID `{pid}`\\)")
             else:
@@ -493,6 +497,7 @@ def _register_handlers(bot: telebot.TeleBot, chat_id: str) -> None:  # noqa: C90
 
 # ── Startup notification ───────────────────────────────────────────────────────
 
+
 def _send_startup_notification(bot: telebot.TeleBot, chat_id: str) -> None:
     """Send a startup notification with proxy links."""
     from mtproxymaxpy import process_manager
@@ -516,6 +521,7 @@ def _send_startup_notification(bot: telebot.TeleBot, chat_id: str) -> None:
 
 
 # ── Public API ─────────────────────────────────────────────────────────────────
+
 
 def start() -> None:
     """Start background bot threads. No-op if already running or bot not configured."""
@@ -594,4 +600,3 @@ def send_alert(text: str) -> None:
     if not settings.telegram_enabled or not _bot_instance:
         return
     _send(_bot_instance, settings.telegram_chat_id, escape_md(text))
-

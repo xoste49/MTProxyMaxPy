@@ -22,4 +22,5 @@ class StatusBox(Static):
 
     def refresh_status(self) -> None:
         from mtproxymaxpy import process_manager
+
         self.running = process_manager.is_running()

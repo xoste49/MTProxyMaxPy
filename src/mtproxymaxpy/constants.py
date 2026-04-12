@@ -40,9 +40,7 @@ LEGACY_BASH_INSTANCES_FILE = LEGACY_BASH_DIR / "instances.conf"
 
 # ── Self-update ────────────────────────────────────────────────────────────────
 GITHUB_REPO = "xoste49/MTProxyMaxPy"
-GITHUB_API_COMMITS = (
-    "https://api.github.com/repos/xoste49/MTProxyMaxPy/commits/main"
-)
+GITHUB_API_COMMITS = "https://api.github.com/repos/xoste49/MTProxyMaxPy/commits/main"
 UPDATE_SHA_FILE = INSTALL_DIR / ".update_sha"
 UPDATE_BADGE_FILE = Path("/tmp/.mtproxymaxpy_update_available")
 
@@ -51,18 +49,13 @@ BINARY_DIR = INSTALL_DIR / "bin"
 BINARY_NAME = "telemt"
 BINARY_PATH = BINARY_DIR / BINARY_NAME
 
-TELEMT_RELEASES_URL = (
-    "https://github.com/telemt/telemt/releases/download"
-)
-TELEMT_GITHUB_API = (
-    "https://api.github.com/repos/telemt/telemt/releases/latest"
-)
+TELEMT_RELEASES_URL = "https://github.com/telemt/telemt/releases/download"
+TELEMT_GITHUB_API = "https://api.github.com/repos/telemt/telemt/releases/latest"
 
 # Fallback download URL template: {version} and {arch} are substituted at runtime
 # Assets are named e.g. telemt-x86_64-linux-gnu.tar.gz (no 'v' prefix on tag)
 TELEMT_DOWNLOAD_URL_TEMPLATE = (
-    "https://github.com/telemt/telemt/releases/download"
-    "/{version}/telemt-{arch}-linux-gnu.tar.gz"
+    "https://github.com/telemt/telemt/releases/download/{version}/telemt-{arch}-linux-gnu.tar.gz"
 )
 
 # ── Defaults ───────────────────────────────────────────────────────────────────
@@ -93,9 +86,9 @@ PUBLIC_IP_CACHE_TTL = 300  # seconds
 # ── Terminal UI ────────────────────────────────────────────────────────────────
 APP_TITLE = "MTProxyMaxPy"
 BANNER = r"""
-  __  __ _____ ___                       __  __           
+  __  __ _____ ___                       __  __
  |  \/  |_   _| _ \_ _ _____ ___  _  _|  \/  |__ ___ __
  | |\/| | | | |  _/ '_/ _ \ \ / || | | |\/| / _` \ \ /
  |_|  |_| |_| |_| |_| \___/_\_\_, | |_|  |_\__,_/_\_\
-                                |__/                     
+                                |__/
 """

@@ -13,6 +13,7 @@ class SettingsScreen(Screen):
 
     def compose(self) -> ComposeResult:
         from mtproxymaxpy.config.settings import load_settings
+
         s = load_settings()
         yield Header()
         with ScrollableContainer():

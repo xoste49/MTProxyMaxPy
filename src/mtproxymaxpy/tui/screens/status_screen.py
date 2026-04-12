@@ -65,7 +65,4 @@ class StatusScreen(Screen):
         links_container.remove_children()
         for s in secrets:
             if s.enabled:
-                links_container.mount(
-                    ProxyLink(ip, settings.proxy_port, s.key,
-                              settings.proxy_domain, label=s.label)
-                )
+                links_container.mount(ProxyLink(ip, settings.proxy_port, s.key, settings.proxy_domain, label=s.label))

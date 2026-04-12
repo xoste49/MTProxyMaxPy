@@ -15,6 +15,7 @@ def _qr_text(data: str) -> str:
     try:
         import qrcode
         from io import StringIO
+
         qr = qrcode.QRCode(border=1)
         qr.add_data(data)
         qr.make(fit=True)

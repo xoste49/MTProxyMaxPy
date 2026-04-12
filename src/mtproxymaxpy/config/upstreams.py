@@ -21,11 +21,11 @@ _ADDR_RE = re.compile(r"^[a-zA-Z0-9._-]+:[0-9]+$")
 class Upstream(BaseModel):
     name: str
     type: Literal["direct", "socks5", "socks4"] = "direct"
-    addr: str = ""          # "host:port" for SOCKS
+    addr: str = ""  # "host:port" for SOCKS
     user: str = ""
     password: str = ""
     weight: int = Field(DEFAULT_UPSTREAM_WEIGHT, ge=1, le=100)
-    iface: str = ""         # source network interface (optional)
+    iface: str = ""  # source network interface (optional)
     enabled: bool = True
 
 
@@ -39,7 +39,7 @@ def _assert_valid_name(name: str) -> None:
 
 
 def _assert_safe_text(value: str, field: str) -> None:
-    if any(ch in value for ch in ('|', '"', '\\')):
+    if any(ch in value for ch in ("|", '"', "\\")):
         raise ValueError(f"{field} cannot contain '|', '\"', or '\\'")
 
 
@@ -98,6 +98,7 @@ def save_upstreams(items: list[Upstream], path: Path = UPSTREAMS_FILE) -> None:
 
 
 # ── Mutation helpers ───────────────────────────────────────────────────────────
+
 
 def _set_upstream_field(name: str, field: str, value, path: Path = UPSTREAMS_FILE) -> Upstream:
     items = load_upstreams(path)
@@ -226,15 +227,15 @@ def test_upstream(name: str, timeout: float = 10.0) -> dict:
         cmd += ["--interface", upstream.iface]
     if upstream.type != "direct":
         cmd += [
-            "--proxy", f"{upstream.type}://"
-            + (f"{upstream.user}:{upstream.password}@" if upstream.user else "")
-            + upstream.addr,
+            "--proxy",
+            f"{upstream.type}://" + (f"{upstream.user}:{upstream.password}@" if upstream.user else "") + upstream.addr,
         ]
     cmd += ["-o", "/dev/null", "-w", "%{http_code}", "https://api.ipify.org"]
 
     t0 = time.monotonic()
     try:
         import subprocess
+
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout + 2)
         latency_ms = (time.monotonic() - t0) * 1000
         ok = result.returncode == 0

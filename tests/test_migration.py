@@ -24,6 +24,7 @@ from mtproxymaxpy.constants import (
 
 # ── detect_legacy ─────────────────────────────────────────────────────────────
 
+
 def test_detect_legacy_empty(tmp_path: Path) -> None:
     result = detect_legacy(tmp_path)
     assert result == {}
@@ -55,6 +56,7 @@ def test_detect_legacy_finds_files(tmp_path: Path, monkeypatch: pytest.MonkeyPat
 
 
 # ── _parse_settings_conf ──────────────────────────────────────────────────────
+
 
 def _write(path: Path, text: str) -> Path:
     path.write_text(text)
@@ -90,6 +92,7 @@ def test_parse_settings_skips_comments(tmp_path: Path) -> None:
 
 # ── _parse_secrets_conf ───────────────────────────────────────────────────────
 
+
 def test_parse_secrets_basic(tmp_path: Path) -> None:
     content = "alice|" + "a" * 32 + "|1700000000|true|0|0|0||notes\n"
     f = _write(tmp_path / "secrets.conf", content)
@@ -102,10 +105,12 @@ def test_parse_secrets_basic(tmp_path: Path) -> None:
 
 
 def test_parse_secrets_multiple(tmp_path: Path) -> None:
-    lines = "\n".join([
-        "alice|" + "a" * 32 + "|0|true|0|0|0||",
-        "bob|" + "b" * 32 + "|0|false|5|2|1000000||vip",
-    ])
+    lines = "\n".join(
+        [
+            "alice|" + "a" * 32 + "|0|true|0|0|0||",
+            "bob|" + "b" * 32 + "|0|false|5|2|1000000||vip",
+        ]
+    )
     f = _write(tmp_path / "secrets.conf", lines)
     items = _parse_secrets_conf(f)
     assert len(items) == 2
@@ -130,6 +135,7 @@ def test_parse_secrets_skips_bad_lines(tmp_path: Path) -> None:
 
 # ── _parse_upstreams_conf ──────────────────────────────────────────────────────
 
+
 def test_parse_upstreams_basic(tmp_path: Path) -> None:
     content = "warp|socks5|127.0.0.1:1080|user|pass|90|eth0|true\n"
     f = _write(tmp_path / "upstreams.conf", content)
@@ -151,6 +157,7 @@ def test_parse_upstreams_skips_bad(tmp_path: Path) -> None:
 
 
 # ── run_migration ─────────────────────────────────────────────────────────────
+
 
 def test_run_migration_full(tmp_path: Path) -> None:
     settings_src = _write(

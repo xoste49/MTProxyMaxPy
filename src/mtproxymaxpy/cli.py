@@ -21,6 +21,7 @@ app = typer.Typer(
 
 # ── install ────────────────────────────────────────────────────────────────────
 
+
 @app.command()
 def install(
     port: Annotated[int, typer.Option("--port", "-p", help="Proxy listen port")] = 443,
@@ -46,9 +47,7 @@ def install(
         typer.echo(f"[*] Legacy MTProxyMax config detected: {', '.join(legacy)}")
         typer.echo("[*] Migrating settings, secrets and upstreams…")
         result = run_migration(legacy)
-        typer.echo(f"[+] Migration complete: "
-                   f"{result.secrets_count} secret(s), "
-                   f"{result.upstreams_count} upstream(s).")
+        typer.echo(f"[+] Migration complete: {result.secrets_count} secret(s), {result.upstreams_count} upstream(s).")
         settings = load_settings()
     else:
         settings = Settings(proxy_port=port, proxy_domain=domain)
@@ -61,6 +60,7 @@ def install(
 
     if systemd:
         from mtproxymaxpy import systemd as svc
+
         try:
             svc.install()
             typer.echo("[+] systemd service installed and started.")
@@ -71,6 +71,7 @@ def install(
 
 
 # ── uninstall ──────────────────────────────────────────────────────────────────
+
 
 @app.command()
 def uninstall(
@@ -108,6 +109,7 @@ def uninstall(
 
 
 # ── start / stop / restart / reload ───────────────────────────────────────────
+
 
 @app.command()
 def start(
@@ -157,6 +159,7 @@ def reload() -> None:
 
 # ── status ─────────────────────────────────────────────────────────────────────
 
+
 @app.command()
 def status(
     output_json: Annotated[bool, typer.Option("--json", help="Output machine-readable JSON")] = False,
@@ -186,15 +189,19 @@ def status(
 
     icon = "●" if st["running"] else "○"
     uptime = format_duration(st["uptime_sec"]) if st.get("uptime_sec") is not None else "?"
-    typer.echo(f"{icon} telemt  running={st['running']}  pid={st['pid'] or '—'}  "
-               f"port={settings.proxy_port}  uptime={uptime}")
+    typer.echo(
+        f"{icon} telemt  running={st['running']}  pid={st['pid'] or '—'}  port={settings.proxy_port}  uptime={uptime}"
+    )
     typer.echo(f"  secrets: {sum(1 for s in secrets if s.enabled)}/{len(secrets)} active")
     if mst.get("available"):
-        typer.echo(f"  traffic: ↑{format_bytes(mst['bytes_out'])} ↓{format_bytes(mst['bytes_in'])}  "
-                   f"connections: {mst['active_connections']} active")
+        typer.echo(
+            f"  traffic: ↑{format_bytes(mst['bytes_out'])} ↓{format_bytes(mst['bytes_in'])}  "
+            f"connections: {mst['active_connections']} active"
+        )
 
 
 # ── update ─────────────────────────────────────────────────────────────────────
+
 
 @app.command()
 def update() -> None:
@@ -218,6 +225,7 @@ def update() -> None:
 
 
 # ── doctor ─────────────────────────────────────────────────────────────────────
+
 
 @app.command()
 def doctor() -> None:
@@ -248,6 +256,7 @@ def doctor() -> None:
 
 # ── health ─────────────────────────────────────────────────────────────────────
 
+
 @app.command()
 def health() -> None:
     """Quick health check — exits 0 if proxy is running, 1 otherwise."""
@@ -261,6 +270,7 @@ def health() -> None:
 
 
 # ── logs ──────────────────────────────────────────────────────────────────────
+
 
 @app.command()
 def logs(
@@ -277,13 +287,16 @@ def logs(
 
     if follow:
         import subprocess
+
         subprocess.run(["tail", "-f", str(log_file)])
     else:
         import subprocess
+
         subprocess.run(["tail", f"-{lines}", str(log_file)])
 
 
 # ── metrics ────────────────────────────────────────────────────────────────────
+
 
 @app.command()
 def metrics() -> None:
@@ -304,12 +317,15 @@ def metrics() -> None:
     if user_stats:
         typer.echo("\n  Per-user:")
         for key, us in user_stats.items():
-            typer.echo(f"    {key[:12]}…  ↑{format_bytes(us.get('bytes_out', 0))}  "
-                       f"↓{format_bytes(us.get('bytes_in', 0))}  "
-                       f"active={int(us.get('active', 0))}")
+            typer.echo(
+                f"    {key[:12]}…  ↑{format_bytes(us.get('bytes_out', 0))}  "
+                f"↓{format_bytes(us.get('bytes_in', 0))}  "
+                f"active={int(us.get('active', 0))}"
+            )
 
 
 # ── traffic (alias of metrics) ─────────────────────────────────────────────────
+
 
 @app.command()
 def traffic() -> None:
@@ -318,6 +334,7 @@ def traffic() -> None:
 
 
 # ── connections ────────────────────────────────────────────────────────────────
+
 
 @app.command()
 def connections() -> None:
@@ -336,6 +353,7 @@ def connections() -> None:
 
 
 # ── port ──────────────────────────────────────────────────────────────────────
+
 
 @app.command()
 def port(
@@ -356,6 +374,7 @@ def port(
 
 
 # ── domain ─────────────────────────────────────────────────────────────────────
+
 
 @app.command()
 def domain(
@@ -378,6 +397,7 @@ def domain(
 
 # ── ip ─────────────────────────────────────────────────────────────────────────
 
+
 @app.command()
 def ip(
     value: Annotated[Optional[str], typer.Argument(help="New IP, 'get', or 'auto'")] = None,
@@ -398,6 +418,7 @@ def ip(
 
 
 # ── adtag ─────────────────────────────────────────────────────────────────────
+
 
 @app.command()
 def adtag(
@@ -425,6 +446,7 @@ def adtag(
 
 
 # ── sni-policy ────────────────────────────────────────────────────────────────
+
 
 @app.command(name="sni-policy")
 def sni_policy(
@@ -466,8 +488,9 @@ def secret_add(
 
     quota_bytes = parse_human_bytes(quota) if quota != "0" else 0
     try:
-        s = add_secret(label, max_conns=max_conns, max_ips=max_ips, quota_bytes=quota_bytes,
-                       expires=expires, notes=notes)
+        s = add_secret(
+            label, max_conns=max_conns, max_ips=max_ips, quota_bytes=quota_bytes, expires=expires, notes=notes
+        )
         typer.echo(f"[+] Secret '{s.label}' created: {s.key}")
         if not no_restart:
             _restart_if_running()
@@ -551,6 +574,7 @@ def secret_rotate(
 def secret_enable(label: Annotated[str, typer.Argument()]) -> None:
     """Enable a secret."""
     from mtproxymaxpy.config.secrets import enable_secret
+
     enable_secret(label)
     typer.echo(f"[+] Enabled '{label}'.")
     _restart_if_running()
@@ -560,6 +584,7 @@ def secret_enable(label: Annotated[str, typer.Argument()]) -> None:
 def secret_disable(label: Annotated[str, typer.Argument()]) -> None:
     """Disable a secret (without removing it)."""
     from mtproxymaxpy.config.secrets import disable_secret
+
     disable_secret(label)
     typer.echo(f"[+] Disabled '{label}'.")
     _restart_if_running()
@@ -618,6 +643,7 @@ def secret_extend(
 ) -> None:
     """Extend a secret's expiry by N days."""
     from mtproxymaxpy.config.secrets import extend_secret
+
     s = extend_secret(label, days)
     typer.echo(f"[+] New expiry for '{label}': {s.expires}")
 
@@ -628,6 +654,7 @@ def secret_bulk_extend(
 ) -> None:
     """Extend the expiry of all secrets by N days."""
     from mtproxymaxpy.config.secrets import bulk_extend_secrets
+
     changed = bulk_extend_secrets(days)
     typer.echo(f"[+] Extended {len(changed)} secrets by {days} days.")
 
@@ -636,6 +663,7 @@ def secret_bulk_extend(
 def secret_disable_expired() -> None:
     """Disable all secrets whose expiry date has passed."""
     from mtproxymaxpy.config.secrets import disable_expired_secrets
+
     changed = disable_expired_secrets()
     typer.echo(f"[+] Disabled {len(changed)} expired secret(s).")
     if changed:
@@ -649,6 +677,7 @@ def secret_rename(
 ) -> None:
     """Rename a secret (label only; key unchanged)."""
     from mtproxymaxpy.config.secrets import rename_secret
+
     rename_secret(old_label, new_label)
     typer.echo(f"[+] Renamed '{old_label}' → '{new_label}'.")
 
@@ -660,6 +689,7 @@ def secret_clone(
 ) -> None:
     """Clone a secret with a new label and fresh key."""
     from mtproxymaxpy.config.secrets import clone_secret
+
     s = clone_secret(src_label, new_label)
     typer.echo(f"[+] Cloned '{src_label}' → '{new_label}': {s.key}")
     _restart_if_running()
@@ -672,6 +702,7 @@ def secret_note(
 ) -> None:
     """Set or clear the note for a secret."""
     from mtproxymaxpy.config.secrets import set_secret_note
+
     set_secret_note(label, text)
     typer.echo(f"[+] Note updated for '{label}'.")
 
@@ -747,7 +778,7 @@ def secret_stats() -> None:
     for key, us in mst.get("user_stats", {}).items():
         label = key_to_label.get(key, key[:12] + "…")
         typer.echo(
-            f"  {label:<22} {key[:12]+'…':<14} "
+            f"  {label:<22} {key[:12] + '…':<14} "
             f"{format_bytes(us.get('bytes_in', 0)):>10} "
             f"{format_bytes(us.get('bytes_out', 0)):>10} "
             f"{int(us.get('active', 0)):>8}"
@@ -768,6 +799,7 @@ def secret_reset_traffic(
         files = list(STATS_DIR.glob("*.json"))
     else:
         from mtproxymaxpy.config.secrets import load_secrets
+
         secs = load_secrets()
         s = next((x for x in secs if x.label == label), None)
         if s is None:
@@ -783,6 +815,7 @@ def secret_reset_traffic(
 def secret_export() -> None:
     """Export all secrets as CSV to stdout."""
     from mtproxymaxpy.config.secrets import export_secrets_csv
+
     typer.echo(export_secrets_csv(), nl=False)
 
 
@@ -793,6 +826,7 @@ def secret_import(
 ) -> None:
     """Import secrets from a CSV file (as produced by 'secret export')."""
     from mtproxymaxpy.config.secrets import import_secrets_csv
+
     text = file.read()
     added = import_secrets_csv(text, overwrite=overwrite)
     typer.echo(f"[+] Imported {len(added)} secret(s).")
@@ -851,6 +885,7 @@ def upstream_remove(name: Annotated[str, typer.Argument()]) -> None:
 def upstream_enable(name: Annotated[str, typer.Argument()]) -> None:
     """Enable an upstream."""
     from mtproxymaxpy.config.upstreams import enable_upstream
+
     enable_upstream(name)
     typer.echo(f"[+] Enabled '{name}'.")
     _restart_if_running()
@@ -860,6 +895,7 @@ def upstream_enable(name: Annotated[str, typer.Argument()]) -> None:
 def upstream_disable(name: Annotated[str, typer.Argument()]) -> None:
     """Disable an upstream."""
     from mtproxymaxpy.config.upstreams import disable_upstream
+
     disable_upstream(name)
     typer.echo(f"[+] Disabled '{name}'.")
     _restart_if_running()
@@ -869,6 +905,7 @@ def upstream_disable(name: Annotated[str, typer.Argument()]) -> None:
 def upstream_test(name: Annotated[str, typer.Argument()]) -> None:
     """Test connectivity through an upstream."""
     from mtproxymaxpy.config.upstreams import test_upstream
+
     typer.echo(f"  Testing '{name}'…")
     result = test_upstream(name)
     if result.get("ok"):
@@ -891,6 +928,7 @@ def backup_create(
 ) -> None:
     """Create a new backup archive."""
     from mtproxymaxpy import backup as _backup
+
     path = _backup.create_backup(label)
     typer.echo(f"[+] Backup created: {path}")
 
@@ -939,6 +977,7 @@ def geoblock_add(
 ) -> None:
     """Block a country (downloads CIDRs and applies iptables rules)."""
     from mtproxymaxpy import geoblock
+
     typer.echo(f"[*] Applying geo-block for {cc.upper()}…")
     n = geoblock.add_country(cc)
     typer.echo(f"[+] Blocked {cc.upper()} ({n} CIDRs).")
@@ -948,6 +987,7 @@ def geoblock_add(
 def geoblock_remove(cc: Annotated[str, typer.Argument()]) -> None:
     """Remove geo-block for a country."""
     from mtproxymaxpy import geoblock
+
     geoblock.remove_country(cc)
     typer.echo(f"[+] Removed geo-block for {cc.upper()}.")
 
@@ -956,6 +996,7 @@ def geoblock_remove(cc: Annotated[str, typer.Argument()]) -> None:
 def geoblock_list() -> None:
     """List currently geo-blocked countries."""
     from mtproxymaxpy import geoblock
+
     countries = geoblock.list_countries()
     if countries:
         typer.echo("  Blocked: " + ", ".join(countries))
@@ -969,6 +1010,7 @@ def geoblock_clear(
 ) -> None:
     """Remove all geo-block rules."""
     from mtproxymaxpy import geoblock
+
     if not yes:
         typer.confirm("Remove all geo-block rules?", abort=True)
     geoblock.clear_all()
@@ -1014,6 +1056,7 @@ def telegram_test() -> None:
 def telegram_disable() -> None:
     """Disable the Telegram bot."""
     from mtproxymaxpy.config.settings import load_settings, save_settings
+
     settings = load_settings()
     save_settings(settings.model_copy(update={"telegram_enabled": False}))
     typer.echo("[+] Telegram bot disabled.")
@@ -1023,6 +1066,7 @@ def telegram_disable() -> None:
 def telegram_enable() -> None:
     """Enable the Telegram bot."""
     from mtproxymaxpy.config.settings import load_settings, save_settings
+
     settings = load_settings()
     if not settings.telegram_bot_token or not settings.telegram_chat_id:
         typer.echo("[!] Configure token and chat_id first.", err=True)
@@ -1032,6 +1076,7 @@ def telegram_enable() -> None:
 
 
 # ── telegram-bot (systemd daemon entry) ───────────────────────────────────────
+
 
 @app.command("telegram-bot")
 def run_telegram_bot(
@@ -1053,6 +1098,7 @@ def run_telegram_bot(
 
 # ── version ────────────────────────────────────────────────────────────────────
 
+
 @app.command()
 def version() -> None:
     """Print the version and exit."""
@@ -1060,6 +1106,7 @@ def version() -> None:
 
 
 # ── Internal helpers ───────────────────────────────────────────────────────────
+
 
 def _restart_if_running() -> None:
     """Regenerate config and restart the proxy if it's currently running."""
@@ -1076,4 +1123,3 @@ def _restart_if_running() -> None:
             process_manager.write_toml_config()
         except Exception:
             pass
-

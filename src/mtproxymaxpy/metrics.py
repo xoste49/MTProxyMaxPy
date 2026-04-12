@@ -63,6 +63,7 @@ def parse_metrics(raw: str) -> list[dict[str, Any]]:
 
 # ── Aggregation helpers ────────────────────────────────────────────────────────
 
+
 def _total(samples: list[dict], name: str, **label_filter: str) -> float:
     total = 0.0
     for s in samples:
@@ -82,6 +83,7 @@ def _first(samples: list[dict], *names: str, **label_filter: str) -> float:
 
 
 # ── Public API ─────────────────────────────────────────────────────────────────
+
 
 def get_stats() -> dict[str, Any]:
     """Return a structured stats dict from the live Prometheus endpoint.

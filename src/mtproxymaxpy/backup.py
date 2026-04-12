@@ -30,6 +30,7 @@ from mtproxymaxpy.constants import (
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
+
 def _metadata() -> dict:
     return {
         "version": VERSION,
@@ -40,6 +41,7 @@ def _metadata() -> dict:
 
 
 # ── Public API ─────────────────────────────────────────────────────────────────
+
 
 def create_backup(label: str = "") -> Path:
     """Create a backup archive. Returns the path to the .tar.gz file."""

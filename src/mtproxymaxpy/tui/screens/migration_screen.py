@@ -52,6 +52,7 @@ class MigrationScreen(Screen):
                 return
 
             from mtproxymaxpy.config.migration import run_migration
+
             try:
                 result = run_migration(files=selected)
                 if result.settings_imported:
