@@ -103,6 +103,23 @@ def install(*, telegram: bool = False) -> None:
             logger.warning("Could not start %s: %s", SYSTEMD_TELEGRAM_SERVICE, exc)
 
 
+def install_telegram_service() -> None:
+    """Write, enable, and start only the Telegram bot systemd unit."""
+    if not SYSTEMD_UNIT_DIR.exists():
+        raise RuntimeError("systemd unit directory not found — is this a systemd-based OS?")
+
+    py = _python_exe()
+    tg_path = SYSTEMD_UNIT_DIR / f"{SYSTEMD_TELEGRAM_SERVICE}.service"
+    tg_path.write_text(_telegram_unit(py))
+
+    _systemctl("daemon-reload")
+    _systemctl("enable", SYSTEMD_TELEGRAM_SERVICE)
+    try:
+        _systemctl("start", SYSTEMD_TELEGRAM_SERVICE)
+    except RuntimeError as exc:
+        logger.warning("Could not start %s: %s", SYSTEMD_TELEGRAM_SERVICE, exc)
+
+
 def uninstall(*, telegram: bool = True) -> None:
     """Stop and remove unit files."""
     for svc in [SYSTEMD_SERVICE] + ([SYSTEMD_TELEGRAM_SERVICE] if telegram else []):

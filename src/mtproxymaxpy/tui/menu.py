@@ -1283,10 +1283,11 @@ def _telegram_menu() -> None:
             _choice(3, "Enable / Disable"),
             _choice(4, "Set report interval"),
             _choice(5, "Toggle alerts"),
+            _choice(6, "Install / Repair Telegram service"),
             _choice(0, "Back"),
             sep="\n",
         )
-        ch = _ask_choice(5)
+        ch = _ask_choice(6)
         if ch == 0:
             return
         try:
@@ -1301,20 +1302,21 @@ def _telegram_menu() -> None:
                 state = "enabled" if settings.telegram_enabled else "disabled"
                 console.print(f"[green][+] Telegram bot {state}[/green]")
 
-                if service_unit.exists():
-                    try:
-                        from mtproxymaxpy import systemd as _systemd
+                try:
+                    from mtproxymaxpy import systemd as _systemd
 
-                        if settings.telegram_enabled:
+                    if settings.telegram_enabled:
+                        if not service_unit.exists():
+                            _systemd.install_telegram_service()
+                            console.print("[green][+] Telegram service installed[/green]")
+                        else:
                             _systemd.start_service(SYSTEMD_TELEGRAM_SERVICE)
                             console.print("[green][+] Telegram service started[/green]")
-                        else:
-                            _systemd.stop_service(SYSTEMD_TELEGRAM_SERVICE)
-                            console.print("[yellow][*] Telegram service stopped[/yellow]")
-                    except Exception as exc:
-                        console.print(f"[yellow][!] Could not change service state: {exc}[/yellow]")
-                else:
-                    console.print("[yellow][!] Telegram service unit is not installed[/yellow]")
+                    elif service_unit.exists():
+                        _systemd.stop_service(SYSTEMD_TELEGRAM_SERVICE)
+                        console.print("[yellow][*] Telegram service stopped[/yellow]")
+                except Exception as exc:
+                    console.print(f"[yellow][!] Could not change service state: {exc}[/yellow]")
                 _pause()
             elif ch == 4:
                 hours = IntPrompt.ask("  Report interval (hours)", default=settings.telegram_interval, console=console)
@@ -1326,6 +1328,12 @@ def _telegram_menu() -> None:
                 save_settings(settings)
                 state = "enabled" if settings.telegram_alerts_enabled else "disabled"
                 console.print(f"[green][+] Alerts {state}[/green]")
+                _pause()
+            elif ch == 6:
+                from mtproxymaxpy import systemd as _systemd
+
+                _systemd.install_telegram_service()
+                console.print("[green][+] Telegram service installed and started[/green]")
                 _pause()
         except Exception as exc:
             console.print(f"[red]Error:[/red] {exc}")
