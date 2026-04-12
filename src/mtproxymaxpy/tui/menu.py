@@ -37,11 +37,13 @@ def _pause() -> None:
 
 def _header_panel() -> Panel:
     """Build the status header shown at the top of every screen."""
+    tg_line = Text("TG bot: unknown", style="dim")
     try:
         from mtproxymaxpy import process_manager
 
         st = process_manager.status()
         from mtproxymaxpy.config.settings import load_settings
+        from mtproxymaxpy.constants import SYSTEMD_TELEGRAM_SERVICE, SYSTEMD_UNIT_DIR
 
         settings = load_settings()
 
@@ -60,6 +62,24 @@ def _header_panel() -> Panel:
             parts.append(Text(f"  Uptime: {format_duration(st['uptime_sec'])}", style="yellow"))
         if st["pid"]:
             parts.append(Text(f"  PID: {st['pid']}", style="dim"))
+
+        tg_line = Text("TG bot: ", style="dim")
+        if not settings.telegram_enabled:
+            tg_line.append("disabled", style="red")
+        else:
+            service_unit = SYSTEMD_UNIT_DIR / f"{SYSTEMD_TELEGRAM_SERVICE}.service"
+            if not service_unit.exists():
+                tg_line.append("enabled, service not installed", style="yellow")
+            else:
+                try:
+                    from mtproxymaxpy import systemd as _systemd
+
+                    if _systemd.is_active(SYSTEMD_TELEGRAM_SERVICE):
+                        tg_line.append("running", style="green")
+                    else:
+                        tg_line.append("stopped", style="red")
+                except Exception:
+                    tg_line.append("state unknown", style="dim")
     except Exception:
         status_txt = Text("○ UNKNOWN", style="dim")
         parts = [status_txt]
@@ -76,6 +96,9 @@ def _header_panel() -> Panel:
             combined.append("  ⬆ Update available — select [10]", style="bold yellow")
     except Exception:
         pass
+
+    combined.append("\n")
+    combined.append_text(tg_line)
 
     title = f"[bold cyan]{APP_TITLE} v{VERSION}[/bold cyan]  [dim]Telegram MTProto Proxy Manager[/dim]"
     return Panel(combined, title=title, border_style="cyan", padding=(0, 2))
@@ -1191,14 +1214,29 @@ def _telegram_menu() -> None:
         _clear()
         console.print(_header_panel())
         from mtproxymaxpy.config.settings import load_settings, save_settings
+        from mtproxymaxpy.constants import SYSTEMD_TELEGRAM_SERVICE, SYSTEMD_UNIT_DIR
 
         settings = load_settings()
+        service_unit = SYSTEMD_UNIT_DIR / f"{SYSTEMD_TELEGRAM_SERVICE}.service"
+        service_status = "[dim]unknown[/dim]"
+        if not service_unit.exists():
+            service_status = "[yellow]not installed[/yellow]"
+        else:
+            try:
+                from mtproxymaxpy import systemd as _systemd
+
+                service_status = (
+                    "[green]running[/green]" if _systemd.is_active(SYSTEMD_TELEGRAM_SERVICE) else "[red]stopped[/red]"
+                )
+            except Exception:
+                service_status = "[dim]unknown[/dim]"
 
         console.print(Rule("[cyan]Telegram Bot[/cyan]"))
         tbl = Table(show_header=False, box=None, padding=(0, 2))
         tbl.add_column("Key", style="dim", width=26)
         tbl.add_column("Value")
-        tbl.add_row("Enabled", "[green]yes[/green]" if settings.telegram_enabled else "[red]no[/red]")
+        tbl.add_row("Configured enabled", "[green]yes[/green]" if settings.telegram_enabled else "[red]no[/red]")
+        tbl.add_row("Service status", service_status)
         tbl.add_row(
             "Bot token",
             ("*" * 8 + settings.telegram_bot_token[-4:])
@@ -1234,6 +1272,21 @@ def _telegram_menu() -> None:
                 save_settings(settings)
                 state = "enabled" if settings.telegram_enabled else "disabled"
                 console.print(f"[green][+] Telegram bot {state}[/green]")
+
+                if service_unit.exists():
+                    try:
+                        from mtproxymaxpy import systemd as _systemd
+
+                        if settings.telegram_enabled:
+                            _systemd.start_service(SYSTEMD_TELEGRAM_SERVICE)
+                            console.print("[green][+] Telegram service started[/green]")
+                        else:
+                            _systemd.stop_service(SYSTEMD_TELEGRAM_SERVICE)
+                            console.print("[yellow][*] Telegram service stopped[/yellow]")
+                    except Exception as exc:
+                        console.print(f"[yellow][!] Could not change service state: {exc}[/yellow]")
+                else:
+                    console.print("[yellow][!] Telegram service unit is not installed[/yellow]")
                 _pause()
             elif ch == 4:
                 hours = IntPrompt.ask("  Report interval (hours)", default=settings.telegram_interval, console=console)
