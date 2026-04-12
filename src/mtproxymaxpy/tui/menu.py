@@ -1043,11 +1043,25 @@ def _update_screen() -> None:  # noqa: C901
                 else:
                     uv = str(uv)
                     console.print("  Pulling latest code…")
+                    # Stash any local modifications (e.g. regenerated uv.lock)
+                    # so that --ff-only pull is not blocked by a dirty tree.
+                    _sp.run(
+                        [git, "-C", str(INSTALL_DIR), "stash", "--quiet"],
+                        capture_output=True, text=True,
+                    )
                     r1 = _sp.run(
                         [git, "-C", str(INSTALL_DIR), "pull", "--ff-only"],
                         capture_output=True, text=True,
                     )
-                    console.print(f"  {r1.stdout.strip() or r1.stderr.strip()}")
+                    # Always drop any stash created above — generated files
+                    # (uv.lock etc.) will be recreated by uv sync anyway.
+                    _sp.run(
+                        [git, "-C", str(INSTALL_DIR), "stash", "drop", "--quiet"],
+                        capture_output=True, text=True,
+                    )
+                    out = "\n".join(filter(None, [r1.stdout.strip(), r1.stderr.strip()]))
+                    if out:
+                        console.print(f"  {out}")
                     if r1.returncode != 0:
                         console.print(f"[red][!] git pull failed[/red]")
                     else:
