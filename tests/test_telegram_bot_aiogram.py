@@ -121,3 +121,18 @@ def test_send_alert_schedules_on_aiogram_loop(monkeypatch: pytest.MonkeyPatch) -
     assert sent
     assert sent[0][0] == "1"
     assert sent[0][2] == "MarkdownV2"
+
+
+def test_start_polling_disables_signal_handlers() -> None:
+    calls = []
+
+    class _Dispatcher:
+        async def start_polling(self, bot, **kwargs):
+            calls.append((bot, kwargs))
+
+    bot = object()
+    asyncio.run(tga._start_polling(_Dispatcher(), bot))
+
+    assert calls
+    assert calls[0][0] is bot
+    assert calls[0][1]["handle_signals"] is False

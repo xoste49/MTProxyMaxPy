@@ -65,6 +65,11 @@ def _build_bot_commands(bot_command_cls: Any) -> list[Any]:
     return [bot_command_cls(command=command, description=description) for command, description in _COMMAND_SPECS]
 
 
+async def _start_polling(dispatcher: Any, bot: Any) -> None:
+    # Polling runs in a worker thread; aiogram signal handlers are main-thread only.
+    await dispatcher.start_polling(bot, handle_signals=False)
+
+
 def _warn_once() -> None:
     global _warned
     if _warned:
@@ -405,7 +410,7 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
         _started_event.set()
         report_task = asyncio.create_task(_report_loop(), name="tg-aiogram-report")
         try:
-            await dp.start_polling(bot)
+            await _start_polling(dp, bot)
         finally:
             report_task.cancel()
             try:
