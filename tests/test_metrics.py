@@ -60,6 +60,30 @@ def test_get_stats_success_and_user_aggregation(monkeypatch: pytest.MonkeyPatch)
     assert stats["user_stats"]["alice"]["active"] == 1.0
 
 
+def test_get_stats_supports_legacy_telemt_user_metric_names(monkeypatch: pytest.MonkeyPatch) -> None:
+    metrics._stats_cache = None
+    raw = "\n".join(
+        [
+            'telemt_user_octets_from_client{user="alice"} 100',
+            'telemt_user_octets_to_client{user="alice"} 200',
+            'telemt_user_connections_current{user="alice"} 2',
+            'telemt_user_octets_from_client{user="bob"} 300',
+            'telemt_user_octets_to_client{user="bob"} 400',
+            'telemt_user_connections_current{user="bob"} 3',
+        ]
+    )
+    monkeypatch.setattr(metrics, "fetch_raw", lambda timeout=5.0: raw)
+
+    stats = metrics.get_stats()
+    assert stats["available"] is True
+    assert stats["bytes_in"] == 400
+    assert stats["bytes_out"] == 600
+    assert stats["active_connections"] == 5
+    assert stats["user_stats"]["alice"]["bytes_in"] == 100.0
+    assert stats["user_stats"]["alice"]["bytes_out"] == 200.0
+    assert stats["user_stats"]["alice"]["active"] == 2.0
+
+
 def test_get_stats_uses_cache(monkeypatch: pytest.MonkeyPatch) -> None:
     metrics._stats_cache = None
     calls = {"n": 0}

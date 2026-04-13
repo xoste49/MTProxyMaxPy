@@ -86,6 +86,13 @@ def _first(samples: list[dict], *names: str, **label_filter: str) -> float:
     return 0.0
 
 
+def _sum_names(samples: list[dict], *names: str, **label_filter: str) -> float:
+    total = 0.0
+    for n in names:
+        total += _total(samples, n, **label_filter)
+    return total
+
+
 # ── Public API ─────────────────────────────────────────────────────────────────
 
 
@@ -111,23 +118,34 @@ def get_stats(*, timeout: float = 5.0, max_age: float = 0.0) -> dict[str, Any]:
             "telemt_incoming_bytes_total",
             "telemt_rx_bytes_total",
         )
+        if bytes_in <= 0:
+            bytes_in = _sum_names(samples, "telemt_user_octets_from_client")
+
         bytes_out = _first(
             samples,
             "telemt_bytes_out_total",
             "telemt_outgoing_bytes_total",
             "telemt_tx_bytes_total",
         )
+        if bytes_out <= 0:
+            bytes_out = _sum_names(samples, "telemt_user_octets_to_client")
+
         active = _first(
             samples,
             "telemt_connections_active",
             "telemt_active_connections",
             "telemt_connections_current",
         )
+        if active <= 0:
+            active = _sum_names(samples, "telemt_user_connections_current")
+
         total_conns = _first(
             samples,
             "telemt_connections_total",
             "telemt_total_connections",
         )
+        if total_conns <= 0:
+            total_conns = _sum_names(samples, "telemt_user_connections_total")
 
         # Per-user stats: aggregate all samples that carry a "user" label
         user_stats: dict[str, dict[str, float]] = {}
@@ -138,11 +156,25 @@ def get_stats(*, timeout: float = 5.0, max_age: float = 0.0) -> dict[str, Any]:
             if user not in user_stats:
                 user_stats[user] = {"bytes_in": 0.0, "bytes_out": 0.0, "active": 0.0}
             n = s["name"].lower()
-            if "in" in n or "rx" in n or "incoming" in n or "recv" in n:
+            if (
+                "incoming" in n
+                or "rx" in n
+                or "recv" in n
+                or "bytes_in" in n
+                or "octets_from_client" in n
+                or "from_client" in n
+            ):
                 user_stats[user]["bytes_in"] += s["value"]
-            elif "out" in n or "tx" in n or "outgoing" in n or "sent" in n:
+            elif (
+                "outgoing" in n
+                or "tx" in n
+                or "sent" in n
+                or "bytes_out" in n
+                or "octets_to_client" in n
+                or "to_client" in n
+            ):
                 user_stats[user]["bytes_out"] += s["value"]
-            elif "active" in n or "current" in n:
+            elif "active" in n or "connections_current" in n:
                 user_stats[user]["active"] += s["value"]
 
         result = {
