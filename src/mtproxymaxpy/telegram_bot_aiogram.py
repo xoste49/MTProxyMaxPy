@@ -1,15 +1,10 @@
-"""Aiogram backend for phased Telegram bot migration.
-
-Phase 1 implements a minimal live backend with safe fallback to legacy when
-aiogram is unavailable.
-"""
+"""Aiogram Telegram bot backend."""
 
 from __future__ import annotations
 
 import asyncio
 import logging
 import threading
-from types import ModuleType
 from typing import Any
 
 from mtproxymaxpy.config.secrets import load_secrets
@@ -23,13 +18,10 @@ from mtproxymaxpy.telegram_messages import (
     build_mp_upstreams_text,
     build_users_text,
 )
-from mtproxymaxpy.utils.formatting import escape_md, format_bytes
+from mtproxymaxpy.utils.formatting import escape_md, format_bytes, format_duration
 
 logger = logging.getLogger(__name__)
 
-_warned = False
-_using_legacy = False
-_legacy_module: ModuleType | None = None
 _poll_thread: threading.Thread | None = None
 _loop: asyncio.AbstractEventLoop | None = None
 _bot: Any = None
@@ -70,22 +62,50 @@ async def _start_polling(dispatcher: Any, bot: Any) -> None:
     await dispatcher.start_polling(bot, handle_signals=False)
 
 
-def _warn_once() -> None:
-    global _warned
-    if _warned:
-        return
-    logger.info("Telegram backend=aiogram selected; migration scaffold currently delegates to legacy backend")
-    _warned = True
+def _get_stats_text() -> str:
+    from mtproxymaxpy import metrics as _metrics, process_manager
+
+    st = process_manager.status()
+    settings = load_settings()
+    secrets = load_secrets()
+
+    running_emoji = "🟢" if st["running"] else "🔴"
+    uptime_str = escape_md(format_duration(st["uptime_sec"])) if st.get("uptime_sec") else "?"
+    lines = [
+        f"{running_emoji} *{_md(settings.telegram_server_label)}*",
+        f"Port: `{settings.proxy_port}`",
+        f"Status: `{'running' if st['running'] else 'stopped'}`",
+        f"PID: `{st['pid'] or 'N/A'}`",
+        f"Uptime: `{uptime_str}`",
+    ]
+    mst = _metrics.get_stats()
+    if mst.get("available"):
+        lines += [
+            f"Traffic ↑: `{_md(format_bytes(mst['bytes_out']))}`",
+            f"Traffic ↓: `{_md(format_bytes(mst['bytes_in']))}`",
+            f"Active conns: `{mst['active_connections']}`",
+        ]
+    if secrets:
+        lines.append("")
+        lines.append(f"*Users* \\({len(secrets)}\\):")
+        for s in secrets:
+            flag = "✅" if s.enabled else "❌"
+            lines.append(f"  {flag} `{_md(s.label)}`")
+    return "\n".join(lines)
 
 
-def _start_legacy(reason: str) -> None:
-    global _using_legacy, _legacy_module
-    from mtproxymaxpy import telegram_bot as legacy
+def _get_health_text() -> str:
+    from mtproxymaxpy import doctor
 
-    logger.warning("aiogram backend fallback to legacy: %s", reason)
-    _using_legacy = True
-    _legacy_module = legacy
-    legacy.start()
+    results = doctor.run_full_doctor()
+    lines = ["🏥 *Health Check*", ""]
+    for r in results:
+        ok = r.get("ok")
+        icon = "✅" if ok is True else ("❌" if ok is False else "⚠️")
+        name = _md(r["name"])
+        extra = _md(str(r.get("error", ""))) if r.get("error") else ""
+        lines.append(f"{icon} {name}{(' — ' + extra) if extra else ''}")
+    return "\n".join(lines)
 
 
 def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
@@ -129,9 +149,7 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
             while True:
                 await asyncio.sleep(interval_hours * 3600)
                 try:
-                    from mtproxymaxpy import telegram_bot as legacy
-
-                    await _send_text(legacy._get_stats_text())
+                    await _send_text(_get_stats_text())
                 except Exception as exc:
                     logger.warning("aiogram report loop send failed: %s", exc)
 
@@ -139,9 +157,7 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
         async def handle_status(msg: Message) -> None:
             if not await _authorised(msg):
                 return
-            from mtproxymaxpy import telegram_bot as legacy
-
-            await msg.answer(legacy._get_stats_text(), parse_mode="MarkdownV2")
+            await msg.answer(_get_stats_text(), parse_mode="MarkdownV2")
 
         @router.message(Command("users"))
         async def handle_users(msg: Message) -> None:
@@ -174,9 +190,7 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
         async def handle_mp_health(msg: Message) -> None:
             if not await _authorised(msg):
                 return
-            from mtproxymaxpy import telegram_bot as legacy
-
-            await msg.answer(legacy._get_health_text(), parse_mode="MarkdownV2")
+            await msg.answer(_get_health_text(), parse_mode="MarkdownV2")
 
         @router.message(Command("mp_traffic"))
         async def handle_mp_traffic(msg: Message) -> None:
@@ -445,7 +459,7 @@ def _reset_runtime_state() -> None:
 
 def start() -> None:
     """Start aiogram backend in a background polling thread."""
-    global _using_legacy, _legacy_module, _poll_thread
+    global _poll_thread
 
     settings = load_settings()
     if not settings.telegram_enabled:
@@ -465,12 +479,9 @@ def start() -> None:
     try:
         import aiogram  # noqa: F401
     except Exception as exc:
-        _warn_once()
-        _start_legacy(str(exc))
+        logger.warning("aiogram import failed: %s", exc)
         return
 
-    _using_legacy = False
-    _legacy_module = None
     _started_event.clear()
     _poll_thread = threading.Thread(
         target=_run_polling,
@@ -484,12 +495,6 @@ def start() -> None:
 
 def stop() -> None:
     """Stop Telegram backend and background tasks."""
-    global _using_legacy, _legacy_module
-
-    if _using_legacy and _legacy_module is not None:
-        _legacy_module.stop()
-        return
-
     if _loop is not None and _dispatcher is not None:
 
         async def _shutdown() -> None:
@@ -514,10 +519,6 @@ def stop() -> None:
 def send_alert(text: str) -> None:
     """Send alert message through selected backend."""
     settings = load_settings()
-
-    if _using_legacy and _legacy_module is not None:
-        _legacy_module.send_alert(text)
-        return
 
     if not settings.telegram_enabled or _loop is None or _bot is None:
         return

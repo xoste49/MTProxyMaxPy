@@ -25,7 +25,6 @@ class FakeSettings:
         self.telegram_interval = kwargs.get("telegram_interval", 24)
         self.telegram_alerts_enabled = kwargs.get("telegram_alerts_enabled", True)
         self.telegram_server_label = kwargs.get("telegram_server_label", "srv")
-        self.telegram_backend = kwargs.get("telegram_backend", "aiogram")
 
     def model_copy(self, update: dict):
         data = self.__dict__.copy()
@@ -422,40 +421,34 @@ def test_upstream_backup_geo_telegram_and_misc(
     cli.geoblock_list()
     cli.geoblock_clear(yes=True)
 
-    settings = FakeSettings(
-        telegram_enabled=True,
-        telegram_bot_token="tok",
-        telegram_chat_id="1",
-        telegram_backend="pytelegrambotapi",
-    )
+    settings = FakeSettings(telegram_enabled=True, telegram_bot_token="tok", telegram_chat_id="1")
     saved: list[FakeSettings] = []
     monkeypatch.setitem(
         sys.modules,
         "mtproxymaxpy.config.settings",
         SimpleNamespace(load_settings=lambda: settings, save_settings=lambda s: saved.append(s)),
     )
-    monkeypatch.setitem(
-        sys.modules,
-        "telebot",
-        SimpleNamespace(TeleBot=lambda tok: SimpleNamespace(send_message=lambda chat_id, text: None)),
-    )
+
+    class _AioBot:
+        def __init__(self, token: str):
+            self.token = token
+
+            async def _close() -> None:
+                return None
+
+            self.session = SimpleNamespace(close=_close)
+
+        async def send_message(self, chat_id: str, text: str):
+            return None
+
+    monkeypatch.setitem(sys.modules, "aiogram", SimpleNamespace(Bot=_AioBot))
     cli.telegram_status()
     cli.telegram_test()
     cli.telegram_disable()
     cli.telegram_enable()
-    cli.telegram_backend(None)
-    cli.telegram_backend("aiogram")
-    assert saved[-1].telegram_backend == "aiogram"
-    cli.telegram_backend("pytelegrambotapi")
-    assert saved[-1].telegram_backend == "pytelegrambotapi"
     assert saved[-1].telegram_enabled is True
 
-    settings2 = FakeSettings(
-        telegram_enabled=False,
-        telegram_bot_token="",
-        telegram_chat_id="",
-        telegram_backend="pytelegrambotapi",
-    )
+    settings2 = FakeSettings(telegram_enabled=False, telegram_bot_token="", telegram_chat_id="")
     monkeypatch.setitem(
         sys.modules,
         "mtproxymaxpy.config.settings",
@@ -465,31 +458,10 @@ def test_upstream_backup_geo_telegram_and_misc(
         cli.telegram_test()
     with pytest.raises(typer.Exit):
         cli.telegram_enable()
-    with pytest.raises(typer.Exit):
-        cli.telegram_backend("legacy")
-
-    bot_calls = {"start": 0, "stop": 0}
-    _set_pkg_module(
-        monkeypatch,
-        "telegram_bot",
-        SimpleNamespace(
-            start=lambda: bot_calls.__setitem__("start", bot_calls["start"] + 1),
-            stop=lambda: bot_calls.__setitem__("stop", bot_calls["stop"] + 1),
-        ),
-    )
     monkeypatch.setitem(
         sys.modules, "signal", SimpleNamespace(pause=lambda: (_ for _ in ()).throw(KeyboardInterrupt()))
     )
-    cli.run_telegram_bot()
-    assert bot_calls == {"start": 1, "stop": 1}
-
-    # aiogram backend path
-    settings_aiogram = FakeSettings(
-        telegram_enabled=True,
-        telegram_bot_token="tok",
-        telegram_chat_id="1",
-        telegram_backend="aiogram",
-    )
+    settings_aiogram = FakeSettings(telegram_enabled=True, telegram_bot_token="tok", telegram_chat_id="1")
     monkeypatch.setitem(
         sys.modules,
         "mtproxymaxpy.config.settings",

@@ -122,12 +122,8 @@ Full proxy management from your phone. Supports `/status`, `/users`, `/restart` 
 
 ```bash
 mtproxymaxpy telegram-bot          # Run bot (used by systemd)
-mtproxymaxpy telegram backend      # Show current backend
-mtproxymaxpy telegram backend aiogram
-mtproxymaxpy telegram backend pytelegrambotapi
 ```
 
-Default backend is `aiogram`. If you need rollback compatibility, switch to `pytelegrambotapi`.
 Configure via TUI (Settings screen) or edit `settings.toml` directly.
 
 ---
@@ -244,13 +240,9 @@ mtproxymaxpy upstream remove <name>
 
 ```bash
 mtproxymaxpy telegram-bot         # Run bot process (blocking, for systemd)
-mtproxymaxpy telegram backend     # Print backend
-mtproxymaxpy telegram backend aiogram
-mtproxymaxpy telegram backend pytelegrambotapi
 ```
 
 Bot token and chat ID are configured via TUI (Settings screen) or directly in `settings.toml`.
-`telegram_backend` defaults to `aiogram`.
 
 ---
 
@@ -339,7 +331,7 @@ Complete rewrite from Bash to Python 3.13:
 - **Textual TUI** — fully interactive menu-driven interface
 - **Pydantic models** — all config validated at load time, stored as TOML + JSON
 - **Native telemt binary** — no Docker required; binary downloaded from GitHub releases
-- **aiogram** (default) + **pyTelegramBotAPI** (fallback) — Telegram bot backends with command parity
+- **aiogram** — Telegram bot backend with command parity
 - **Typer CLI** — `install`, `start`, `stop`, `restart`, `status`, `update`, `secret`, `upstream`
 - **Legacy migration** — auto-detects old bash configs on first run and offers import
 - Removed: replication (master-slave sync), Docker, iptables geo-blocking

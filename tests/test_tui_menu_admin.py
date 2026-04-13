@@ -161,21 +161,38 @@ def test_telegram_menu_and_helpers(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     real_test()
 
     state["settings"] = _Settings(telegram_enabled=True, telegram_bot_token="tok", telegram_chat_id="1")
-    monkeypatch.setitem(
-        sys.modules,
-        "telebot",
-        SimpleNamespace(TeleBot=lambda token: SimpleNamespace(send_message=lambda cid, text: None)),
-    )
-    real_test()
+
+    class _AioBot:
+        def __init__(self, token):
+            async def _close():
+                return None
+
+            self.session = SimpleNamespace(close=_close)
+
+        async def send_message(self, cid, text):
+            return None
 
     monkeypatch.setitem(
         sys.modules,
-        "telebot",
-        SimpleNamespace(
-            TeleBot=lambda token: SimpleNamespace(
-                send_message=lambda cid, text: (_ for _ in ()).throw(RuntimeError("bad"))
-            )
-        ),
+        "aiogram",
+        SimpleNamespace(Bot=_AioBot),
+    )
+    real_test()
+
+    class _AioBotFail:
+        def __init__(self, token):
+            async def _close():
+                return None
+
+            self.session = SimpleNamespace(close=_close)
+
+        async def send_message(self, cid, text):
+            raise RuntimeError("bad")
+
+    monkeypatch.setitem(
+        sys.modules,
+        "aiogram",
+        SimpleNamespace(Bot=_AioBotFail),
     )
     real_test()
 

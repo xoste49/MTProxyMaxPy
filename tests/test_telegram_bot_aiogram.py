@@ -8,22 +8,7 @@ import pytest
 from mtproxymaxpy import telegram_bot_aiogram as tga
 
 
-class _Legacy:
-    def __init__(self) -> None:
-        self.calls = {"start": 0, "stop": 0, "alert": 0}
-
-    def start(self) -> None:
-        self.calls["start"] += 1
-
-    def stop(self) -> None:
-        self.calls["stop"] += 1
-
-    def send_alert(self, text: str) -> None:
-        self.calls["alert"] += 1
-
-
-def test_start_fallbacks_to_legacy_when_aiogram_missing(monkeypatch: pytest.MonkeyPatch) -> None:
-    legacy = _Legacy()
+def test_start_noop_when_aiogram_missing(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         tga,
         "load_settings",
@@ -34,7 +19,6 @@ def test_start_fallbacks_to_legacy_when_aiogram_missing(monkeypatch: pytest.Monk
             telegram_interval=1,
         ),
     )
-    monkeypatch.setattr(tga, "_start_legacy", lambda reason: legacy.start())
 
     real_import = __import__
 
@@ -46,19 +30,7 @@ def test_start_fallbacks_to_legacy_when_aiogram_missing(monkeypatch: pytest.Monk
     monkeypatch.setattr("builtins.__import__", _boom_import)
 
     tga.start()
-    assert legacy.calls["start"] == 1
-
-
-def test_stop_and_send_alert_delegate_in_legacy_mode(monkeypatch: pytest.MonkeyPatch) -> None:
-    legacy = _Legacy()
-    monkeypatch.setattr(tga, "_using_legacy", True)
-    monkeypatch.setattr(tga, "_legacy_module", legacy)
-
-    tga.stop()
-    tga.send_alert("hello")
-
-    assert legacy.calls["stop"] == 1
-    assert legacy.calls["alert"] == 1
+    assert tga._poll_thread is None
 
 
 def test_start_noop_when_telegram_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -72,8 +44,6 @@ def test_start_noop_when_telegram_disabled(monkeypatch: pytest.MonkeyPatch) -> N
             telegram_interval=1,
         ),
     )
-    monkeypatch.setattr(tga, "_start_legacy", lambda reason: (_ for _ in ()).throw(RuntimeError("should not call")))
-
     tga.start()
 
 
@@ -110,8 +80,6 @@ def test_send_alert_schedules_on_aiogram_loop(monkeypatch: pytest.MonkeyPatch) -
         "load_settings",
         lambda: SimpleNamespace(telegram_enabled=True, telegram_chat_id="1"),
     )
-    monkeypatch.setattr(tga, "_using_legacy", False)
-    monkeypatch.setattr(tga, "_legacy_module", None)
     monkeypatch.setattr(tga, "_loop", _Loop())
     monkeypatch.setattr(tga, "_bot", _Bot())
     monkeypatch.setattr(tga.asyncio, "create_task", lambda coro: asyncio.run(coro))

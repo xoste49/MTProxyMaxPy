@@ -1404,6 +1404,9 @@ def _telegram_setup_wizard() -> None:
 
 
 def _telegram_test() -> None:
+    import asyncio
+
+    from aiogram import Bot
     from mtproxymaxpy.config.settings import load_settings
 
     settings = load_settings()
@@ -1412,10 +1415,15 @@ def _telegram_test() -> None:
         _pause()
         return
     try:
-        import telebot
 
-        bot = telebot.TeleBot(settings.telegram_bot_token)
-        bot.send_message(settings.telegram_chat_id, "✅ MTProxyMaxPy test message — bot is working!")
+        async def _send_test() -> None:
+            bot = Bot(token=settings.telegram_bot_token)
+            try:
+                await bot.send_message(settings.telegram_chat_id, "✅ MTProxyMaxPy test message — bot is working!")
+            finally:
+                await bot.session.close()
+
+        asyncio.run(_send_test())
         console.print("[green][+] Test message sent[/green]")
     except Exception as exc:
         console.print(f"[red][!] Failed: {exc}[/red]")

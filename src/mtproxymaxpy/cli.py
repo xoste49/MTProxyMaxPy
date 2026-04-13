@@ -1035,21 +1035,29 @@ def telegram_status() -> None:
     typer.echo(f"  interval (h):  {settings.telegram_interval}")
     typer.echo(f"  alerts:        {settings.telegram_alerts_enabled}")
     typer.echo(f"  server label:  {settings.telegram_server_label}")
-    typer.echo(f"  backend:       {getattr(settings, 'telegram_backend', 'aiogram')}")
 
 
 @telegram_app.command("test")
 def telegram_test() -> None:
     """Send a test message to the configured Telegram chat."""
+    import asyncio
+
+    from aiogram import Bot
     from mtproxymaxpy.config.settings import load_settings
-    import telebot
 
     settings = load_settings()
     if not settings.telegram_bot_token or not settings.telegram_chat_id:
         typer.echo("[!] Bot token or chat ID not configured.", err=True)
         raise typer.Exit(1)
-    bot = telebot.TeleBot(settings.telegram_bot_token)
-    bot.send_message(settings.telegram_chat_id, "✅ MTProxyMaxPy test message — bot is working!")
+
+    async def _send_test() -> None:
+        bot = Bot(token=settings.telegram_bot_token)
+        try:
+            await bot.send_message(settings.telegram_chat_id, "✅ MTProxyMaxPy test message — bot is working!")
+        finally:
+            await bot.session.close()
+
+    asyncio.run(_send_test())
     typer.echo("[+] Test message sent.")
 
 
@@ -1076,27 +1084,6 @@ def telegram_enable() -> None:
     typer.echo("[+] Telegram bot enabled.")
 
 
-@telegram_app.command("backend")
-def telegram_backend(
-    value: Annotated[Optional[str], typer.Argument(help="Backend name: pytelegrambotapi|aiogram")] = None,
-) -> None:
-    """Get or set Telegram backend implementation."""
-    from mtproxymaxpy.config.settings import load_settings, save_settings
-
-    settings = load_settings()
-    current = getattr(settings, "telegram_backend", "aiogram")
-    if value is None:
-        typer.echo(current)
-        return
-
-    if value not in ("pytelegrambotapi", "aiogram"):
-        typer.echo("[!] Backend must be 'pytelegrambotapi' or 'aiogram'.", err=True)
-        raise typer.Exit(1)
-
-    save_settings(settings.model_copy(update={"telegram_backend": value}))
-    typer.echo(f"[+] Telegram backend set to {value}.")
-
-
 # ── telegram-bot (systemd daemon entry) ───────────────────────────────────────
 
 
@@ -1106,18 +1093,10 @@ def run_telegram_bot(
 ) -> None:
     """Run the Telegram bot (blocking — intended for use by systemd)."""
     import signal as _signal
-    from mtproxymaxpy.config.settings import load_settings
-
-    settings = load_settings()
-    backend = getattr(settings, "telegram_backend", "aiogram")
-
-    if backend == "aiogram":
-        from mtproxymaxpy import telegram_bot_aiogram as telegram_backend
-    else:
-        from mtproxymaxpy import telegram_bot as telegram_backend
+    from mtproxymaxpy import telegram_bot_aiogram as telegram_backend
 
     telegram_backend.start()
-    typer.echo(f"[+] Telegram bot running ({backend}). Press Ctrl+C to stop.")
+    typer.echo("[+] Telegram bot running (aiogram). Press Ctrl+C to stop.")
     try:
         _signal.pause()
     except (KeyboardInterrupt, AttributeError):
