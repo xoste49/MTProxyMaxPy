@@ -187,3 +187,47 @@ def test_logs_traffic_screen_paths(monkeypatch: pytest.MonkeyPatch) -> None:
         menu._logs_traffic_screen()
 
     assert calls == {"l": 1, "c": 1, "m": 1, "ml": 1, "a": 1}
+
+
+def test_logs_traffic_screen_uses_label_keyed_user_stats(monkeypatch: pytest.MonkeyPatch) -> None:
+    rendered: list[str] = []
+
+    def _capture_print(*args, **kwargs) -> None:
+        rendered.append(" ".join(str(a) for a in args))
+
+    monkeypatch.setattr(menu, "_clear", lambda: None)
+    monkeypatch.setattr(menu, "_pause", lambda: None)
+    monkeypatch.setattr(menu, "_header_panel", lambda: "H")
+    monkeypatch.setattr(menu.console, "print", _capture_print)
+    monkeypatch.setattr(menu, "_ask_choice", lambda *a, **k: 0)
+
+    import mtproxymaxpy as pkg
+
+    pm = SimpleNamespace(is_running=lambda: True)
+    met = SimpleNamespace(
+        get_stats=lambda: {
+            "available": True,
+            "bytes_in": 10,
+            "bytes_out": 20,
+            "active_connections": 2,
+            "user_stats": {
+                "me": {"bytes_in": 1, "bytes_out": 2, "active": 3},
+            },
+        }
+    )
+
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.process_manager", pm)
+    monkeypatch.setattr(pkg, "process_manager", pm, raising=False)
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.metrics", met)
+    monkeypatch.setattr(pkg, "metrics", met, raising=False)
+    monkeypatch.setitem(
+        sys.modules,
+        "mtproxymaxpy.config.secrets",
+        SimpleNamespace(load_secrets=lambda: [SimpleNamespace(enabled=True, label="me", key="a" * 32)]),
+    )
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.utils.formatting", SimpleNamespace(format_bytes=lambda n: f"{n} B"))
+
+    menu._logs_traffic_screen()
+
+    payload = "\n".join(rendered)
+    assert "↓ 1 B  ↑ 2 B  conns: 3" in payload

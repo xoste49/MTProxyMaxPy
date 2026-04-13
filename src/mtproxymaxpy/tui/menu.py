@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import sys
 import time
+from pathlib import Path
 from typing import Callable, Optional
 
 from rich.columns import Columns
@@ -33,6 +34,27 @@ def _clear() -> None:
 
 def _pause() -> None:
     Prompt.ask("\n  [dim]Press Enter to continue…[/dim]", default="", console=console)
+
+
+def _read_last_lines(path: Path, limit: int, max_bytes: int = 262_144) -> list[str]:
+    """Read only tail lines from a potentially large log file.
+
+    Limits bytes read from the end of file to avoid high memory usage in live screens.
+    """
+    try:
+        with path.open("rb") as fh:
+            fh.seek(0, os.SEEK_END)
+            size = fh.tell()
+            read_from = max(0, size - max_bytes)
+            fh.seek(read_from)
+            chunk = fh.read()
+        lines = chunk.decode("utf-8", errors="replace").splitlines()
+        if read_from > 0 and lines:
+            # First line may be cut if we started in the middle of the file.
+            lines = lines[1:]
+        return lines[-limit:]
+    except Exception:
+        return []
 
 
 def _header_panel() -> Panel:
@@ -298,8 +320,7 @@ def _logs_screen() -> None:
 
         log_file = INSTALL_DIR / "telemt.log"
         if log_file.exists():
-            lines = log_file.read_text(errors="replace").splitlines()
-            for line in lines[-50:]:
+            for line in _read_last_lines(log_file, 50):
                 console.print(f"  {line}")
         else:
             console.print("  [dim]Log file not found.[/dim]")
@@ -977,8 +998,7 @@ def _stream_live_logs_screen() -> None:
             console.print(_header_panel())
             console.print(Rule("[cyan]Live Proxy Logs[/cyan]"))
             console.print("  [dim][live - refreshing every 2s, Ctrl+C to stop][/dim]\n")
-            lines = log_file.read_text(errors="replace").splitlines()
-            for line in lines[-30:]:
+            for line in _read_last_lines(log_file, 30):
                 console.print(f"  {line}")
             time.sleep(2)
     except KeyboardInterrupt:
@@ -1001,8 +1021,7 @@ def _stream_telegram_logs_screen() -> None:
             console.print(_header_panel())
             console.print(Rule("[cyan]Live Telegram Bot Logs[/cyan]"))
             console.print("  [dim][live - refreshing every 2s, Ctrl+C to stop][/dim]\n")
-            lines = log_file.read_text(errors="replace").splitlines()
-            for line in lines[-30:]:
+            for line in _read_last_lines(log_file, 30):
                 console.print(f"  {line}")
             time.sleep(2)
     except KeyboardInterrupt:
@@ -1018,8 +1037,7 @@ def _connection_log_screen() -> None:
         from mtproxymaxpy.constants import CONNECTION_LOG
 
         if CONNECTION_LOG.exists() and CONNECTION_LOG.stat().st_size > 0:
-            lines = CONNECTION_LOG.read_text(errors="replace").splitlines()
-            for line in lines[-50:]:
+            for line in _read_last_lines(CONNECTION_LOG, 50):
                 console.print(f"  {line}")
         else:
             console.print("  [dim]Connection log is empty.[/dim]")
@@ -1127,7 +1145,7 @@ def _logs_traffic_screen() -> None:
             console.print("  [dim]No enabled users.[/dim]")
         else:
             for s in enabled:
-                us = user_stats.get(s.key, {})
+                us = user_stats.get(s.label, {})
                 u_in = int(us.get("bytes_in", 0))
                 u_out = int(us.get("bytes_out", 0))
                 u_active = int(us.get("active", 0))
