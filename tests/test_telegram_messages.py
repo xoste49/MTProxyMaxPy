@@ -18,7 +18,7 @@ def test_build_mp_secrets_lines_escapes_markdown() -> None:
     secrets = [SimpleNamespace(label="alice_user", key="a" * 32, enabled=True)]
     stats = {
         "available": True,
-        "user_stats": {"a" * 32: {"bytes_in": 1024, "bytes_out": 2048, "active": 3}},
+        "user_stats": {"alice_user": {"bytes_in": 1024, "bytes_out": 2048, "active": 3}},
     }
 
     lines = build_mp_secrets_lines(secrets, stats, md=escape_md, bytes_formatter=format_bytes)
@@ -26,6 +26,26 @@ def test_build_mp_secrets_lines_escapes_markdown() -> None:
 
     assert "alice\\_user" in payload
     assert "conns\\=" in payload
+
+
+def test_build_mp_secrets_lines_uses_label_keyed_user_stats() -> None:
+    """Regression: metrics user_stats are keyed by user label, not secret key."""
+    secrets = [SimpleNamespace(label="alice_user", key="a" * 32, enabled=True)]
+    stats = {
+        "available": True,
+        "user_stats": {
+            "alice_user": {
+                "bytes_in": 1024,
+                "bytes_out": 2048,
+                "active": 3,
+            }
+        },
+    }
+
+    lines = build_mp_secrets_lines(secrets, stats, md=escape_md, bytes_formatter=format_bytes)
+    payload = "\n".join(lines)
+
+    assert "↑2\\.0 KB ↓1\\.0 KB conns\\=3" in payload
 
 
 def test_build_mp_traffic_text_renders_expected_fields() -> None:

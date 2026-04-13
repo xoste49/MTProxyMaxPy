@@ -65,7 +65,7 @@ def build_mp_secrets_lines(
 
     for secret in secrets:
         flag = "✅" if secret.enabled else "❌"
-        stats = user_stats.get(secret.key, {})
+        stats = user_stats.get(secret.label, {})
         bytes_in = bytes_formatter(stats.get("bytes_in", 0)) if stats else "—"
         bytes_out = bytes_formatter(stats.get("bytes_out", 0)) if stats else "—"
         conns = str(int(stats.get("active", 0))) if stats else "—"

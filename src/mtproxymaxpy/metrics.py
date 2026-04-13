@@ -192,9 +192,9 @@ def get_stats(*, timeout: float = 5.0, max_age: float = 0.0) -> dict[str, Any]:
         return {"available": False, "error": str(exc)}
 
 
-def get_user_stats(key: str) -> dict[str, float]:
-    """Return stats for a specific user key (hex secret key)."""
+def get_user_stats(label: str) -> dict[str, float]:
+    """Return stats for a specific user label."""
     stats = get_stats()
     if not stats.get("available"):
         return {}
-    return stats.get("user_stats", {}).get(key, {})
+    return stats.get("user_stats", {}).get(label, {})
