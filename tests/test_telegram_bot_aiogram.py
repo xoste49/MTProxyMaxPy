@@ -131,3 +131,18 @@ def test_select_mp_link_targets_with_label_returns_single_enabled() -> None:
 
     assert len(selected) == 1
     assert selected[0].label == "two"
+
+
+def test_is_telegram_timeout_error_for_timeout_error() -> None:
+    assert tga._is_telegram_timeout_error(TimeoutError("timed out")) is True
+
+
+def test_is_telegram_timeout_error_for_telegram_network_timeout_message() -> None:
+    telegram_error = type("TelegramNetworkError", (Exception,), {})
+    exc = telegram_error("HTTP Client says - Request timeout error")
+
+    assert tga._is_telegram_timeout_error(exc) is True
+
+
+def test_is_telegram_timeout_error_false_for_non_timeout_error() -> None:
+    assert tga._is_telegram_timeout_error(RuntimeError("bad markdown")) is False

@@ -64,6 +64,24 @@ def _select_mp_link_targets(secrets: list[Any], label: str | None) -> list[Any]:
     return [secret for secret in secrets if secret.enabled]
 
 
+def _is_telegram_timeout_error(exc: Exception) -> bool:
+    """Detect transient timeout errors raised by aiogram/aiohttp stack."""
+    if isinstance(exc, TimeoutError | asyncio.TimeoutError):
+        return True
+
+    name = exc.__class__.__name__
+    message = str(exc).lower()
+    if name == "TelegramNetworkError" and "timeout" in message:
+        return True
+
+    cause = exc.__cause__
+    if cause is None:
+        return False
+    if isinstance(cause, TimeoutError | asyncio.TimeoutError):
+        return True
+    return "timeout" in str(cause).lower()
+
+
 async def _start_polling(dispatcher: Any, bot: Any) -> None:
     # Polling runs in a worker thread; aiogram signal handlers are main-thread only.
     await dispatcher.start_polling(bot, handle_signals=False)
@@ -302,7 +320,13 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
             for secret in targets:
                 tg, web = build_proxy_links(secret.key, settings.proxy_domain, srv, settings.proxy_port)
                 qr_url = qr_api_url(web)
-                await msg.answer(build_mp_link_text(secret.label, tg, web, qr_url, md=_md), parse_mode="MarkdownV2")
+                try:
+                    await msg.answer(build_mp_link_text(secret.label, tg, web, qr_url, md=_md), parse_mode="MarkdownV2")
+                except Exception as exc:
+                    if _is_telegram_timeout_error(exc):
+                        logger.warning("mp_link reply timeout for label=%s: %s", secret.label, exc)
+                        continue
+                    raise
 
         @router.message(Command("mp_add"))
         async def handle_mp_add(msg: Message) -> None:
