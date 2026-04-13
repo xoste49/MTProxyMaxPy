@@ -122,7 +122,7 @@ def test_telegram_menu_and_helpers(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
         SimpleNamespace(load_settings=_load_settings, save_settings=_save_settings),
     )
 
-    calls = {"start": 0, "stop": 0, "install": 0, "wizard": 0, "test": 0}
+    calls = {"start": 0, "stop": 0, "install": 0, "wizard": 0, "test": 0, "tg_logs": 0}
     sd = SimpleNamespace(
         is_active=lambda name: False,
         install_telegram_service=lambda: calls.__setitem__("install", calls["install"] + 1),
@@ -135,15 +135,19 @@ def test_telegram_menu_and_helpers(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     real_test = menu._telegram_test
     monkeypatch.setattr(menu, "_telegram_setup_wizard", lambda: calls.__setitem__("wizard", calls["wizard"] + 1))
     monkeypatch.setattr(menu, "_telegram_test", lambda: calls.__setitem__("test", calls["test"] + 1))
+    monkeypatch.setattr(
+        menu, "_stream_telegram_logs_screen", lambda: calls.__setitem__("tg_logs", calls["tg_logs"] + 1)
+    )
     monkeypatch.setattr(menu.IntPrompt, "ask", lambda *a, **k: 12)
 
-    choices = iter([1, 2, 3, 4, 5, 6, 0])
+    choices = iter([1, 2, 3, 4, 5, 6, 7, 0])
     monkeypatch.setattr(menu, "_ask_choice", lambda *a, **k: next(choices))
     menu._telegram_menu()
 
     assert calls["wizard"] == 1
     assert calls["test"] == 1
     assert calls["install"] >= 1
+    assert calls["tg_logs"] == 1
 
     # _telegram_setup_wizard real path
     prompts = iter(["token", "chat", "node-1"])

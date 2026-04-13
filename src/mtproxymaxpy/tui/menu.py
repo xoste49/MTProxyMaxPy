@@ -985,6 +985,30 @@ def _stream_live_logs_screen() -> None:
         pass
 
 
+def _stream_telegram_logs_screen() -> None:
+    """Continuously refresh and show the latest Telegram bot log lines until Ctrl+C."""
+    try:
+        from mtproxymaxpy.constants import INSTALL_DIR
+
+        log_file = INSTALL_DIR / "telegram-bot.log"
+        if not log_file.exists():
+            console.print("  [dim]Telegram bot log file not found.[/dim]")
+            _pause()
+            return
+
+        while True:
+            _clear()
+            console.print(_header_panel())
+            console.print(Rule("[cyan]Live Telegram Bot Logs[/cyan]"))
+            console.print("  [dim][live - refreshing every 2s, Ctrl+C to stop][/dim]\n")
+            lines = log_file.read_text(errors="replace").splitlines()
+            for line in lines[-30:]:
+                console.print(f"  {line}")
+            time.sleep(2)
+    except KeyboardInterrupt:
+        pass
+
+
 def _connection_log_screen() -> None:
     """Show recent lines from connection.log."""
     _clear()
@@ -1294,10 +1318,11 @@ def _telegram_menu() -> None:
             _choice(4, "Set report interval"),
             _choice(5, "Toggle alerts"),
             _choice(6, "Install / Repair Telegram service"),
+            _choice(7, "Stream telegram bot logs"),
             _choice(0, "Back"),
             sep="\n",
         )
-        ch = _ask_choice(6)
+        ch = _ask_choice(7)
         if ch == 0:
             return
         try:
@@ -1345,6 +1370,8 @@ def _telegram_menu() -> None:
                 _systemd.install_telegram_service()
                 console.print("[green][+] Telegram service installed and started[/green]")
                 _pause()
+            elif ch == 7:
+                _stream_telegram_logs_screen()
         except Exception as exc:
             console.print(f"[red]Error:[/red] {exc}")
             _pause()
