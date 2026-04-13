@@ -44,6 +44,7 @@ def test_main_module_dunder_main_invokes_main(monkeypatch: pytest.MonkeyPatch) -
     called = {"n": 0}
     fake_tui = SimpleNamespace(run_tui=lambda: called.__setitem__("n", called["n"] + 1))
     monkeypatch.setitem(sys.modules, "mtproxymaxpy.tui.app", fake_tui)
+    monkeypatch.delitem(sys.modules, "mtproxymaxpy.__main__", raising=False)
     monkeypatch.setattr(sys, "argv", ["mtproxymaxpy"])
 
     runpy.run_module("mtproxymaxpy.__main__", run_name="__main__")

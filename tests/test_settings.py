@@ -51,6 +51,11 @@ def test_missing_file_returns_defaults(tmp_path: Path) -> None:
     assert s == Settings()
 
 
+def test_default_telegram_backend_is_aiogram() -> None:
+    s = Settings()
+    assert s.telegram_backend == "aiogram"
+
+
 def test_invalid_geoblock_mode() -> None:
     with pytest.raises(Exception):
         Settings(geoblock_mode="invalid")
@@ -59,3 +64,8 @@ def test_invalid_geoblock_mode() -> None:
 def test_invalid_sni_action() -> None:
     with pytest.raises(Exception):
         Settings(unknown_sni_action="bogus")
+
+
+def test_invalid_telegram_backend() -> None:
+    with pytest.raises(Exception):
+        Settings(telegram_backend="legacy")

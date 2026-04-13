@@ -1035,6 +1035,7 @@ def telegram_status() -> None:
     typer.echo(f"  interval (h):  {settings.telegram_interval}")
     typer.echo(f"  alerts:        {settings.telegram_alerts_enabled}")
     typer.echo(f"  server label:  {settings.telegram_server_label}")
+    typer.echo(f"  backend:       {getattr(settings, 'telegram_backend', 'aiogram')}")
 
 
 @telegram_app.command("test")
@@ -1075,6 +1076,27 @@ def telegram_enable() -> None:
     typer.echo("[+] Telegram bot enabled.")
 
 
+@telegram_app.command("backend")
+def telegram_backend(
+    value: Annotated[Optional[str], typer.Argument(help="Backend name: pytelegrambotapi|aiogram")] = None,
+) -> None:
+    """Get or set Telegram backend implementation."""
+    from mtproxymaxpy.config.settings import load_settings, save_settings
+
+    settings = load_settings()
+    current = getattr(settings, "telegram_backend", "aiogram")
+    if value is None:
+        typer.echo(current)
+        return
+
+    if value not in ("pytelegrambotapi", "aiogram"):
+        typer.echo("[!] Backend must be 'pytelegrambotapi' or 'aiogram'.", err=True)
+        raise typer.Exit(1)
+
+    save_settings(settings.model_copy(update={"telegram_backend": value}))
+    typer.echo(f"[+] Telegram backend set to {value}.")
+
+
 # ── telegram-bot (systemd daemon entry) ───────────────────────────────────────
 
 
@@ -1084,16 +1106,24 @@ def run_telegram_bot(
 ) -> None:
     """Run the Telegram bot (blocking — intended for use by systemd)."""
     import signal as _signal
-    from mtproxymaxpy import telegram_bot
+    from mtproxymaxpy.config.settings import load_settings
 
-    telegram_bot.start()
-    typer.echo("[+] Telegram bot running. Press Ctrl+C to stop.")
+    settings = load_settings()
+    backend = getattr(settings, "telegram_backend", "aiogram")
+
+    if backend == "aiogram":
+        from mtproxymaxpy import telegram_bot_aiogram as telegram_backend
+    else:
+        from mtproxymaxpy import telegram_bot as telegram_backend
+
+    telegram_backend.start()
+    typer.echo(f"[+] Telegram bot running ({backend}). Press Ctrl+C to stop.")
     try:
         _signal.pause()
     except (KeyboardInterrupt, AttributeError):
         pass
     finally:
-        telegram_bot.stop()
+        telegram_backend.stop()
 
 
 # ── version ────────────────────────────────────────────────────────────────────

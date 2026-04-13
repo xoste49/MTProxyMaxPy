@@ -25,6 +25,7 @@ class FakeSettings:
         self.telegram_interval = kwargs.get("telegram_interval", 24)
         self.telegram_alerts_enabled = kwargs.get("telegram_alerts_enabled", True)
         self.telegram_server_label = kwargs.get("telegram_server_label", "srv")
+        self.telegram_backend = kwargs.get("telegram_backend", "aiogram")
 
     def model_copy(self, update: dict):
         data = self.__dict__.copy()
@@ -421,7 +422,12 @@ def test_upstream_backup_geo_telegram_and_misc(
     cli.geoblock_list()
     cli.geoblock_clear(yes=True)
 
-    settings = FakeSettings(telegram_enabled=True, telegram_bot_token="tok", telegram_chat_id="1")
+    settings = FakeSettings(
+        telegram_enabled=True,
+        telegram_bot_token="tok",
+        telegram_chat_id="1",
+        telegram_backend="pytelegrambotapi",
+    )
     saved: list[FakeSettings] = []
     monkeypatch.setitem(
         sys.modules,
@@ -437,9 +443,19 @@ def test_upstream_backup_geo_telegram_and_misc(
     cli.telegram_test()
     cli.telegram_disable()
     cli.telegram_enable()
+    cli.telegram_backend(None)
+    cli.telegram_backend("aiogram")
+    assert saved[-1].telegram_backend == "aiogram"
+    cli.telegram_backend("pytelegrambotapi")
+    assert saved[-1].telegram_backend == "pytelegrambotapi"
     assert saved[-1].telegram_enabled is True
 
-    settings2 = FakeSettings(telegram_enabled=False, telegram_bot_token="", telegram_chat_id="")
+    settings2 = FakeSettings(
+        telegram_enabled=False,
+        telegram_bot_token="",
+        telegram_chat_id="",
+        telegram_backend="pytelegrambotapi",
+    )
     monkeypatch.setitem(
         sys.modules,
         "mtproxymaxpy.config.settings",
@@ -449,6 +465,8 @@ def test_upstream_backup_geo_telegram_and_misc(
         cli.telegram_test()
     with pytest.raises(typer.Exit):
         cli.telegram_enable()
+    with pytest.raises(typer.Exit):
+        cli.telegram_backend("legacy")
 
     bot_calls = {"start": 0, "stop": 0}
     _set_pkg_module(
@@ -464,6 +482,30 @@ def test_upstream_backup_geo_telegram_and_misc(
     )
     cli.run_telegram_bot()
     assert bot_calls == {"start": 1, "stop": 1}
+
+    # aiogram backend path
+    settings_aiogram = FakeSettings(
+        telegram_enabled=True,
+        telegram_bot_token="tok",
+        telegram_chat_id="1",
+        telegram_backend="aiogram",
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "mtproxymaxpy.config.settings",
+        SimpleNamespace(load_settings=lambda: settings_aiogram, save_settings=lambda s: saved.append(s)),
+    )
+    aiogram_calls = {"start": 0, "stop": 0}
+    _set_pkg_module(
+        monkeypatch,
+        "telegram_bot_aiogram",
+        SimpleNamespace(
+            start=lambda: aiogram_calls.__setitem__("start", aiogram_calls["start"] + 1),
+            stop=lambda: aiogram_calls.__setitem__("stop", aiogram_calls["stop"] + 1),
+        ),
+    )
+    cli.run_telegram_bot()
+    assert aiogram_calls == {"start": 1, "stop": 1}
 
     cli.version()
     assert "MTProxyMaxPy" in capsys.readouterr().out

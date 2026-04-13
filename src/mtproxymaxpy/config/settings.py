@@ -57,6 +57,7 @@ class Settings(BaseModel):
     telegram_interval: int = Field(DEFAULT_TELEGRAM_INTERVAL_HOURS, ge=1)
     telegram_alerts_enabled: bool = True
     telegram_server_label: str = "mtproxymaxpy"
+    telegram_backend: str = "aiogram"
 
     # ── Auto-update ───────────────────────────────────────────────────────────
     auto_update_enabled: bool = True
@@ -73,6 +74,13 @@ class Settings(BaseModel):
     def _validate_sni_action(cls, v: str) -> str:
         if v not in ("mask", "drop"):
             raise ValueError("unknown_sni_action must be 'mask' or 'drop'")
+        return v
+
+    @field_validator("telegram_backend")
+    @classmethod
+    def _validate_telegram_backend(cls, v: str) -> str:
+        if v not in ("pytelegrambotapi", "aiogram"):
+            raise ValueError("telegram_backend must be 'pytelegrambotapi' or 'aiogram'")
         return v
 
 

@@ -27,6 +27,15 @@ from telebot.types import BotCommand, Message
 
 from mtproxymaxpy.config.settings import load_settings
 from mtproxymaxpy.config.secrets import load_secrets
+from mtproxymaxpy.telegram_messages import (
+    build_help_text,
+    build_mp_link_text,
+    build_mp_limits_text,
+    build_mp_secrets_lines,
+    build_mp_traffic_text,
+    build_mp_upstreams_text,
+    build_users_text,
+)
 from mtproxymaxpy.utils.formatting import escape_md, format_bytes, format_duration
 
 logger = logging.getLogger(__name__)
@@ -217,15 +226,7 @@ def _register_handlers(bot: telebot.TeleBot, chat_id: str) -> None:  # noqa: C90
     def handle_users(msg: Message) -> None:
         if not guard(msg):
             return
-        secrets = load_secrets()
-        if not secrets:
-            _send(bot, chat_id, "No users configured\\.")
-            return
-        lines = ["*Users:*"]
-        for s in secrets:
-            flag = "✅" if s.enabled else "❌"
-            lines.append(f"  {flag} `{_md(s.label)}` — `{s.key[:8]}…`")
-        _send(bot, chat_id, "\n".join(lines))
+        _send(bot, chat_id, build_users_text(load_secrets(), md=_md))
 
     # /restart
     @bot.message_handler(commands=["restart"])
@@ -261,19 +262,7 @@ def _register_handlers(bot: telebot.TeleBot, chat_id: str) -> None:  # noqa: C90
             try:
                 secrets = load_secrets()
                 mst = _metrics.get_stats(timeout=2.0, max_age=5.0)
-                user_stats = mst.get("user_stats", {}) if mst.get("available") else {}
-                lines = ["*Secrets:*", ""]
-                if not mst.get("available"):
-                    err = _md(str(mst.get("error", "metrics unavailable")))
-                    lines.append(f"[metrics unavailable: `{err}`]")
-                    lines.append("")
-                for s in secrets:
-                    flag = "✅" if s.enabled else "❌"
-                    us = user_stats.get(s.key, {})
-                    bi = format_bytes(us.get("bytes_in", 0)) if us else "—"
-                    bo = format_bytes(us.get("bytes_out", 0)) if us else "—"
-                    conns = str(int(us.get("active", 0))) if us else "—"
-                    lines.append(f"{flag} `{_md(s.label)}`\n    ↑{_md(bo)} ↓{_md(bi)} {_md(f'conns={conns}')}")
+                lines = build_mp_secrets_lines(secrets, mst, md=_md, bytes_formatter=format_bytes)
                 _send_chunked(bot, chat_id, lines)
             except Exception as exc:
                 _send(bot, chat_id, f"❌ Failed to collect stats: `{_md(str(exc))}`")
@@ -300,16 +289,7 @@ def _register_handlers(bot: telebot.TeleBot, chat_id: str) -> None:  # noqa: C90
         srv = settings.custom_ip or get_public_ip() or "?"
         tg, web = build_proxy_links(s.key, settings.proxy_domain, srv, settings.proxy_port)
         qr_url = qr_api_url(web)
-        lines = [
-            f"🔗 *{_md(s.label)}*",
-            "",
-            f"`{_md(tg)}`",
-            "",
-            f"`{_md(web)}`",
-            "",
-            f"[QR code]({_md(qr_url)})",
-        ]
-        _send(bot, chat_id, "\n".join(lines))
+        _send(bot, chat_id, build_mp_link_text(s.label, tg, web, qr_url, md=_md))
 
     # /mp_add <label>
     @bot.message_handler(commands=["mp_add"])
@@ -409,14 +389,7 @@ def _register_handlers(bot: telebot.TeleBot, chat_id: str) -> None:  # noqa: C90
         if not mst.get("available"):
             _send(bot, chat_id, "❌ Metrics unavailable\\.")
             return
-        lines = [
-            "📊 *Traffic*",
-            f"↑ Out: `{_md(format_bytes(mst['bytes_out']))}`",
-            f"↓ In:  `{_md(format_bytes(mst['bytes_in']))}`",
-            f"Active: `{mst['active_connections']}`",
-            f"Total:  `{mst['total_connections']}`",
-        ]
-        _send(bot, chat_id, "\n".join(lines))
+        _send(bot, chat_id, build_mp_traffic_text(mst, md=_md, bytes_formatter=format_bytes))
 
     # /mp_update
     @bot.message_handler(commands=["mp_update"])
@@ -462,14 +435,7 @@ def _register_handlers(bot: telebot.TeleBot, chat_id: str) -> None:  # noqa: C90
         if s is None:
             _send(bot, chat_id, f"❌ Not found: `{_md(label)}`")
             return
-        lines = [
-            f"🔒 *{_md(s.label)} limits*",
-            f"max\\_conns: `{s.max_conns or 'unlimited'}`",
-            f"max\\_ips: `{s.max_ips or 'unlimited'}`",
-            f"quota: `{_md(format_bytes(s.quota_bytes)) if s.quota_bytes else 'unlimited'}`",
-            f"expires: `{s.expires or 'never'}`",
-        ]
-        _send(bot, chat_id, "\n".join(lines))
+        _send(bot, chat_id, build_mp_limits_text(s, md=_md, bytes_formatter=format_bytes))
 
     # /mp_setlimit <label> <field> <value>
     @bot.message_handler(commands=["mp_setlimit"])
@@ -510,45 +476,14 @@ def _register_handlers(bot: telebot.TeleBot, chat_id: str) -> None:  # noqa: C90
         from mtproxymaxpy.config.upstreams import load_upstreams
 
         ups = load_upstreams()
-        if not ups:
-            _send(bot, chat_id, "No upstreams configured\\.")
-            return
-        lines = ["🔀 *Upstreams:*"]
-        for u in ups:
-            flag = "✅" if u.enabled else "❌"
-            lines.append(f"  {flag} `{_md(u.name)}` {_md(u.type)} `{_md(u.addr)}` w={u.weight}")
-        _send(bot, chat_id, "\n".join(lines))
+        _send(bot, chat_id, build_mp_upstreams_text(ups, md=_md))
 
     # /mp_help
     @bot.message_handler(commands=["mp_help", "help", "start"])
     def handle_mp_help(msg: Message) -> None:
         if not guard(msg):
             return
-        lines = [
-            "📋 *MTProxyMaxPy Bot Commands*",
-            "",
-            "/status — proxy status",
-            "/users — list users",
-            "/restart — restart proxy",
-            "",
-            "/mp\\_health — full diagnostics",
-            "/mp\\_secrets — secrets with traffic stats",
-            "/mp\\_link \\[label\\] — proxy link \\+ QR",
-            "/mp\\_traffic — traffic statistics",
-            "/mp\\_upstreams — list upstreams",
-            "",
-            "/mp\\_add \\<label\\> — add secret",
-            "/mp\\_remove \\<label\\> — remove secret",
-            "/mp\\_rotate \\<label\\> — rotate key",
-            "/mp\\_enable \\<label\\> — enable",
-            "/mp\\_disable \\<label\\> — disable",
-            "/mp\\_limits \\<label\\> — show limits",
-            "/mp\\_setlimit \\<label\\> \\<field\\> \\<val\\>",
-            "",
-            "/mp\\_update — update telemt binary",
-            "/mp\\_help — this message",
-        ]
-        _send(bot, chat_id, "\n".join(lines))
+        _send(bot, chat_id, build_help_text())
 
 
 # ── Startup notification ───────────────────────────────────────────────────────
