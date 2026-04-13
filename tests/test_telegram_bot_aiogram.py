@@ -104,3 +104,30 @@ def test_start_polling_disables_signal_handlers() -> None:
     assert calls
     assert calls[0][0] is bot
     assert calls[0][1]["handle_signals"] is False
+
+
+def test_select_mp_link_targets_without_label_returns_all_enabled() -> None:
+    secrets = [
+        SimpleNamespace(label="one", enabled=True),
+        SimpleNamespace(label="two", enabled=True),
+        SimpleNamespace(label="three", enabled=True),
+        SimpleNamespace(label="off", enabled=False),
+    ]
+
+    selected = tga._select_mp_link_targets(secrets, label=None)
+    labels = [s.label for s in selected]
+
+    assert labels == ["one", "two", "three"]
+
+
+def test_select_mp_link_targets_with_label_returns_single_enabled() -> None:
+    secrets = [
+        SimpleNamespace(label="one", enabled=True),
+        SimpleNamespace(label="two", enabled=True),
+        SimpleNamespace(label="two", enabled=False),
+    ]
+
+    selected = tga._select_mp_link_targets(secrets, label="two")
+
+    assert len(selected) == 1
+    assert selected[0].label == "two"

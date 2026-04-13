@@ -98,8 +98,10 @@ def test_build_mp_link_text_contains_all_parts() -> None:
     text = build_mp_link_text("alice_user", "tg://proxy", "https://example", "https://qr", md=escape_md)
 
     assert "alice\\_user" in text
-    assert "tg://proxy" in text
-    assert "QR code" in text
+    assert "[tg link](tg://proxy)" in text
+    assert "[t\\.me link](https://example)" in text
+    assert "[QR code](https://qr)" in text
+    assert text.count("](") == 3
 
 
 def test_build_help_text_contains_core_commands() -> None:

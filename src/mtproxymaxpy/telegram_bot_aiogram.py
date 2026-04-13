@@ -57,6 +57,13 @@ def _build_bot_commands(bot_command_cls: Any) -> list[Any]:
     return [bot_command_cls(command=command, description=description) for command, description in _COMMAND_SPECS]
 
 
+def _select_mp_link_targets(secrets: list[Any], label: str | None) -> list[Any]:
+    """Return enabled secrets for /mp_link (all enabled or a specific label)."""
+    if label:
+        return [secret for secret in secrets if secret.enabled and secret.label == label]
+    return [secret for secret in secrets if secret.enabled]
+
+
 async def _start_polling(dispatcher: Any, bot: Any) -> None:
     # Polling runs in a worker thread; aiogram signal handlers are main-thread only.
     await dispatcher.start_polling(bot, handle_signals=False)
@@ -285,16 +292,17 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
             args = (msg.text or "").split(maxsplit=1)
             label = args[1].strip() if len(args) > 1 else None
             secrets = load_secrets()
-            secret = next((x for x in secrets if (not label or x.label == label) and x.enabled), None)
-            if secret is None:
+            targets = _select_mp_link_targets(secrets, label)
+            if not targets:
                 await msg.answer("❌ Secret not found\\.", parse_mode="MarkdownV2")
                 return
 
             settings = load_settings()
             srv = settings.custom_ip or get_public_ip() or "?"
-            tg, web = build_proxy_links(secret.key, settings.proxy_domain, srv, settings.proxy_port)
-            qr_url = qr_api_url(web)
-            await msg.answer(build_mp_link_text(secret.label, tg, web, qr_url, md=_md), parse_mode="MarkdownV2")
+            for secret in targets:
+                tg, web = build_proxy_links(secret.key, settings.proxy_domain, srv, settings.proxy_port)
+                qr_url = qr_api_url(web)
+                await msg.answer(build_mp_link_text(secret.label, tg, web, qr_url, md=_md), parse_mode="MarkdownV2")
 
         @router.message(Command("mp_add"))
         async def handle_mp_add(msg: Message) -> None:

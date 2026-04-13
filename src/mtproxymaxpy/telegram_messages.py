@@ -128,9 +128,9 @@ def build_mp_link_text(label: str, tg_link: str, web_link: str, qr_url: str, *, 
     lines = [
         f"🔗 *{md(label)}*",
         "",
-        f"`{md(tg_link)}`",
+        f"[tg link]({md(tg_link)})",
         "",
-        f"`{md(web_link)}`",
+        f"[t\\.me link]({md(web_link)})",
         "",
         f"[QR code]({md(qr_url)})",
     ]
