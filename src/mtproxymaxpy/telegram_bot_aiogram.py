@@ -211,7 +211,6 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
                 return
             from mtproxymaxpy import metrics as _metrics
 
-            await msg.answer("⏳ Collecting secrets stats…", parse_mode="MarkdownV2")
             secrets = load_secrets()
             mst = _metrics.get_stats(timeout=2.0, max_age=5.0)
             lines = build_mp_secrets_lines(secrets, mst, md=_md, bytes_formatter=format_bytes)
