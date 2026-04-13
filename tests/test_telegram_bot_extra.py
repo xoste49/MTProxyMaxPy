@@ -193,6 +193,72 @@ def test_mp_secrets_worker_failure_and_update_failure(monkeypatch: pytest.Monkey
     assert any("Update failed" in s for s in sent)
 
 
+def test_mp_secrets_escapes_equals_for_markdown_v2(monkeypatch: pytest.MonkeyPatch) -> None:
+    sent = []
+    chunked = []
+    monkeypatch.setattr(telegram_bot, "_send", lambda b, chat, text: sent.append(text))
+    monkeypatch.setattr(
+        telegram_bot, "_send_chunked", lambda b, chat, lines, limit=3500: chunked.append("\n".join(lines))
+    )
+
+    class _Msg:
+        def __init__(self, text: str):
+            self.chat = SimpleNamespace(id=1)
+            self.text = text
+
+    class _HBot:
+        def __init__(self):
+            self.handlers = {}
+
+        def message_handler(self, commands=None):
+            def _d(fn):
+                for c in commands or []:
+                    self.handlers[c] = fn
+                return fn
+
+            return _d
+
+    bot = _HBot()
+    monkeypatch.setattr(
+        telegram_bot,
+        "load_settings",
+        lambda: SimpleNamespace(custom_ip="", proxy_domain="cf.com", proxy_port=443, telegram_server_label="node"),
+    )
+    monkeypatch.setattr(
+        telegram_bot,
+        "load_secrets",
+        lambda: [SimpleNamespace(label="alice", key="a" * 32, enabled=True)],
+    )
+    _set_pkg_module(
+        monkeypatch,
+        "metrics",
+        SimpleNamespace(
+            get_stats=lambda *a, **k: {
+                "available": True,
+                "user_stats": {"a" * 32: {"bytes_in": 1024, "bytes_out": 2048, "active": 3}},
+            }
+        ),
+    )
+
+    class _Thread:
+        def __init__(self, target=None, args=(), kwargs=None, **k):
+            self.target = target
+            self.args = args
+            self.kwargs = kwargs or {}
+
+        def start(self):
+            if self.target:
+                self.target(*self.args, **self.kwargs)
+
+    monkeypatch.setattr(telegram_bot.threading, "Thread", _Thread)
+
+    telegram_bot._register_handlers(bot, "1")
+    bot.handlers["mp_secrets"](_Msg("/mp_secrets"))
+
+    assert any("Collecting secrets stats" in s for s in sent)
+    assert any("conns\\=" in payload for payload in chunked)
+
+
 def test_more_handler_error_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     sent = []
     monkeypatch.setattr(telegram_bot, "_send", lambda b, chat, text: sent.append(text))

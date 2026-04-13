@@ -273,7 +273,7 @@ def _register_handlers(bot: telebot.TeleBot, chat_id: str) -> None:  # noqa: C90
                     bi = format_bytes(us.get("bytes_in", 0)) if us else "—"
                     bo = format_bytes(us.get("bytes_out", 0)) if us else "—"
                     conns = str(int(us.get("active", 0))) if us else "—"
-                    lines.append(f"{flag} `{_md(s.label)}`\n    ↑{_md(bo)} ↓{_md(bi)} conns={conns}")
+                    lines.append(f"{flag} `{_md(s.label)}`\n    ↑{_md(bo)} ↓{_md(bi)} {_md(f'conns={conns}')}")
                 _send_chunked(bot, chat_id, lines)
             except Exception as exc:
                 _send(bot, chat_id, f"❌ Failed to collect stats: `{_md(str(exc))}`")
