@@ -146,3 +146,35 @@ def test_is_telegram_timeout_error_for_telegram_network_timeout_message() -> Non
 
 def test_is_telegram_timeout_error_false_for_non_timeout_error() -> None:
     assert tga._is_telegram_timeout_error(RuntimeError("bad markdown")) is False
+
+
+def test_polling_retry_delay_sec_exponential_and_capped() -> None:
+    assert tga._polling_retry_delay_sec(1) == 3
+    assert tga._polling_retry_delay_sec(2) == 6
+    assert tga._polling_retry_delay_sec(3) == 12
+    assert tga._polling_retry_delay_sec(6) == 60
+    assert tga._polling_retry_delay_sec(20) == 60
+
+
+def test_run_polling_retries_after_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _TimeoutError(Exception):
+        pass
+
+    timeout_exc = _TimeoutError("HTTP Client says - Request timeout error")
+    state = {"calls": 0}
+
+    def _fake_asyncio_run(coro):
+        state["calls"] += 1
+        coro.close()
+        if state["calls"] == 1:
+            raise timeout_exc
+        tga._stop_event.set()
+
+    monkeypatch.setattr(tga.asyncio, "run", _fake_asyncio_run)
+    monkeypatch.setattr(tga, "_is_telegram_timeout_error", lambda exc: True)
+    monkeypatch.setattr(tga._stop_event, "wait", lambda timeout=None: False)
+
+    tga._stop_event.clear()
+    tga._run_polling("token", "1", 1)
+
+    assert state["calls"] == 2

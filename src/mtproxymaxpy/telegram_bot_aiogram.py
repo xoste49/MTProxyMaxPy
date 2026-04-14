@@ -27,6 +27,10 @@ _loop: asyncio.AbstractEventLoop | None = None
 _bot: Any = None
 _dispatcher: Any = None
 _started_event = threading.Event()
+_stop_event = threading.Event()
+
+_POLLING_RETRY_BASE_SEC = 3
+_POLLING_RETRY_MAX_SEC = 60
 
 _COMMAND_SPECS: tuple[tuple[str, str], ...] = (
     ("status", "proxy status"),
@@ -80,6 +84,14 @@ def _is_telegram_timeout_error(exc: Exception) -> bool:
     if isinstance(cause, TimeoutError | asyncio.TimeoutError):
         return True
     return "timeout" in str(cause).lower()
+
+
+def _polling_retry_delay_sec(attempt: int) -> int:
+    """Return exponential backoff delay for polling retries."""
+    if attempt < 1:
+        return _POLLING_RETRY_BASE_SEC
+    delay = _POLLING_RETRY_BASE_SEC * (2 ** (attempt - 1))
+    return min(delay, _POLLING_RETRY_MAX_SEC)
 
 
 async def _start_polling(dispatcher: Any, bot: Any) -> None:
@@ -464,12 +476,31 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
                 pass
             await bot.session.close()
 
-    try:
-        asyncio.run(_main())
-    except Exception as exc:
-        logger.exception("aiogram polling thread crashed: %s", exc)
-    finally:
-        _reset_runtime_state()
+    timeout_retry_attempt = 0
+    while not _stop_event.is_set():
+        try:
+            asyncio.run(_main())
+            if _stop_event.is_set():
+                break
+            logger.warning("aiogram polling exited unexpectedly; restarting")
+            timeout_retry_attempt = 0
+        except Exception as exc:
+            if _stop_event.is_set():
+                break
+            if _is_telegram_timeout_error(exc):
+                timeout_retry_attempt += 1
+                delay = _polling_retry_delay_sec(timeout_retry_attempt)
+                logger.warning(
+                    "aiogram polling timeout (%s); retrying in %ss",
+                    exc,
+                    delay,
+                )
+                _stop_event.wait(delay)
+                continue
+            logger.exception("aiogram polling thread crashed: %s", exc)
+            break
+        finally:
+            _reset_runtime_state()
 
 
 def _set_runtime_state(loop: asyncio.AbstractEventLoop, bot: Any, dispatcher: Any) -> None:
@@ -514,6 +545,7 @@ def start() -> None:
         return
 
     _started_event.clear()
+    _stop_event.clear()
     _poll_thread = threading.Thread(
         target=_run_polling,
         args=(settings.telegram_bot_token, settings.telegram_chat_id, settings.telegram_interval),
@@ -526,6 +558,8 @@ def start() -> None:
 
 def stop() -> None:
     """Stop Telegram backend and background tasks."""
+    _stop_event.set()
+
     if _loop is not None and _dispatcher is not None:
 
         async def _shutdown() -> None:
