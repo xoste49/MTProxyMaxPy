@@ -95,6 +95,27 @@ def test_download_url_and_latest_version(monkeypatch: pytest.MonkeyPatch) -> Non
     assert pm.get_latest_version() == pm.TELEMT_VERSION
 
 
+def test_get_binary_version(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(pm, "is_binary_present", lambda: True)
+
+    monkeypatch.setattr(
+        pm.subprocess,
+        "run",
+        lambda *a, **k: SimpleNamespace(stdout="telemt 3.4.0\n", stderr=""),
+    )
+    assert pm.get_binary_version(default="1.0.0") == "3.4.0"
+
+    monkeypatch.setattr(
+        pm.subprocess,
+        "run",
+        lambda *a, **k: SimpleNamespace(stdout="version: unknown\n", stderr=""),
+    )
+    assert pm.get_binary_version(default="1.0.0") == "1.0.0"
+
+    monkeypatch.setattr(pm, "is_binary_present", lambda: False)
+    assert pm.get_binary_version(default="2.0.0") == "2.0.0"
+
+
 def test_binary_presence_and_download(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()

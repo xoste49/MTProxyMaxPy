@@ -1648,14 +1648,17 @@ def _update_screen() -> None:  # noqa: C901
         from mtproxymaxpy import process_manager
         from mtproxymaxpy.constants import TELEMT_VERSION
 
-        console.print(f"  Current: [bold]{TELEMT_VERSION}[/bold]  Checking latest…")
+        current = (
+            process_manager.get_binary_version() if hasattr(process_manager, "get_binary_version") else TELEMT_VERSION
+        )
+        console.print(f"  Current: [bold]{current}[/bold]  Checking latest…")
         latest = process_manager.get_latest_version()
         console.print(f"  Latest:  [bold]{latest}[/bold]")
 
-        if latest == TELEMT_VERSION:
+        if latest == current:
             console.print("  [green]✓ Engine up to date[/green]")
         else:
-            console.print(f"  [yellow]⬆ Engine update: {TELEMT_VERSION} → {latest}[/yellow]")
+            console.print(f"  [yellow]⬆ Engine update: {current} → {latest}[/yellow]")
             if Confirm.ask("  Download and install engine update?", console=console):
                 was_running = process_manager.is_running()
                 if was_running:

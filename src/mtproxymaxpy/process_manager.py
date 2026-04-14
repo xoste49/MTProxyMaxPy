@@ -14,6 +14,7 @@ import io
 import json
 import logging
 import os
+import re
 import signal
 import subprocess
 import tarfile
@@ -274,6 +275,26 @@ def get_latest_version() -> str:
         return tag.lstrip("v")
     except Exception:
         return TELEMT_VERSION
+
+
+def get_binary_version(default: str = TELEMT_VERSION) -> str:
+    """Return installed telemt version parsed from `telemt --version` output."""
+    if not is_binary_present():
+        return default
+
+    try:
+        res = subprocess.run(
+            [str(BINARY_PATH), "--version"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except Exception:
+        return default
+
+    text = (res.stdout + res.stderr).strip()
+    match = re.search(r"\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?", text)
+    return match.group(0) if match else default
 
 
 def is_binary_present() -> bool:

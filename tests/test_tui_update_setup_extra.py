@@ -282,6 +282,63 @@ def test_update_screen_engine_upgrade_path(monkeypatch: pytest.MonkeyPatch, tmp_
     assert calls == {"stop": 1, "dl": 1, "start": 1}
 
 
+def test_update_screen_engine_upgrade_is_not_reoffered_after_success(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _mute_ui(monkeypatch)
+    import mtproxymaxpy as pkg
+
+    install_dir = tmp_path / "install"
+    install_dir.mkdir()
+    sha_file = tmp_path / "sha"
+    badge_file = tmp_path / "badge"
+
+    monkeypatch.setitem(
+        sys.modules,
+        "mtproxymaxpy.constants",
+        SimpleNamespace(
+            GITHUB_REPO="owner/repo",
+            GITHUB_API_COMMITS="https://api.example/commits",
+            INSTALL_DIR=install_dir,
+            UPDATE_SHA_FILE=sha_file,
+            UPDATE_BADGE_FILE=badge_file,
+            VERSION="1.0.0",
+            TELEMT_VERSION="3.3.39",
+            SYSTEMD_TELEGRAM_SERVICE="mtproxymaxpy-telegram",
+        ),
+    )
+
+    monkeypatch.setitem(sys.modules, "httpx", SimpleNamespace(get=lambda *a, **k: SimpleNamespace(text="a" * 40)))
+    monkeypatch.setattr("subprocess.run", lambda *a, **k: SimpleNamespace(returncode=0, stdout="a" * 40, stderr=""))
+
+    state = {"installed": "3.3.39"}
+    calls = {"stop": 0, "dl": 0, "start": 0}
+
+    def _download_binary(**kwargs):
+        calls["dl"] += 1
+        state["installed"] = kwargs["version"]
+
+    pm = SimpleNamespace(
+        get_latest_version=lambda: "3.4.0",
+        get_binary_version=lambda: state["installed"],
+        is_running=lambda: True,
+        stop=lambda: calls.__setitem__("stop", calls["stop"] + 1),
+        download_binary=_download_binary,
+        start=lambda public_ip="": calls.__setitem__("start", calls["start"] + 1) or 123,
+    )
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.process_manager", pm)
+    monkeypatch.setattr(pkg, "process_manager", pm, raising=False)
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.utils.network", SimpleNamespace(get_public_ip=lambda: "1.2.3.4"))
+
+    confirms = iter([True, True])
+    monkeypatch.setattr(menu.Confirm, "ask", lambda *a, **k: next(confirms, False))
+
+    menu._update_screen()
+    menu._update_screen()
+
+    assert calls == {"stop": 1, "dl": 1, "start": 1}
+
+
 def test_menu_loop_exception_handlers(monkeypatch: pytest.MonkeyPatch) -> None:
     _mute_ui(monkeypatch)
 

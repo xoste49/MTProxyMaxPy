@@ -449,12 +449,17 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
 
             await msg.answer("🔍 Checking for updates…", parse_mode="MarkdownV2")
             try:
+                current = (
+                    process_manager.get_binary_version()
+                    if hasattr(process_manager, "get_binary_version")
+                    else TELEMT_VERSION
+                )
                 latest = process_manager.get_latest_version()
-                if latest == TELEMT_VERSION:
-                    await msg.answer(f"✅ Already on latest: `{_md(TELEMT_VERSION)}`", parse_mode="MarkdownV2")
+                if latest == current:
+                    await msg.answer(f"✅ Already on latest: `{_md(current)}`", parse_mode="MarkdownV2")
                     return
                 await msg.answer(
-                    f"⬇️ Updating `{_md(TELEMT_VERSION)}` → `{_md(latest)}`…",
+                    f"⬇️ Updating `{_md(current)}` → `{_md(latest)}`…",
                     parse_mode="MarkdownV2",
                 )
                 was_running = process_manager.is_running()
