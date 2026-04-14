@@ -148,6 +148,17 @@ def test_is_telegram_timeout_error_false_for_non_timeout_error() -> None:
     assert tga._is_telegram_timeout_error(RuntimeError("bad markdown")) is False
 
 
+def test_should_suppress_update_error_for_timeout() -> None:
+    telegram_error = type("TelegramNetworkError", (Exception,), {})
+    exc = telegram_error("HTTP Client says - Request timeout error")
+
+    assert tga._should_suppress_update_error(exc) is True
+
+
+def test_should_not_suppress_update_error_for_non_timeout() -> None:
+    assert tga._should_suppress_update_error(RuntimeError("bad markdown")) is False
+
+
 def test_polling_retry_delay_sec_exponential_and_capped() -> None:
     assert tga._polling_retry_delay_sec(1) == 3
     assert tga._polling_retry_delay_sec(2) == 6

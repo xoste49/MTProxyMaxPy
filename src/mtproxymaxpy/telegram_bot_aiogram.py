@@ -86,6 +86,11 @@ def _is_telegram_timeout_error(exc: Exception) -> bool:
     return "timeout" in str(cause).lower()
 
 
+def _should_suppress_update_error(exc: Exception) -> bool:
+    """Return True for transient update-processing errors that should not spam tracebacks."""
+    return _is_telegram_timeout_error(exc)
+
+
 def _polling_retry_delay_sec(attempt: int) -> int:
     """Return exponential backoff delay for polling retries."""
     if attempt < 1:
@@ -152,7 +157,7 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
         nonlocal token, chat_id, interval_hours
         from aiogram import Bot, Dispatcher, Router
         from aiogram.filters import Command
-        from aiogram.types import BotCommand, Message
+        from aiogram.types import BotCommand, ErrorEvent, Message
 
         bot = Bot(token=token)
         dp = Dispatcher()
@@ -189,6 +194,14 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
                     await _send_text(_get_stats_text())
                 except Exception as exc:
                     logger.warning("aiogram report loop send failed: %s", exc)
+
+        @router.error()
+        async def handle_router_error(event: ErrorEvent) -> None:
+            exc = event.exception
+            if isinstance(exc, Exception) and _should_suppress_update_error(exc):
+                logger.warning("aiogram update timeout suppressed: %s", exc)
+                return
+            raise exc
 
         @router.message(Command("status"))
         async def handle_status(msg: Message) -> None:
