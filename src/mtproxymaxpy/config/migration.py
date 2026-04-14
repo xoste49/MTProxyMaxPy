@@ -66,6 +66,7 @@ _SETTINGS_KEY_MAP: dict[str, str] = {
     "TELEGRAM_ALERTS_ENABLED": "telegram_alerts_enabled",
     "TELEGRAM_SERVER_LABEL": "telegram_server_label",
     "AUTO_UPDATE_ENABLED": "auto_update_enabled",
+    "MANAGER_UPDATE_BRANCH": "manager_update_branch",
 }
 
 _BOOL_TRUE = {"true", "1", "yes"}

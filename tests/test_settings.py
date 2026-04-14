@@ -59,3 +59,10 @@ def test_invalid_geoblock_mode() -> None:
 def test_invalid_sni_action() -> None:
     with pytest.raises(Exception):
         Settings(unknown_sni_action="bogus")
+
+
+def test_invalid_manager_update_branch() -> None:
+    with pytest.raises(Exception):
+        Settings(manager_update_branch="")
+    with pytest.raises(Exception):
+        Settings(manager_update_branch="feature branch")

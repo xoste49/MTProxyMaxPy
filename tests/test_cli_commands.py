@@ -25,6 +25,7 @@ class FakeSettings:
         self.telegram_interval = kwargs.get("telegram_interval", 24)
         self.telegram_alerts_enabled = kwargs.get("telegram_alerts_enabled", True)
         self.telegram_server_label = kwargs.get("telegram_server_label", "srv")
+        self.manager_update_branch = kwargs.get("manager_update_branch", "main")
 
     def model_copy(self, update: dict):
         data = self.__dict__.copy()
@@ -250,6 +251,15 @@ def test_settings_commands(monkeypatch: pytest.MonkeyPatch, capsys: pytest.Captu
     assert saved[-1].unknown_sni_action == "drop"
     with pytest.raises(typer.Exit):
         cli.sni_policy("oops")
+
+    cli.manager_branch(None)
+    assert "main" in capsys.readouterr().out
+    cli.manager_branch("develop")
+    assert saved[-1].manager_update_branch == "develop"
+    with pytest.raises(typer.Exit):
+        cli.manager_branch(" ")
+    with pytest.raises(typer.Exit):
+        cli.manager_branch("bad branch")
 
 
 def test_secret_commands(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

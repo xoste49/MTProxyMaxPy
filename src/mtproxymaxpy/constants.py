@@ -69,6 +69,7 @@ DEFAULT_MASKING_PORT = 443
 DEFAULT_TELEGRAM_INTERVAL_HOURS = 6
 DEFAULT_REPLICATION_SYNC_INTERVAL = 60
 DEFAULT_SSH_PORT = 22
+DEFAULT_MANAGER_UPDATE_BRANCH = "main"
 
 # ── Systemd unit names ─────────────────────────────────────────────────────────
 SYSTEMD_SERVICE = "mtproxymaxpy"

@@ -15,6 +15,7 @@ from mtproxymaxpy.constants import (
     DEFAULT_CONCURRENCY,
     DEFAULT_DOMAIN,
     DEFAULT_FAKE_CERT_LEN,
+    DEFAULT_MANAGER_UPDATE_BRANCH,
     DEFAULT_MASKING_HOST,
     DEFAULT_MASKING_PORT,
     DEFAULT_METRICS_PORT,
@@ -60,6 +61,7 @@ class Settings(BaseModel):
 
     # ── Auto-update ───────────────────────────────────────────────────────────
     auto_update_enabled: bool = True
+    manager_update_branch: str = DEFAULT_MANAGER_UPDATE_BRANCH
 
     @field_validator("geoblock_mode")
     @classmethod
@@ -74,6 +76,16 @@ class Settings(BaseModel):
         if v not in ("mask", "drop"):
             raise ValueError("unknown_sni_action must be 'mask' or 'drop'")
         return v
+
+    @field_validator("manager_update_branch")
+    @classmethod
+    def _validate_manager_update_branch(cls, v: str) -> str:
+        branch = v.strip()
+        if not branch:
+            raise ValueError("manager_update_branch must not be empty")
+        if any(ch.isspace() for ch in branch):
+            raise ValueError("manager_update_branch must not contain spaces")
+        return branch
 
 
 def load_settings(path: Path = SETTINGS_FILE) -> Settings:

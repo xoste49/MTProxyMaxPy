@@ -466,6 +466,34 @@ def sni_policy(
     typer.echo(f"[+] SNI policy set to '{value}'.")
 
 
+# ── manager-branch ────────────────────────────────────────────────────────────
+
+
+@app.command(name="manager-branch")
+def manager_branch(
+    value: Annotated[Optional[str], typer.Argument(help="Branch name (omit or 'get' to show current)")] = None,
+) -> None:
+    """Get or set repository branch used for MTProxyMaxPy self-update."""
+    from mtproxymaxpy.config.settings import load_settings, save_settings
+
+    settings = load_settings()
+    current = getattr(settings, "manager_update_branch", "main")
+    if value is None or value == "get":
+        typer.echo(current)
+        return
+
+    branch = value.strip()
+    if not branch:
+        typer.echo("[!] Branch name must not be empty", err=True)
+        raise typer.Exit(1)
+    if any(ch.isspace() for ch in branch):
+        typer.echo("[!] Branch name must not contain spaces", err=True)
+        raise typer.Exit(1)
+
+    save_settings(settings.model_copy(update={"manager_update_branch": branch}))
+    typer.echo(f"[+] Manager update branch set to '{branch}'.")
+
+
 # ── secrets ────────────────────────────────────────────────────────────────────
 
 secrets_app = typer.Typer(help="Manage user secrets", no_args_is_help=True)

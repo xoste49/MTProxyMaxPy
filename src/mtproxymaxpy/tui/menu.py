@@ -149,6 +149,29 @@ def _ask_choice(max_n: int, allow_zero: bool = True) -> int:
         console.print("  [red]Invalid choice[/red]")
 
 
+def _manager_update_branch() -> str:
+    try:
+        from mtproxymaxpy.config.settings import load_settings
+
+        settings = load_settings()
+        branch = str(getattr(settings, "manager_update_branch", "main") or "main").strip()
+        if branch and not any(ch.isspace() for ch in branch):
+            return branch
+    except Exception:
+        pass
+    return "main"
+
+
+def _manager_commits_url(branch: str) -> str:
+    from urllib.parse import quote
+    from mtproxymaxpy.constants import GITHUB_API_COMMITS
+
+    base = GITHUB_API_COMMITS.strip().rstrip("/")
+    if base.rsplit("/", 1)[-1] == "commits":
+        return f"{base}/{quote(branch, safe='')}"
+    return f"{base.rsplit('/', 1)[0]}/{quote(branch, safe='')}"
+
+
 # ── Background update checker ─────────────────────────────────────────────────
 
 
@@ -182,10 +205,13 @@ def _check_update_bg(wait_timeout: float = 3.0) -> None:
     def _worker() -> None:
         try:
             import httpx
-            from mtproxymaxpy.constants import GITHUB_API_COMMITS, UPDATE_BADGE_FILE, UPDATE_SHA_FILE
+            from mtproxymaxpy.constants import UPDATE_BADGE_FILE, UPDATE_SHA_FILE
+
+            branch = _manager_update_branch()
+            commits_url = _manager_commits_url(branch)
 
             resp = httpx.get(
-                GITHUB_API_COMMITS,
+                commits_url,
                 headers={"Accept": "application/vnd.github.sha"},
                 timeout=10,
                 follow_redirects=True,
@@ -887,6 +913,7 @@ def _settings_menu() -> None:
             ("17 telegram_chat_id", settings.telegram_chat_id or "(not set)"),
             ("18 telegram_interval (h)", str(settings.telegram_interval)),
             ("19 telegram_server_label", settings.telegram_server_label),
+            ("20 manager_update_branch", getattr(settings, "manager_update_branch", "main")),
         ]
         for k, v in fields:
             tbl.add_row(k, v)
@@ -896,7 +923,7 @@ def _settings_menu() -> None:
         console.print()
         console.print("  Enter field number to edit, [bold cyan]0[/bold cyan] to go back")
 
-        ch = _ask_choice(19)
+        ch = _ask_choice(20)
         if ch == 0:
             return
 
@@ -920,13 +947,19 @@ def _settings_menu() -> None:
             17: ("telegram_chat_id", str),
             18: ("telegram_interval", int),
             19: ("telegram_server_label", str),
+            20: ("manager_update_branch", lambda v: v.strip()),
         }
         if ch in field_map:
             field, converter = field_map[ch]
-            current = getattr(settings, field)
+            current = getattr(settings, field, "")
             new_val_str = Prompt.ask(f"  {field}", default=str(current), console=console)
             try:
                 new_val = converter(new_val_str)
+                if field == "manager_update_branch":
+                    if not new_val:
+                        raise ValueError("manager_update_branch must not be empty")
+                    if any(ch.isspace() for ch in new_val):
+                        raise ValueError("manager_update_branch must not contain spaces")
                 updated = settings.model_copy(update={field: new_val})
                 save_settings(updated)
                 console.print(f"[green][+] Saved {field} = {new_val}[/green]")
@@ -1464,12 +1497,14 @@ def _update_screen() -> None:  # noqa: C901
         import httpx
         from mtproxymaxpy.constants import (
             GITHUB_REPO,
-            GITHUB_API_COMMITS,
             INSTALL_DIR,
             UPDATE_SHA_FILE,
             UPDATE_BADGE_FILE,
             VERSION,
         )
+
+        branch = _manager_update_branch()
+        commits_url = _manager_commits_url(branch)
 
         local_sha = ""
         try:
@@ -1490,7 +1525,7 @@ def _update_screen() -> None:  # noqa: C901
 
         console.print("  Checking GitHub for manager updates…")
         resp = httpx.get(
-            GITHUB_API_COMMITS,
+            commits_url,
             headers={"Accept": "application/vnd.github.sha"},
             timeout=15,
             follow_redirects=True,
@@ -1501,7 +1536,7 @@ def _update_screen() -> None:  # noqa: C901
             console.print("  [green]✓ Already up to date[/green]")
             UPDATE_BADGE_FILE.unlink(missing_ok=True)
         else:
-            console.print(f"  [yellow]⬆ New commits available on main[/yellow]")
+            console.print(f"  [yellow]⬆ New commits available on {branch}[/yellow]")
             if local_sha:
                 console.print(f"  Local SHA  : [dim]{local_sha[:12]}…[/dim]")
             console.print(f"  Remote SHA : [dim]{remote_sha[:12]}…[/dim]")
@@ -1535,11 +1570,29 @@ def _update_screen() -> None:  # noqa: C901
                         capture_output=True,
                         text=True,
                     )
-                    r1 = _sp.run(
-                        [git, "-C", str(INSTALL_DIR), "pull", "--ff-only"],
+                    r0 = _sp.run(
+                        [git, "-C", str(INSTALL_DIR), "checkout", branch],
                         capture_output=True,
                         text=True,
                     )
+                    if r0.returncode != 0:
+                        r0 = _sp.run(
+                            [git, "-C", str(INSTALL_DIR), "checkout", "-b", branch, f"origin/{branch}"],
+                            capture_output=True,
+                            text=True,
+                        )
+                    if r0.returncode != 0:
+                        out0 = "\n".join(filter(None, [r0.stdout.strip(), r0.stderr.strip()]))
+                        if out0:
+                            console.print(f"  {out0}")
+                        console.print(f"[red][!] failed to switch to branch '{branch}'[/red]")
+                        r1 = None
+                    else:
+                        r1 = _sp.run(
+                            [git, "-C", str(INSTALL_DIR), "pull", "--ff-only", "origin", branch],
+                            capture_output=True,
+                            text=True,
+                        )
                     # Always drop any stash created above — generated files
                     # (uv.lock etc.) will be recreated by uv sync anyway.
                     _sp.run(
@@ -1547,10 +1600,13 @@ def _update_screen() -> None:  # noqa: C901
                         capture_output=True,
                         text=True,
                     )
-                    out = "\n".join(filter(None, [r1.stdout.strip(), r1.stderr.strip()]))
-                    if out:
-                        console.print(f"  {out}")
-                    if r1.returncode != 0:
+                    if r1 is None:
+                        pass
+                    else:
+                        out = "\n".join(filter(None, [r1.stdout.strip(), r1.stderr.strip()]))
+                        if out:
+                            console.print(f"  {out}")
+                    if r1 is None or r1.returncode != 0:
                         console.print(f"[red][!] git pull failed[/red]")
                     else:
                         console.print("  Syncing dependencies…")
