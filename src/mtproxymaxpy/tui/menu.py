@@ -1570,19 +1570,43 @@ def _update_screen() -> None:  # noqa: C901
                         capture_output=True,
                         text=True,
                     )
+                    r_fetch = _sp.run(
+                        [git, "-C", str(INSTALL_DIR), "fetch", "origin", branch],
+                        capture_output=True,
+                        text=True,
+                    )
                     r0 = _sp.run(
                         [git, "-C", str(INSTALL_DIR), "checkout", branch],
                         capture_output=True,
                         text=True,
                     )
                     if r0.returncode != 0:
-                        r0 = _sp.run(
-                            [git, "-C", str(INSTALL_DIR), "checkout", "-b", branch, f"origin/{branch}"],
-                            capture_output=True,
-                            text=True,
-                        )
+                        # Use FETCH_HEAD because origin/<branch> may be absent locally
+                        # even when fetch succeeded (e.g. minimal/non-standard refspecs).
+                        if r_fetch.returncode == 0:
+                            r0 = _sp.run(
+                                [git, "-C", str(INSTALL_DIR), "checkout", "-B", branch, "FETCH_HEAD"],
+                                capture_output=True,
+                                text=True,
+                            )
+                        else:
+                            r0 = _sp.run(
+                                [git, "-C", str(INSTALL_DIR), "checkout", "-b", branch, f"origin/{branch}"],
+                                capture_output=True,
+                                text=True,
+                            )
                     if r0.returncode != 0:
-                        out0 = "\n".join(filter(None, [r0.stdout.strip(), r0.stderr.strip()]))
+                        out0 = "\n".join(
+                            filter(
+                                None,
+                                [
+                                    (r_fetch.stdout or "").strip(),
+                                    (r_fetch.stderr or "").strip(),
+                                    (r0.stdout or "").strip(),
+                                    (r0.stderr or "").strip(),
+                                ],
+                            )
+                        )
                         if out0:
                             console.print(f"  {out0}")
                         console.print(f"[red][!] failed to switch to branch '{branch}'[/red]")
