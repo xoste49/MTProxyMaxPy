@@ -109,30 +109,28 @@ def _get_stats_text() -> str:
 
     st = process_manager.status()
     settings = load_settings()
-    secrets = load_secrets()
+    if not st["running"]:
+        return "📱 *MTProxy Status*\n\n🔴 Status: Stopped"
 
-    running_emoji = "🟢" if st["running"] else "🔴"
-    uptime_str = escape_md(format_duration(st["uptime_sec"])) if st.get("uptime_sec") else "?"
+    uptime_str = escape_md(format_duration(st["uptime_sec"])) if st.get("uptime_sec") else "0m"
     lines = [
-        f"{running_emoji} *{_md(settings.telegram_server_label)}*",
-        f"Port: `{settings.proxy_port}`",
-        f"Status: `{'running' if st['running'] else 'stopped'}`",
-        f"PID: `{st['pid'] or 'N/A'}`",
-        f"Uptime: `{uptime_str}`",
+        "📱 *MTProxy Status*",
+        "",
+        "🟢 Status: Running",
+        f"⏱ Uptime: {uptime_str}",
     ]
     mst = _metrics.get_stats()
     if mst.get("available"):
         lines += [
-            f"Traffic ↑: `{_md(format_bytes(mst['bytes_out']))}`",
-            f"Traffic ↓: `{_md(format_bytes(mst['bytes_in']))}`",
-            f"Active conns: `{mst['active_connections']}`",
+            f"👥 Connections: {_md(str(mst['active_connections']))}",
+            f"📊 Traffic: ↓ {_md(format_bytes(mst['bytes_in']))} ↑ {_md(format_bytes(mst['bytes_out']))}",
         ]
-    if secrets:
-        lines.append("")
-        lines.append(f"*Users* \\({len(secrets)}\\):")
-        for s in secrets:
-            flag = "✅" if s.enabled else "❌"
-            lines.append(f"  {flag} `{_md(s.label)}`")
+    else:
+        lines += [
+            "👥 Connections: 0",
+            "📊 Traffic: ↓ 0 B ↑ 0 B",
+        ]
+    lines.append(f"🔗 Port: {_md(str(settings.proxy_port))} | Domain: {_md(settings.proxy_domain)}")
     return "\n".join(lines)
 
 
@@ -221,12 +219,12 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
                 return
             from mtproxymaxpy import process_manager
 
-            await msg.answer("🔄 Restarting telemt…", parse_mode="MarkdownV2")
+            await msg.answer("🔄 Restarting proxy...", parse_mode="MarkdownV2")
             try:
-                pid = process_manager.restart()
-                await msg.answer(f"✅ Restarted \\(PID `{pid}`\\)", parse_mode="MarkdownV2")
+                process_manager.restart()
+                await msg.answer("✅ Proxy restarted successfully", parse_mode="MarkdownV2")
             except Exception as exc:
-                await msg.answer(f"❌ Restart failed: `{_md(str(exc))}`", parse_mode="MarkdownV2")
+                await msg.answer(f"❌ Proxy failed to restart: {_md(str(exc))}", parse_mode="MarkdownV2")
 
         @router.message(Command("help"))
         @router.message(Command("start"))
