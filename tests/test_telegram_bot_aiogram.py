@@ -88,7 +88,7 @@ def test_send_alert_schedules_on_aiogram_loop(monkeypatch: pytest.MonkeyPatch) -
 
     assert sent
     assert sent[0][0] == "1"
-    assert sent[0][2] == "MarkdownV2"
+    assert sent[0][2] is None
 
 
 def test_start_polling_disables_signal_handlers() -> None:

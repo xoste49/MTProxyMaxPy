@@ -104,17 +104,18 @@ async def _start_polling(dispatcher: Any, bot: Any) -> None:
     await dispatcher.start_polling(bot, handle_signals=False)
 
 
-def _get_stats_text() -> str:
+def _get_stats_text() -> Any:
+    from aiogram.utils.formatting import Bold, Text
     from mtproxymaxpy import metrics as _metrics, process_manager
 
     st = process_manager.status()
     settings = load_settings()
     if not st["running"]:
-        return "📱 *MTProxy Status*\n\n🔴 Status: Stopped"
+        return Text("📱 ", Bold("MTProxy Status"), "\n\n🔴 Status: Stopped")
 
-    uptime_str = escape_md(format_duration(st["uptime_sec"])) if st.get("uptime_sec") else "0m"
+    uptime_str = format_duration(st["uptime_sec"]) if st.get("uptime_sec") else "0m"
     lines = [
-        "📱 *MTProxy Status*",
+        Text("📱 ", Bold("MTProxy Status")),
         "",
         "🟢 Status: Running",
         f"⏱ Uptime: {uptime_str}",
@@ -122,30 +123,43 @@ def _get_stats_text() -> str:
     mst = _metrics.get_stats()
     if mst.get("available"):
         lines += [
-            f"👥 Connections: {_md(str(mst['active_connections']))}",
-            f"📊 Traffic: ↓ {_md(format_bytes(mst['bytes_in']))} ↑ {_md(format_bytes(mst['bytes_out']))}",
+            f"👥 Connections: {mst['active_connections']}",
+            f"📊 Traffic: ↓ {format_bytes(mst['bytes_in'])} ↑ {format_bytes(mst['bytes_out'])}",
         ]
     else:
         lines += [
             "👥 Connections: 0",
             "📊 Traffic: ↓ 0 B ↑ 0 B",
         ]
-    lines.append(f"🔗 Port: {_md(str(settings.proxy_port))} | Domain: {_md(settings.proxy_domain)}")
-    return "\n".join(lines)
+    lines.append(f"🔗 Port: {settings.proxy_port} | Domain: {settings.proxy_domain}")
+
+    parts: list[Any] = []
+    for idx, line in enumerate(lines):
+        if idx:
+            parts.append("\n")
+        parts.append(line)
+    return Text(*parts)
 
 
-def _get_health_text() -> str:
+def _get_health_text() -> Any:
+    from aiogram.utils.formatting import Bold, Text
     from mtproxymaxpy import doctor
 
     results = doctor.run_full_doctor()
-    lines = ["🏥 *Health Check*", ""]
+    lines: list[Any] = [Text("🏥 ", Bold("Health Check")), ""]
     for r in results:
         ok = r.get("ok")
         icon = "✅" if ok is True else ("❌" if ok is False else "⚠️")
-        name = _md(r["name"])
-        extra = _md(str(r.get("error", ""))) if r.get("error") else ""
+        name = r["name"]
+        extra = str(r.get("error", "")) if r.get("error") else ""
         lines.append(f"{icon} {name}{(' — ' + extra) if extra else ''}")
-    return "\n".join(lines)
+
+    parts: list[Any] = []
+    for idx, line in enumerate(lines):
+        if idx:
+            parts.append("\n")
+        parts.append(line)
+    return Text(*parts)
 
 
 def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
@@ -156,6 +170,7 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
         from aiogram import Bot, Dispatcher, Router
         from aiogram.filters import Command
         from aiogram.types import BotCommand, ErrorEvent, Message
+        from aiogram.utils.formatting import Text
 
         bot = Bot(token=token)
         dp = Dispatcher()
@@ -167,23 +182,39 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
         async def _authorised(msg: Message) -> bool:
             return bool(msg.chat and str(msg.chat.id) == chat_id)
 
-        async def _send_text(text: str) -> None:
-            await bot.send_message(chat_id, text, parse_mode="MarkdownV2")
+        def _content_kwargs(content: Any) -> dict[str, Any]:
+            if hasattr(content, "as_kwargs"):
+                return content.as_kwargs()
+            return {"text": str(content)}
 
-        async def _send_chunked(lines: list[str], limit: int = 3500) -> None:
-            chunk: list[str] = []
+        def _join_content_lines(lines: list[Any]) -> Any:
+            parts: list[Any] = []
+            for idx, line in enumerate(lines):
+                if idx:
+                    parts.append("\n")
+                parts.append(line)
+            return Text(*parts)
+
+        async def _send_text(content: Any) -> None:
+            await bot.send_message(chat_id, **_content_kwargs(content))
+
+        async def _answer(msg: Message, content: Any) -> None:
+            await msg.answer(**_content_kwargs(content))
+
+        async def _send_chunked(lines: list[Any], limit: int = 3500) -> None:
+            chunk: list[Any] = []
             chunk_len = 0
             for line in lines:
-                line_len = len(line) + 1
+                line_len = len(_content_kwargs(line)["text"]) + 1
                 if chunk and chunk_len + line_len > limit:
-                    await _send_text("\n".join(chunk))
+                    await _send_text(_join_content_lines(chunk))
                     chunk = [line]
                     chunk_len = line_len
                 else:
                     chunk.append(line)
                     chunk_len += line_len
             if chunk:
-                await _send_text("\n".join(chunk))
+                await _send_text(_join_content_lines(chunk))
 
         async def _report_loop() -> None:
             while True:
@@ -205,13 +236,13 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
         async def handle_status(msg: Message) -> None:
             if not await _authorised(msg):
                 return
-            await msg.answer(_get_stats_text(), parse_mode="MarkdownV2")
+            await _answer(msg, _get_stats_text())
 
         @router.message(Command("users"))
         async def handle_users(msg: Message) -> None:
             if not await _authorised(msg):
                 return
-            await msg.answer(build_users_text(load_secrets(), md=_md), parse_mode="MarkdownV2")
+            await _answer(msg, build_users_text(load_secrets()))
 
         @router.message(Command("restart"))
         async def handle_restart(msg: Message) -> None:
@@ -232,13 +263,13 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
         async def handle_help(msg: Message) -> None:
             if not await _authorised(msg):
                 return
-            await msg.answer(build_help_text(), parse_mode="MarkdownV2")
+            await _answer(msg, build_help_text())
 
         @router.message(Command("mp_health"))
         async def handle_mp_health(msg: Message) -> None:
             if not await _authorised(msg):
                 return
-            await msg.answer(_get_health_text(), parse_mode="MarkdownV2")
+            await _answer(msg, _get_health_text())
 
         @router.message(Command("mp_traffic"))
         async def handle_mp_traffic(msg: Message) -> None:
@@ -250,8 +281,8 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
             if not mst.get("available"):
                 await msg.answer("❌ Metrics unavailable\\.", parse_mode="MarkdownV2")
                 return
-            text = build_mp_traffic_text(mst, md=_md, bytes_formatter=format_bytes)
-            await msg.answer(text, parse_mode="MarkdownV2")
+            text = build_mp_traffic_text(mst, bytes_formatter=format_bytes)
+            await _answer(msg, text)
 
         @router.message(Command("mp_secrets"))
         async def handle_mp_secrets(msg: Message) -> None:
@@ -261,7 +292,7 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
 
             secrets = load_secrets()
             mst = _metrics.get_stats(timeout=2.0, max_age=5.0)
-            lines = build_mp_secrets_lines(secrets, mst, md=_md, bytes_formatter=format_bytes)
+            lines = build_mp_secrets_lines(secrets, mst, bytes_formatter=format_bytes)
             await _send_chunked(lines)
 
         @router.message(Command("mp_limits"))
@@ -277,9 +308,7 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
             if secret is None:
                 await msg.answer(f"❌ Not found: `{_md(label)}`", parse_mode="MarkdownV2")
                 return
-            await msg.answer(
-                build_mp_limits_text(secret, md=_md, bytes_formatter=format_bytes), parse_mode="MarkdownV2"
-            )
+            await _answer(msg, build_mp_limits_text(secret, bytes_formatter=format_bytes))
 
         @router.message(Command("mp_setlimit"))
         async def handle_mp_setlimit(msg: Message) -> None:
@@ -321,7 +350,7 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
                 return
             from mtproxymaxpy.config.upstreams import load_upstreams
 
-            await msg.answer(build_mp_upstreams_text(load_upstreams(), md=_md), parse_mode="MarkdownV2")
+            await _answer(msg, build_mp_upstreams_text(load_upstreams()))
 
         @router.message(Command("mp_link"))
         async def handle_mp_link(msg: Message) -> None:
@@ -344,7 +373,7 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
                 tg, web = build_proxy_links(secret.key, settings.proxy_domain, srv, settings.proxy_port)
                 qr_url = qr_api_url(web)
                 try:
-                    await msg.answer(build_mp_link_text(secret.label, tg, web, qr_url, md=_md), parse_mode="MarkdownV2")
+                    await _answer(msg, build_mp_link_text(secret.label, tg, web, qr_url))
                 except Exception as exc:
                     if _is_telegram_timeout_error(exc):
                         logger.warning("mp_link reply timeout for label=%s: %s", secret.label, exc)
@@ -604,10 +633,10 @@ def send_alert(text: str) -> None:
     if not settings.telegram_enabled or _loop is None or _bot is None:
         return
 
-    payload = escape_md(text)
+    payload = text
 
     async def _send_async() -> None:
-        await _bot.send_message(settings.telegram_chat_id, payload, parse_mode="MarkdownV2")
+        await _bot.send_message(settings.telegram_chat_id, payload)
 
     try:
         _loop.call_soon_threadsafe(lambda: asyncio.create_task(_send_async()))
