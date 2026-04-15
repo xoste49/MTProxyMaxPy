@@ -59,68 +59,105 @@ def _read_last_lines(path: Path, limit: int, max_bytes: int = 262_144) -> list[s
 
 def _header_panel() -> Panel:
     """Build the status header shown at the top of every screen."""
+    lines: list[Text] = []
     tg_line = Text("○ TG UNKNOWN", style="dim")
     try:
-        from mtproxymaxpy import process_manager
-
-        st = process_manager.status()
+        from mtproxymaxpy import metrics, process_manager
+        from mtproxymaxpy.config.secrets import load_secrets
         from mtproxymaxpy.config.settings import load_settings
         from mtproxymaxpy.constants import SYSTEMD_TELEGRAM_SERVICE, SYSTEMD_UNIT_DIR
+        from mtproxymaxpy.utils.formatting import format_bytes, format_duration
 
+        st = process_manager.status()
         settings = load_settings()
+        secrets = load_secrets()
 
-        if st["running"]:
-            status_txt = Text("● RUNNING", style="bold green")
+        status_line = Text()
+        if st.get("running"):
+            status_line.append("● RUNNING", style="bold green")
         else:
-            status_txt = Text("○ STOPPED", style="bold red")
+            status_line.append("○ STOPPED", style="bold red")
 
-        parts: list[Text] = [
-            status_txt,
-            Text(f"  Port: {settings.proxy_port}", style="cyan"),
-        ]
+        get_ver = getattr(process_manager, "get_binary_version", None)
+        ver = "?"
+        if callable(get_ver):
+            try:
+                ver = str(get_ver())
+            except Exception:
+                ver = "?"
+        status_line.append(f"  Engine: telemt v{ver}", style="cyan")
+        lines.append(status_line)
+
+        port = getattr(settings, "proxy_port", "?")
+        domain = getattr(settings, "proxy_domain", "?")
+        uptime = "-"
         if st.get("uptime_sec") is not None:
-            from mtproxymaxpy.utils.formatting import format_duration
+            uptime = format_duration(st["uptime_sec"])
 
-            parts.append(Text(f"  Uptime: {format_duration(st['uptime_sec'])}", style="yellow"))
-        if st["pid"]:
-            parts.append(Text(f"  PID: {st['pid']}", style="dim"))
+        core_line = Text()
+        core_line.append(f"Port: {port}", style="cyan")
+        core_line.append(f"  Uptime: {uptime}", style="yellow")
+        core_line.append(f"  Domain: {domain}", style="magenta")
+        lines.append(core_line)
 
-        tg_line = Text()
-        if not settings.telegram_enabled:
-            tg_line.append("○ TG DISABLED", style="bold red")
+        traffic_line = Text()
+        mst = metrics.get_stats(max_age=2.0)
+        if mst.get("available"):
+            traffic_line.append(
+                f"Traffic: ↓ {format_bytes(int(mst.get('bytes_in', 0)))}  ↑ {format_bytes(int(mst.get('bytes_out', 0)))}",
+                style="green",
+            )
+            traffic_line.append(f"  Conns: {int(mst.get('active_connections', 0))}", style="yellow")
+        else:
+            traffic_line.append("Traffic: ↓ 0 B  ↑ 0 B", style="dim")
+            traffic_line.append("  Conns: 0", style="dim")
+        lines.append(traffic_line)
+
+        active = sum(1 for s in secrets if getattr(s, "enabled", False))
+        disabled = max(0, len(secrets) - active)
+        secrets_line = Text()
+        secrets_line.append(f"Secrets: {active} active / {disabled} disabled", style="cyan")
+        if st.get("pid"):
+            secrets_line.append(f"  PID: {st['pid']}", style="dim")
+        lines.append(secrets_line)
+
+        if not getattr(settings, "telegram_enabled", False):
+            tg_line = Text("○ TG DISABLED", style="bold red")
         else:
             service_unit = SYSTEMD_UNIT_DIR / f"{SYSTEMD_TELEGRAM_SERVICE}.service"
             if not service_unit.exists():
-                tg_line.append("◐ TG NOT INSTALLED", style="bold yellow")
+                tg_line = Text("◐ TG NOT INSTALLED", style="bold yellow")
             else:
                 try:
                     from mtproxymaxpy import systemd as _systemd
 
                     if _systemd.is_active(SYSTEMD_TELEGRAM_SERVICE):
-                        tg_line.append("● TG RUNNING", style="bold green")
+                        tg_line = Text("● TG RUNNING", style="bold green")
                     else:
-                        tg_line.append("○ TG STOPPED", style="bold red")
+                        tg_line = Text("○ TG STOPPED", style="bold red")
                 except Exception:
-                    tg_line.append("○ TG UNKNOWN", style="dim")
+                    tg_line = Text("○ TG UNKNOWN", style="dim")
     except Exception:
-        status_txt = Text("○ UNKNOWN", style="dim")
-        parts = [status_txt]
+        lines = [Text("○ UNKNOWN", style="dim")]
 
     combined = Text()
-    for p in parts:
-        combined.append_text(p)
+    for i, line in enumerate(lines):
+        if i:
+            combined.append("\n")
+        combined.append_text(line)
+
+    combined.append("\n")
+    combined.append_text(tg_line)
 
     # Update badge
     try:
         from mtproxymaxpy.constants import UPDATE_BADGE_FILE
 
         if UPDATE_BADGE_FILE.exists():
-            combined.append("  ⬆ Update available — select [10]", style="bold yellow")
+            combined.append("\n")
+            combined.append("⬆ Update available - select [10]", style="bold yellow")
     except Exception:
         pass
-
-    combined.append("\n")
-    combined.append_text(tg_line)
 
     title = f"[bold cyan]{APP_TITLE} v{VERSION}[/bold cyan]  [dim]Telegram MTProto Proxy Manager[/dim]"
     return Panel(combined, title=title, border_style="cyan", padding=(0, 2))
