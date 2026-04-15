@@ -34,6 +34,17 @@ coverage.xml
 Thumbs.db
 
 # ── Runtime / install artifacts ───────────────────────────────────────────────
-/opt/mtproxymaxpy/
 *.pid
 *.log
+.update_sha
+settings.toml
+secrets.json
+upstreams.json
+instances.json
+proxy-secret
+connection.log
+bin/
+cache/
+mtproxy/
+relay_stats/
+backups/
