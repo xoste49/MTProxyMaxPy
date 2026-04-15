@@ -885,41 +885,91 @@ def _settings_menu() -> None:
 
         settings = load_settings()
 
-        tbl = Table(show_header=False, box=None, padding=(0, 2))
-        tbl.add_column("Key", style="dim", width=30)
+        tbl = Table(show_header=True, box=None, padding=(0, 2))
+        tbl.add_column("#", style="bold cyan", width=3, justify="right")
+        tbl.add_column("Setting", style="dim", width=34)
         tbl.add_column("Value")
-        fields = [
-            ("1  proxy_port", str(settings.proxy_port)),
-            ("2  proxy_domain", settings.proxy_domain),
-            ("3  proxy_concurrency", str(settings.proxy_concurrency)),
-            ("4  custom_ip", settings.custom_ip or "(auto)"),
-            ("5  ad_tag", settings.ad_tag or "(none)"),
-            ("6  masking_enabled", str(settings.masking_enabled)),
-            ("7  masking_host", settings.masking_host),
-            ("8  unknown_sni_action", settings.unknown_sni_action),
-            ("9  proxy_protocol", str(settings.proxy_protocol)),
-            ("10 proxy_protocol_trusted_cidrs", settings.proxy_protocol_trusted_cidrs or "(none)"),
-            ("11 proxy_cpus", settings.proxy_cpus or "(unlimited)"),
-            ("12 proxy_memory", settings.proxy_memory or "(unlimited)"),
-            ("13 auto_update_enabled", str(settings.auto_update_enabled)),
-            ("14 geoblock_mode", settings.geoblock_mode),
-            ("15 telegram_enabled", str(settings.telegram_enabled)),
+
+        def _yes_no(value: bool) -> str:
+            return "yes" if value else "no"
+
+        menu_fields = [
+            (1, "proxy_port", "Proxy port", str(settings.proxy_port), int),
+            (2, "proxy_domain", "Proxy domain", settings.proxy_domain, str),
+            (3, "proxy_concurrency", "Proxy concurrency", str(settings.proxy_concurrency), int),
+            (4, "custom_ip", "Public IP override", settings.custom_ip or "(auto)", str),
+            (5, "ad_tag", "Ad tag", settings.ad_tag or "(none)", str),
             (
-                "16 telegram_bot_token",
+                6,
+                "masking_enabled",
+                "Masking enabled",
+                _yes_no(settings.masking_enabled),
+                lambda v: v.lower() in ("true", "1", "yes", "on"),
+            ),
+            (7, "masking_host", "Masking host", settings.masking_host or "(none)", str),
+            (8, "unknown_sni_action", "Unknown SNI action", settings.unknown_sni_action, str),
+            (
+                9,
+                "proxy_protocol",
+                "Proxy protocol enabled",
+                _yes_no(settings.proxy_protocol),
+                lambda v: v.lower() in ("true", "1", "yes", "on"),
+            ),
+            (
+                10,
+                "proxy_protocol_trusted_cidrs",
+                "Trusted CIDRs (proxy protocol)",
+                settings.proxy_protocol_trusted_cidrs or "(none)",
+                str,
+            ),
+            (11, "proxy_cpus", "CPU limit", settings.proxy_cpus or "(unlimited)", str),
+            (12, "proxy_memory", "Memory limit", settings.proxy_memory or "(unlimited)", str),
+            (
+                13,
+                "auto_update_enabled",
+                "Auto update enabled",
+                _yes_no(settings.auto_update_enabled),
+                lambda v: v.lower() in ("true", "1", "yes", "on"),
+            ),
+            (14, "geoblock_mode", "Geoblock mode", settings.geoblock_mode, str),
+            (
+                15,
+                "telegram_enabled",
+                "Telegram reports enabled",
+                _yes_no(settings.telegram_enabled),
+                lambda v: v.lower() in ("true", "1", "yes", "on"),
+            ),
+            (
+                16,
+                "telegram_bot_token",
+                "Telegram bot token",
                 ("*" * 8 + settings.telegram_bot_token[-4:])
                 if len(settings.telegram_bot_token) > 4
                 else settings.telegram_bot_token or "(not set)",
+                str,
             ),
-            ("17 telegram_chat_id", settings.telegram_chat_id or "(not set)"),
-            ("18 telegram_interval (h)", str(settings.telegram_interval)),
-            ("19 telegram_server_label", settings.telegram_server_label),
-            ("20 manager_update_branch", getattr(settings, "manager_update_branch", "main")),
+            (17, "telegram_chat_id", "Telegram chat ID", settings.telegram_chat_id or "(not set)", str),
+            (18, "telegram_interval", "Telegram interval (h)", str(settings.telegram_interval), int),
+            (19, "telegram_server_label", "Telegram server label", settings.telegram_server_label, str),
+            (
+                20,
+                "manager_update_branch",
+                "Manager update branch",
+                getattr(settings, "manager_update_branch", "main"),
+                lambda v: v.strip(),
+            ),
         ]
-        for k, v in fields:
-            tbl.add_row(k, v)
+        for n, _field, label, value, _converter in menu_fields:
+            tbl.add_row(str(n), label, value)
 
         console.print(Rule("[cyan]Configuration[/cyan]"))
         console.print(tbl)
+        console.print()
+        console.print("  [dim]Tips:[/dim]")
+        console.print("  [dim]- true/false: true, false, yes, no, 1, 0[/dim]")
+        console.print("  [dim]- Unknown SNI action: mask | drop[/dim]")
+        console.print("  [dim]- Trusted CIDRs: comma-separated, e.g. 10.0.0.0/8,192.168.0.0/16[/dim]")
+        console.print("  [dim]- Leave empty to reset optional fields (where allowed)[/dim]")
         console.print()
         console.print("  Enter field number to edit, [bold cyan]0[/bold cyan] to go back")
 
@@ -927,32 +977,11 @@ def _settings_menu() -> None:
         if ch == 0:
             return
 
-        field_map = {
-            1: ("proxy_port", int),
-            2: ("proxy_domain", str),
-            3: ("proxy_concurrency", int),
-            4: ("custom_ip", str),
-            5: ("ad_tag", str),
-            6: ("masking_enabled", lambda v: v.lower() in ("true", "1", "yes", "on")),
-            7: ("masking_host", str),
-            8: ("unknown_sni_action", str),
-            9: ("proxy_protocol", lambda v: v.lower() in ("true", "1", "yes", "on")),
-            10: ("proxy_protocol_trusted_cidrs", str),
-            11: ("proxy_cpus", str),
-            12: ("proxy_memory", str),
-            13: ("auto_update_enabled", lambda v: v.lower() in ("true", "1", "yes", "on")),
-            14: ("geoblock_mode", str),
-            15: ("telegram_enabled", lambda v: v.lower() in ("true", "1", "yes", "on")),
-            16: ("telegram_bot_token", str),
-            17: ("telegram_chat_id", str),
-            18: ("telegram_interval", int),
-            19: ("telegram_server_label", str),
-            20: ("manager_update_branch", lambda v: v.strip()),
-        }
+        field_map = {n: (field, label, converter) for n, field, label, _value, converter in menu_fields}
         if ch in field_map:
-            field, converter = field_map[ch]
+            field, label, converter = field_map[ch]
             current = getattr(settings, field, "")
-            new_val_str = Prompt.ask(f"  {field}", default=str(current), console=console)
+            new_val_str = Prompt.ask(f"  {label}", default=str(current), console=console)
             try:
                 new_val = converter(new_val_str)
                 if field == "manager_update_branch":
