@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import time
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from rich.console import Console
 from rich.panel import Panel
@@ -16,6 +17,10 @@ from rich.prompt import Confirm, IntPrompt, Prompt
 from rich.rule import Rule
 from rich.table import Table
 from rich.text import Text
+
+if TYPE_CHECKING:
+    from mtproxymaxpy.config.secrets import Secret
+    from mtproxymaxpy.config.upstreams import Upstream
 
 from mtproxymaxpy.constants import APP_TITLE, VERSION
 
@@ -614,7 +619,7 @@ def _secrets_menu() -> None:
             _pause()
 
 
-def _secrets_action(ch: int, secs) -> None:
+def _secrets_action(ch: int, secs: list[Secret]) -> None:
 
     if ch == 1:
         _secret_add()
@@ -713,7 +718,7 @@ def _secret_add() -> None:
     _pause()
 
 
-def _secret_show_link(secs) -> None:
+def _secret_show_link(secs: list[Secret]) -> None:
     from mtproxymaxpy.config.settings import load_settings
     from mtproxymaxpy.utils.network import get_public_ip
     from mtproxymaxpy.utils.proxy_link import build_proxy_links, render_qr_terminal
@@ -865,7 +870,7 @@ def _restart_proxy_if_running() -> None:
         console.print(f"[green][+] Proxy restarted (PID {pid})[/green]")
 
 
-def _upstreams_action(ch: int, ups) -> None:
+def _upstreams_action(ch: int, ups: list[Upstream]) -> None:
     if ch == 1:
         from mtproxymaxpy.config.upstreams import add_upstream
 

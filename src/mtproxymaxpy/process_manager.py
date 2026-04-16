@@ -19,6 +19,7 @@ import tarfile
 import tempfile
 import time
 from datetime import UTC, date, datetime
+from typing import Any
 
 import httpx
 
@@ -437,7 +438,7 @@ def stop(timeout: float = 10.0) -> None:
     logger.info("telemt stopped (was PID %s)", pid)
 
 
-def restart(**start_kwargs) -> int:
+def restart(**start_kwargs: Any) -> int:
     """Stop then start telemt."""
     stop()
     return start(**start_kwargs)
