@@ -31,7 +31,7 @@ GEO_STATE_FILE = INSTALL_DIR / "geoblock.json"
 # ── Internal helpers ───────────────────────────────────────────────────────────
 
 
-def _run(*cmd: str, check: bool = True) -> subprocess.CompletedProcess:
+def _run(*cmd: str, check: bool = True) -> subprocess.CompletedProcess[str]:
     try:
         return subprocess.run(list(cmd), check=check, capture_output=True, text=True)
     except FileNotFoundError:
@@ -83,7 +83,7 @@ def _load_state() -> dict[str, Any]:
     return {"countries": [], "mode": "blacklist"}
 
 
-def _save_state(state: dict) -> None:
+def _save_state(state: dict[str, Any]) -> None:
     INSTALL_DIR.mkdir(parents=True, exist_ok=True)
     raw = json.dumps(state, indent=2).encode()
     fd, tmp = tempfile.mkstemp(dir=INSTALL_DIR, suffix=".tmp")

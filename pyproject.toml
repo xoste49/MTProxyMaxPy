@@ -63,12 +63,20 @@ python_version = "3.13"
 
 disallow_untyped_calls = true
 disallow_untyped_defs = true  # Требует типов для всех функций
+disallow_incomplete_defs = true  # Требует полных аннотаций
+check_untyped_defs = true
+disallow_untyped_decorators = true
+disallow_any_generics = true  # Запрещает голые list, dict — требует list[int], dict[str, Any]
 
 warn_redundant_casts = true   # Предупреждает об избыточных cast(), которые ничего не меняют
 warn_unused_ignores = true    # Предупреждает о комментариях # type: ignore, которые уже не нужны
 warn_no_return = true         # Предупреждает, если функция может завершиться без return
 warn_return_any = true        # Предупреждает, если функция возвращает Any в типизированном контексте
 warn_unreachable = true       # Предупреждает о недостижимом коде
+
+local_partial_types = true
+implicit_reexport = false
+strict_equality = true          # Ловит бессмысленные сравнения вроде str == int
 
 [tool.ruff]
 target-version = "py313"

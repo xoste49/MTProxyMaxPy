@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
 from rich.panel import Panel
@@ -1061,7 +1061,7 @@ def _metrics_screen() -> None:
             tbl.add_row("Total connections", str(stats["total_connections"]))
             console.print(tbl)
 
-            user_stats: dict = stats.get("user_stats", {})
+            user_stats: dict[str, Any] = stats.get("user_stats", {})
             if user_stats:
                 console.print()
                 console.print(Rule("[cyan]Per-User Stats[/cyan]"))
@@ -1162,7 +1162,7 @@ def _active_connections_screen() -> None:
             return
 
         console.print(f"  Global active connections: [bold]{stats['active_connections']}[/bold]\n")
-        user_stats: dict = stats.get("user_stats", {})
+        user_stats: dict[str, Any] = stats.get("user_stats", {})
         active_rows = [(key, int(us.get("active", 0))) for key, us in user_stats.items() if int(us.get("active", 0)) > 0]
         if not active_rows:
             console.print("  [dim]No active per-user connections right now.[/dim]")
@@ -1944,7 +1944,7 @@ def _setup_wizard() -> None:  # noqa: C901
 # ── Migration screen ───────────────────────────────────────────────────────────
 
 
-def _migration_screen(legacy: dict) -> None:
+def _migration_screen(legacy: dict[str, Any]) -> None:
     _clear()
     console.print(
         Panel(

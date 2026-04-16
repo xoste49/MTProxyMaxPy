@@ -166,7 +166,7 @@ def set_secret_limits(
     items = load_secrets(path)
     for i, s in enumerate(items):
         if s.label == label:
-            updates: dict = {}
+            updates: dict[str, Any] = {}
             if max_conns is not None:
                 updates["max_conns"] = max_conns
             if max_ips is not None:

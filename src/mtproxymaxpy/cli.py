@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 
@@ -641,7 +641,7 @@ def secret_setlimit(
     from mtproxymaxpy.config.secrets import set_secret_limits
     from mtproxymaxpy.utils.validation import parse_human_bytes
 
-    kwargs: dict = {}
+    kwargs: dict[str, Any] = {}
     if field == "conns":
         kwargs["max_conns"] = int(value)
     elif field == "ips":

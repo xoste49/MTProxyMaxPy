@@ -67,7 +67,7 @@ def parse_metrics(raw: str) -> list[dict[str, Any]]:
 # ── Aggregation helpers ────────────────────────────────────────────────────────
 
 
-def _total(samples: list[dict], name: str, **label_filter: str) -> float:
+def _total(samples: list[dict[str, Any]], name: str, **label_filter: str) -> float:
     total = 0.0
     for s in samples:
         if s["name"] != name:
@@ -77,7 +77,7 @@ def _total(samples: list[dict], name: str, **label_filter: str) -> float:
     return total
 
 
-def _first(samples: list[dict], *names: str, **label_filter: str) -> float:
+def _first(samples: list[dict[str, Any]], *names: str, **label_filter: str) -> float:
     for n in names:
         v = _total(samples, n, **label_filter)
         if v > 0:
@@ -85,7 +85,7 @@ def _first(samples: list[dict], *names: str, **label_filter: str) -> float:
     return 0.0
 
 
-def _sum_names(samples: list[dict], *names: str, **label_filter: str) -> float:
+def _sum_names(samples: list[dict[str, Any]], *names: str, **label_filter: str) -> float:
     total = 0.0
     for n in names:
         total += _total(samples, n, **label_filter)

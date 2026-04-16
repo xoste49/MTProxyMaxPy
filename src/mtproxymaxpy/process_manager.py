@@ -457,7 +457,7 @@ def reload_config() -> None:
         raise RuntimeError("telemt process not found")
 
 
-def status() -> dict:
+def status() -> dict[str, Any]:
     """Return a status dict: running, pid, binary_present, config_exists."""
     pid = get_pid()
     uptime_sec: int | None = None

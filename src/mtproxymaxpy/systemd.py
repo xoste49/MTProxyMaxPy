@@ -129,7 +129,7 @@ def uninstall(*, telegram: bool = True) -> None:
 # ── Service control ────────────────────────────────────────────────────────────
 
 
-def _systemctl(*args: str, check: bool = True) -> subprocess.CompletedProcess:
+def _systemctl(*args: str, check: bool = True) -> subprocess.CompletedProcess[bytes]:
     try:
         return subprocess.run(["systemctl"] + list(args), check=check, capture_output=True)
     except FileNotFoundError:

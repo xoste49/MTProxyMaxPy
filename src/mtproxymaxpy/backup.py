@@ -15,6 +15,7 @@ import tarfile
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from mtproxymaxpy.constants import (
     BACKUP_DIR,
@@ -29,7 +30,7 @@ from mtproxymaxpy.constants import (
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 
-def _metadata() -> dict:
+def _metadata() -> dict[str, Any]:
     now_utc = datetime.now(UTC)
     return {
         "version": VERSION,
@@ -70,11 +71,11 @@ def create_backup(label: str = "") -> Path:
     return archive_path
 
 
-def list_backups() -> list[dict]:
+def list_backups() -> list[dict[str, Any]]:
     """Return a list of backup info dicts, sorted newest first."""
     if not BACKUP_DIR.exists():
         return []
-    backups: list[dict] = []
+    backups: list[dict[str, Any]] = []
     for f in BACKUP_DIR.glob("backup-*.tar.gz"):
         stat = f.stat()
         backups.append(
@@ -88,7 +89,7 @@ def list_backups() -> list[dict]:
     return sorted(backups, key=lambda x: x["mtime"], reverse=True)
 
 
-def restore_backup(archive: Path) -> dict:
+def restore_backup(archive: Path) -> dict[str, Any]:
     """Extract and restore a backup archive.
 
     Returns the metadata dict from the archive.
@@ -102,7 +103,7 @@ def restore_backup(archive: Path) -> dict:
     if SETTINGS_FILE.exists() or SECRETS_FILE.exists():
         pre_restore = create_backup("pre-restore")
 
-    meta: dict = {}
+    meta: dict[str, Any] = {}
     INSTALL_DIR.mkdir(parents=True, exist_ok=True)
 
     with tarfile.open(archive, "r:gz") as tf:
