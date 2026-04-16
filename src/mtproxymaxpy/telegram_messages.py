@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Iterable
+from collections.abc import Callable, Iterable
+from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from aiogram.utils.formatting import Bold, Code, Text, TextLink

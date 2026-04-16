@@ -2,24 +2,16 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
 
 from mtproxymaxpy.config.migration import (
-    MigrationResult,
     _parse_secrets_conf,
     _parse_settings_conf,
     _parse_upstreams_conf,
     detect_legacy,
     run_migration,
-)
-from mtproxymaxpy.constants import (
-    LEGACY_INSTANCES_FILE,
-    LEGACY_SECRETS_FILE,
-    LEGACY_SETTINGS_FILE,
-    LEGACY_UPSTREAMS_FILE,
 )
 
 # ── detect_legacy ─────────────────────────────────────────────────────────────
@@ -190,8 +182,8 @@ def test_run_migration_full(tmp_path: Path) -> None:
     assert result.errors == []
 
     # Verify output files
-    from mtproxymaxpy.config.settings import load_settings
     from mtproxymaxpy.config.secrets import load_secrets
+    from mtproxymaxpy.config.settings import load_settings
 
     s = load_settings(out_dir / "settings.toml")
     assert s.proxy_port == 7443

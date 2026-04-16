@@ -10,8 +10,7 @@ import shutil
 import socket
 import subprocess
 from datetime import date
-from typing import Any, Dict, List
-
+from typing import Any
 
 # ── Individual checks ──────────────────────────────────────────────────────────
 

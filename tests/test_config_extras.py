@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import io
-import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -27,8 +25,10 @@ def test_instances_roundtrip_and_save_error_cleanup(tmp_path: Path, monkeypatch:
 
 def test_secrets_mutation_flows(tmp_path: Path) -> None:
     path = tmp_path / "secrets.json"
-    a = secrets.add_secret("alice", path=path)
-    b = secrets.add_secret("bob", expires="2000-01-01", path=path)
+
+    # Setup: create alice (active) and bob (already expired)
+    secrets.add_secret("alice", path=path)
+    secrets.add_secret("bob", expires="2000-01-01", path=path)
 
     en = secrets.disable_secret("alice", path)
     assert en.enabled is False

@@ -1,8 +1,9 @@
 """Tests for Settings persistence (round-trip TOML)."""
 
 import sys
-import pytest
 from pathlib import Path
+
+import pytest
 
 from mtproxymaxpy.config.settings import Settings, load_settings, save_settings
 
@@ -37,7 +38,6 @@ def test_custom_values_round_trip(tmp_path: Path) -> None:
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Unix permissions not supported on Windows")
 def test_file_has_mode_600(tmp_path: Path) -> None:
-    import stat
 
     path = tmp_path / "settings.toml"
     save_settings(Settings(), path)

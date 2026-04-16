@@ -1,7 +1,6 @@
 """Network utilities: public IP detection, port availability."""
 
 import time
-from typing import Optional
 
 import httpx
 
@@ -10,7 +9,7 @@ from mtproxymaxpy.constants import PUBLIC_IP_CACHE_TTL, PUBLIC_IP_ENDPOINTS
 _ip_cache: tuple[str, float] | None = None
 
 
-def get_public_ip(timeout: float = 5.0) -> Optional[str]:
+def get_public_ip(timeout: float = 5.0) -> str | None:
     """Return the server's public IPv4 address.
 
     Results are cached for PUBLIC_IP_CACHE_TTL seconds.

@@ -10,7 +10,6 @@ import secrets
 import tempfile
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -156,10 +155,10 @@ def _set_field(label: str, field: str, value, path: Path = SECRETS_FILE) -> Secr
 def set_secret_limits(
     label: str,
     *,
-    max_conns: Optional[int] = None,
-    max_ips: Optional[int] = None,
-    quota_bytes: Optional[int] = None,
-    expires: Optional[str] = None,
+    max_conns: int | None = None,
+    max_ips: int | None = None,
+    quota_bytes: int | None = None,
+    expires: str | None = None,
     path: Path = SECRETS_FILE,
 ) -> Secret:
     """Update per-user limit fields for an existing secret."""

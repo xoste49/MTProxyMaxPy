@@ -21,3 +21,9 @@ repos:
         language: system
         pass_filenames: true
         types_or: [python, pyi]
+      - id: mypy
+        name: mypy (uv)
+        entry: uv run mypy src
+        language: system
+        pass_filenames: false
+        types_or: [python, pyi]

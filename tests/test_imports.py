@@ -7,9 +7,7 @@ that surfaced during development (e.g. missing 'load_settings' import in cli.py)
 from __future__ import annotations
 
 import importlib
-import sys
 from pathlib import Path
-from typing import Generator
 
 import pytest
 
@@ -52,8 +50,9 @@ def test_cli_app_importable() -> None:
 
 def _cli_commands() -> list[str]:
     """Return the names of all registered top-level Typer commands via Click."""
-    from mtproxymaxpy.cli import app
     import typer
+
+    from mtproxymaxpy.cli import app
 
     click_app = typer.main.get_command(app)
     # Only include actual commands (not groups that are sub-apps)
@@ -67,7 +66,8 @@ def _cli_commands() -> list[str]:
 def _cli_groups() -> list[tuple[str, str]]:
     """Return (group_name, sub_name) pairs for all sub-command groups."""
     import typer
-    from mtproxymaxpy.cli import app, secrets_app, upstream_app, backup_app, geo_app, telegram_app
+
+    from mtproxymaxpy.cli import backup_app, geo_app, secrets_app, telegram_app, upstream_app
 
     group_map = {
         "secret": secrets_app,
@@ -88,6 +88,7 @@ def _cli_groups() -> list[tuple[str, str]]:
 def test_top_level_help(command: str) -> None:
     """Every top-level command must respond to --help without crashing."""
     from typer.testing import CliRunner
+
     from mtproxymaxpy.cli import app
 
     runner = CliRunner()
@@ -99,6 +100,7 @@ def test_top_level_help(command: str) -> None:
 def test_subcommand_help(group: str, command: str) -> None:
     """Every sub-command must respond to --help without crashing."""
     from typer.testing import CliRunner
+
     from mtproxymaxpy.cli import app
 
     runner = CliRunner()
@@ -161,6 +163,7 @@ def test_install_runs_migration_path(tmp_path: Path, monkeypatch: pytest.MonkeyP
     monkeypatch.setattr(_sd, "install", lambda **kw: None)
 
     from typer.testing import CliRunner
+
     from mtproxymaxpy.cli import app
 
     runner = CliRunner()
@@ -178,7 +181,6 @@ def test_secret_csv_round_trip(tmp_path: Path) -> None:
         add_secret,
         export_secrets_csv,
         import_secrets_csv,
-        load_secrets,
     )
 
     secrets_file = tmp_path / "secrets.json"

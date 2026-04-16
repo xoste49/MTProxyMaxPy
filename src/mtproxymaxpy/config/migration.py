@@ -19,25 +19,25 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from mtproxymaxpy.config.instances import Instance
+from mtproxymaxpy.config.secrets import Secret
+from mtproxymaxpy.config.settings import Settings
+from mtproxymaxpy.config.upstreams import Upstream
 from mtproxymaxpy.constants import (
     INSTALL_DIR,
+    INSTANCES_FILE,
+    LEGACY_BASH_INSTANCES_FILE,
+    LEGACY_BASH_SECRETS_FILE,
+    LEGACY_BASH_SETTINGS_FILE,
+    LEGACY_BASH_UPSTREAMS_FILE,
     LEGACY_INSTANCES_FILE,
     LEGACY_SECRETS_FILE,
     LEGACY_SETTINGS_FILE,
     LEGACY_UPSTREAMS_FILE,
-    LEGACY_BASH_SETTINGS_FILE,
-    LEGACY_BASH_SECRETS_FILE,
-    LEGACY_BASH_UPSTREAMS_FILE,
-    LEGACY_BASH_INSTANCES_FILE,
-    SETTINGS_FILE,
     SECRETS_FILE,
+    SETTINGS_FILE,
     UPSTREAMS_FILE,
-    INSTANCES_FILE,
 )
-from mtproxymaxpy.config.settings import Settings
-from mtproxymaxpy.config.secrets import Secret
-from mtproxymaxpy.config.upstreams import Upstream
-from mtproxymaxpy.config.instances import Instance
 
 # ── Known settings.conf key → Settings field mapping ────────────────────────
 
@@ -265,10 +265,10 @@ def run_migration(
     *files* should be the return value of :func:`detect_legacy`.
     If None, :func:`detect_legacy` is called automatically.
     """
-    from mtproxymaxpy.config.settings import save_settings
-    from mtproxymaxpy.config.secrets import save_secrets
-    from mtproxymaxpy.config.upstreams import save_upstreams
     from mtproxymaxpy.config.instances import save_instances
+    from mtproxymaxpy.config.secrets import save_secrets
+    from mtproxymaxpy.config.settings import save_settings
+    from mtproxymaxpy.config.upstreams import save_upstreams
 
     if files is None:
         files = detect_legacy()
@@ -294,17 +294,17 @@ def run_migration(
 
     if "upstreams" in files:
         try:
-            items = _parse_upstreams_conf(files["upstreams"])
-            save_upstreams(items, upstreams_out)
-            result.upstreams_count = len(items)
+            upstream_items = _parse_upstreams_conf(files["upstreams"])
+            save_upstreams(upstream_items, upstreams_out)
+            result.upstreams_count = len(upstream_items)
         except Exception as exc:
             result.errors.append(f"upstreams: {exc}")
 
     if "instances" in files:
         try:
-            items = _parse_instances_conf(files["instances"])
-            save_instances(items, instances_out)
-            result.instances_count = len(items)
+            instance_items = _parse_instances_conf(files["instances"])
+            save_instances(instance_items, instances_out)
+            result.instances_count = len(instance_items)
         except Exception as exc:
             result.errors.append(f"instances: {exc}")
 

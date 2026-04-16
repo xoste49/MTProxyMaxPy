@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 
@@ -29,18 +29,18 @@ def install(
     systemd: Annotated[bool, typer.Option(help="Install systemd service")] = True,
 ) -> None:
     """Download telemt binary and set up the proxy."""
-    from mtproxymaxpy.utils.system import check_root, check_dependencies
-    from mtproxymaxpy.config.settings import Settings, save_settings
     from mtproxymaxpy import process_manager
+    from mtproxymaxpy.config.settings import Settings, save_settings
+    from mtproxymaxpy.utils.system import check_dependencies, check_root
 
     check_root()
     check_dependencies()
     typer.echo(f"[*] MTProxyMaxPy {VERSION} — installer")
 
     # If legacy bash config exists, migrate it instead of using defaults
-    from mtproxymaxpy.constants import SETTINGS_FILE
     from mtproxymaxpy.config.migration import detect_legacy, run_migration
     from mtproxymaxpy.config.settings import load_settings
+    from mtproxymaxpy.constants import SETTINGS_FILE
 
     legacy = detect_legacy()
     if legacy and not SETTINGS_FILE.exists():
@@ -84,9 +84,11 @@ def uninstall(
     if not yes:
         typer.confirm("This will stop the proxy and remove all installed files. Continue?", abort=True)
 
-    from mtproxymaxpy import process_manager, systemd as svc
-    from mtproxymaxpy.constants import INSTALL_DIR
     import shutil
+
+    from mtproxymaxpy import process_manager
+    from mtproxymaxpy import systemd as svc
+    from mtproxymaxpy.constants import INSTALL_DIR
 
     # Stop proxy
     if process_manager.is_running():
@@ -165,9 +167,10 @@ def status(
     output_json: Annotated[bool, typer.Option("--json", help="Output machine-readable JSON")] = False,
 ) -> None:
     """Show proxy status."""
-    from mtproxymaxpy import process_manager, metrics as _metrics
-    from mtproxymaxpy.config.settings import load_settings
+    from mtproxymaxpy import metrics as _metrics
+    from mtproxymaxpy import process_manager
     from mtproxymaxpy.config.secrets import load_secrets
+    from mtproxymaxpy.config.settings import load_settings
     from mtproxymaxpy.utils.formatting import format_bytes, format_duration
 
     st = process_manager.status()
@@ -189,15 +192,10 @@ def status(
 
     icon = "●" if st["running"] else "○"
     uptime = format_duration(st["uptime_sec"]) if st.get("uptime_sec") is not None else "?"
-    typer.echo(
-        f"{icon} telemt  running={st['running']}  pid={st['pid'] or '—'}  port={settings.proxy_port}  uptime={uptime}"
-    )
+    typer.echo(f"{icon} telemt  running={st['running']}  pid={st['pid'] or '—'}  port={settings.proxy_port}  uptime={uptime}")
     typer.echo(f"  secrets: {sum(1 for s in secrets if s.enabled)}/{len(secrets)} active")
     if mst.get("available"):
-        typer.echo(
-            f"  traffic: ↑{format_bytes(mst['bytes_out'])} ↓{format_bytes(mst['bytes_in'])}  "
-            f"connections: {mst['active_connections']} active"
-        )
+        typer.echo(f"  traffic: ↑{format_bytes(mst['bytes_out'])} ↓{format_bytes(mst['bytes_in'])}  connections: {mst['active_connections']} active")
 
 
 # ── update ─────────────────────────────────────────────────────────────────────
@@ -318,9 +316,7 @@ def metrics() -> None:
         typer.echo("\n  Per-user:")
         for key, us in user_stats.items():
             typer.echo(
-                f"    {key[:12]}…  ↑{format_bytes(us.get('bytes_out', 0))}  "
-                f"↓{format_bytes(us.get('bytes_in', 0))}  "
-                f"active={int(us.get('active', 0))}"
+                f"    {key[:12]}…  ↑{format_bytes(us.get('bytes_out', 0))}  ↓{format_bytes(us.get('bytes_in', 0))}  active={int(us.get('active', 0))}"
             )
 
 
@@ -357,7 +353,7 @@ def connections() -> None:
 
 @app.command()
 def port(
-    value: Annotated[Optional[int], typer.Argument(help="New port number, or omit to get")] = None,
+    value: Annotated[int | None, typer.Argument(help="New port number, or omit to get")] = None,
 ) -> None:
     """Get or set the proxy listen port."""
     from mtproxymaxpy.config.settings import load_settings, save_settings
@@ -378,7 +374,7 @@ def port(
 
 @app.command()
 def domain(
-    value: Annotated[Optional[str], typer.Argument(help="New FakeTLS domain, 'get', or 'clear'")] = None,
+    value: Annotated[str | None, typer.Argument(help="New FakeTLS domain, 'get', or 'clear'")] = None,
 ) -> None:
     """Get, set, or clear the FakeTLS domain."""
     from mtproxymaxpy.config.settings import load_settings, save_settings
@@ -400,7 +396,7 @@ def domain(
 
 @app.command()
 def ip(
-    value: Annotated[Optional[str], typer.Argument(help="New IP, 'get', or 'auto'")] = None,
+    value: Annotated[str | None, typer.Argument(help="New IP, 'get', or 'auto'")] = None,
 ) -> None:
     """Get, set, or auto-detect the public IP address."""
     from mtproxymaxpy.config.settings import load_settings, save_settings
@@ -423,7 +419,7 @@ def ip(
 @app.command()
 def adtag(
     action: Annotated[str, typer.Argument(help="set <tag> | remove | view")] = "view",
-    tag: Annotated[Optional[str], typer.Argument(help="Ad-tag value (for 'set')")] = None,
+    tag: Annotated[str | None, typer.Argument(help="Ad-tag value (for 'set')")] = None,
 ) -> None:
     """Get, set, or remove the Telegram ad-tag."""
     from mtproxymaxpy.config.settings import load_settings, save_settings
@@ -450,7 +446,7 @@ def adtag(
 
 @app.command(name="sni-policy")
 def sni_policy(
-    value: Annotated[Optional[str], typer.Argument(help="mask | drop (omit to get)")] = None,
+    value: Annotated[str | None, typer.Argument(help="mask | drop (omit to get)")] = None,
 ) -> None:
     """Get or set the unknown-SNI action (mask or drop)."""
     from mtproxymaxpy.config.settings import load_settings, save_settings
@@ -471,7 +467,7 @@ def sni_policy(
 
 @app.command(name="manager-branch")
 def manager_branch(
-    value: Annotated[Optional[str], typer.Argument(help="Branch name (omit or 'get' to show current)")] = None,
+    value: Annotated[str | None, typer.Argument(help="Branch name (omit or 'get' to show current)")] = None,
 ) -> None:
     """Get or set repository branch used for MTProxyMaxPy self-update."""
     from mtproxymaxpy.config.settings import load_settings, save_settings
@@ -516,9 +512,7 @@ def secret_add(
 
     quota_bytes = parse_human_bytes(quota) if quota != "0" else 0
     try:
-        s = add_secret(
-            label, max_conns=max_conns, max_ips=max_ips, quota_bytes=quota_bytes, expires=expires, notes=notes
-        )
+        s = add_secret(label, max_conns=max_conns, max_ips=max_ips, quota_bytes=quota_bytes, expires=expires, notes=notes)
         typer.echo(f"[+] Secret '{s.label}' created: {s.key}")
         if not no_restart:
             _restart_if_running()
@@ -737,7 +731,7 @@ def secret_note(
 
 @secrets_app.command("link")
 def secret_link(
-    label: Annotated[Optional[str], typer.Argument(help="Label (omit for first enabled)")] = None,
+    label: Annotated[str | None, typer.Argument(help="Label (omit for first enabled)")] = None,
 ) -> None:
     """Print the proxy link (tg:// and https://) for a secret."""
     from mtproxymaxpy.config.secrets import load_secrets
@@ -762,7 +756,7 @@ def secret_link(
 
 @secrets_app.command("qr")
 def secret_qr(
-    label: Annotated[Optional[str], typer.Argument()] = None,
+    label: Annotated[str | None, typer.Argument()] = None,
 ) -> None:
     """Print an ASCII QR code for a secret's proxy link."""
     from mtproxymaxpy.config.secrets import load_secrets
@@ -788,8 +782,8 @@ def secret_qr(
 @secrets_app.command("stats")
 def secret_stats() -> None:
     """Show per-user traffic stats from the Prometheus endpoint."""
-    from mtproxymaxpy.config.secrets import load_secrets
     from mtproxymaxpy import metrics as _metrics
+    from mtproxymaxpy.config.secrets import load_secrets
     from mtproxymaxpy.utils.formatting import format_bytes
 
     mst = _metrics.get_stats()
@@ -815,7 +809,7 @@ def secret_stats() -> None:
 
 @secrets_app.command("reset-traffic")
 def secret_reset_traffic(
-    label: Annotated[Optional[str], typer.Argument(help="Label, or omit for all")] = None,
+    label: Annotated[str | None, typer.Argument(help="Label, or omit for all")] = None,
 ) -> None:
     """Reset traffic accounting snapshots for a secret (or all)."""
     from mtproxymaxpy.constants import STATS_DIR
@@ -1071,6 +1065,7 @@ def telegram_test() -> None:
     import asyncio
 
     from aiogram import Bot
+
     from mtproxymaxpy.config.settings import load_settings
 
     settings = load_settings()
@@ -1121,12 +1116,13 @@ def run_telegram_bot(
 ) -> None:
     """Run the Telegram bot (blocking — intended for use by systemd)."""
     import signal as _signal
+
     from mtproxymaxpy import telegram_bot_aiogram as telegram_backend
 
     telegram_backend.start()
     typer.echo("[+] Telegram bot running (aiogram). Press Ctrl+C to stop.")
     try:
-        _signal.pause()
+        _signal.pause()  # type: ignore[attr-defined]
     except (KeyboardInterrupt, AttributeError):
         pass
     finally:

@@ -3,7 +3,6 @@ from __future__ import annotations
 import runpy
 import subprocess
 import sys
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -119,9 +118,7 @@ def test_detect_os_variants(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_check_dependencies_paths(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        system.shutil, "which", lambda name: "/bin/x" if name in {"curl", "awk", "openssl", "ss"} else None
-    )
+    monkeypatch.setattr(system.shutil, "which", lambda name: "/bin/x" if name in {"curl", "awk", "openssl", "ss"} else None)
     assert system.check_dependencies() == []
 
     monkeypatch.setattr(system.shutil, "which", lambda name: None)

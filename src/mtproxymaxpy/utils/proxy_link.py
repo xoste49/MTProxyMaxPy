@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import io
 import urllib.parse
-from typing import Optional
 
 
 def build_faketls_secret(key: str, domain: str) -> str:
@@ -40,7 +39,7 @@ def qr_api_url(link: str) -> str:
     return f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={encoded}"
 
 
-def render_qr_terminal(text: str) -> Optional[str]:
+def render_qr_terminal(text: str) -> str | None:
     """Generate an ASCII QR code string using the qrcode library (if installed).
 
     Returns None if qrcode is not available.

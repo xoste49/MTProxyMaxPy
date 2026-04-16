@@ -1,8 +1,9 @@
 """Tests for Upstream persistence."""
 
 import sys
-import pytest
 from pathlib import Path
+
+import pytest
 
 from mtproxymaxpy.config.upstreams import (
     Upstream,

@@ -7,12 +7,11 @@ into a structured stats dict suitable for display in the TUI and CLI.
 
 from __future__ import annotations
 
-import time
 import re
+import time
 from typing import Any
 
 import httpx
-
 
 _stats_cache: tuple[dict[str, Any], float] | None = None
 
@@ -156,23 +155,9 @@ def get_stats(*, timeout: float = 5.0, max_age: float = 0.0) -> dict[str, Any]:
             if user not in user_stats:
                 user_stats[user] = {"bytes_in": 0.0, "bytes_out": 0.0, "active": 0.0}
             n = s["name"].lower()
-            if (
-                "incoming" in n
-                or "rx" in n
-                or "recv" in n
-                or "bytes_in" in n
-                or "octets_from_client" in n
-                or "from_client" in n
-            ):
+            if "incoming" in n or "rx" in n or "recv" in n or "bytes_in" in n or "octets_from_client" in n or "from_client" in n:
                 user_stats[user]["bytes_in"] += s["value"]
-            elif (
-                "outgoing" in n
-                or "tx" in n
-                or "sent" in n
-                or "bytes_out" in n
-                or "octets_to_client" in n
-                or "to_client" in n
-            ):
+            elif "outgoing" in n or "tx" in n or "sent" in n or "bytes_out" in n or "octets_to_client" in n or "to_client" in n:
                 user_stats[user]["bytes_out"] += s["value"]
             elif "active" in n or "connections_current" in n:
                 user_stats[user]["active"] += s["value"]

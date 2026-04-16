@@ -26,11 +26,13 @@ packages = ["src/mtproxymaxpy"]
 
 [dependency-groups]
 dev = [
+    "mypy>=1.20.1",
     "pre-commit>=3.8",
     "pytest>=8",
     "pytest-cov>=5",
     "pytest-mock>=3.14",
-    "ruff>=0.15",
+    "ruff>=0.15.10",
+    "types-qrcode>=8.2.0.20260408",
 ]
 
 [tool.pytest.ini_options]
@@ -55,9 +57,13 @@ show_missing = true
 skip_covered = false
 precision = 2
 
+[tool.mypy]
+plugins = ["pydantic.mypy"]
+python_version = "3.13"
+
 [tool.ruff]
 target-version = "py313"
-line-length = 120
+line-length = 150
 indent-width = 4
 exclude = [
     ".git",
@@ -68,8 +74,22 @@ exclude = [
 ]
 
 [tool.ruff.lint]
-select = ["E4", "E7", "E9", "F"]
-ignore = ["E402", "E741", "F401", "F541", "F841"]
+select = [
+    # pycodestyle
+    "E",
+    "W",
+    # Pyflakes
+    "F",
+    # pyupgrade
+    "UP",
+    # flake8-bugbear
+    #"B",
+    # flake8-simplify
+    #"SIM",
+    # isort
+    "I",
+]
+ignore = ["E741"]
 fixable = ["ALL"]
 
 [tool.ruff.format]

@@ -5,19 +5,15 @@ from __future__ import annotations
 import logging
 import subprocess
 import sys
-from pathlib import Path
-
-logger = logging.getLogger(__name__)
 
 from mtproxymaxpy.constants import (
-    BINARY_PATH,
     INSTALL_DIR,
     SYSTEMD_SERVICE,
     SYSTEMD_TELEGRAM_SERVICE,
     SYSTEMD_UNIT_DIR,
-    TOML_CONFIG_FILE,
 )
 
+logger = logging.getLogger(__name__)
 
 # ── Unit file templates ────────────────────────────────────────────────────────
 

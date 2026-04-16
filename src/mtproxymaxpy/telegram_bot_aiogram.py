@@ -11,8 +11,8 @@ from mtproxymaxpy.config.secrets import load_secrets
 from mtproxymaxpy.config.settings import load_settings
 from mtproxymaxpy.telegram_messages import (
     build_help_text,
-    build_mp_link_text,
     build_mp_limits_text,
+    build_mp_link_text,
     build_mp_secrets_lines,
     build_mp_traffic_text,
     build_mp_upstreams_text,
@@ -106,7 +106,9 @@ async def _start_polling(dispatcher: Any, bot: Any) -> None:
 
 def _get_stats_text() -> Any:
     from aiogram.utils.formatting import Bold, Text
-    from mtproxymaxpy import metrics as _metrics, process_manager
+
+    from mtproxymaxpy import metrics as _metrics
+    from mtproxymaxpy import process_manager
 
     st = process_manager.status()
     settings = load_settings()
@@ -143,6 +145,7 @@ def _get_stats_text() -> Any:
 
 def _get_health_text() -> Any:
     from aiogram.utils.formatting import Bold, Text
+
     from mtproxymaxpy import doctor
 
     results = doctor.run_full_doctor()
@@ -476,11 +479,7 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
 
             await msg.answer("🔍 Checking for updates…", parse_mode="MarkdownV2")
             try:
-                current = (
-                    process_manager.get_binary_version()
-                    if hasattr(process_manager, "get_binary_version")
-                    else TELEMT_VERSION
-                )
+                current = process_manager.get_binary_version() if hasattr(process_manager, "get_binary_version") else TELEMT_VERSION
                 latest = process_manager.get_latest_version()
                 if latest == current:
                     await msg.answer(f"✅ Already on latest: `{_md(current)}`", parse_mode="MarkdownV2")

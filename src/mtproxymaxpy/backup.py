@@ -13,9 +13,8 @@ import platform
 import socket
 import tarfile
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
 
 from mtproxymaxpy.constants import (
     BACKUP_DIR,
@@ -27,12 +26,11 @@ from mtproxymaxpy.constants import (
     VERSION,
 )
 
-
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 
 def _metadata() -> dict:
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
     return {
         "version": VERSION,
         "date": now_utc.isoformat().replace("+00:00", "Z"),
@@ -47,7 +45,7 @@ def _metadata() -> dict:
 def create_backup(label: str = "") -> Path:
     """Create a backup archive. Returns the path to the .tar.gz file."""
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
     slug = f"-{label}" if label else ""
     archive_path = BACKUP_DIR / f"backup-{timestamp}{slug}.tar.gz"
 
@@ -100,7 +98,7 @@ def restore_backup(archive: Path) -> dict:
         raise FileNotFoundError(f"Backup not found: {archive}")
 
     # Safety backup before overwriting anything
-    pre_restore: Optional[Path] = None
+    pre_restore: Path | None = None
     if SETTINGS_FILE.exists() or SECRETS_FILE.exists():
         pre_restore = create_backup("pre-restore")
 

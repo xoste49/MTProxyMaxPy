@@ -4,8 +4,8 @@ from types import SimpleNamespace
 
 from mtproxymaxpy.telegram_messages import (
     build_help_text,
-    build_mp_link_text,
     build_mp_limits_text,
+    build_mp_link_text,
     build_mp_secrets_lines,
     build_mp_traffic_text,
     build_mp_upstreams_text,
