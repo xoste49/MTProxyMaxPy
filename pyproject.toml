@@ -61,6 +61,12 @@ precision = 2
 plugins = ["pydantic.mypy"]
 python_version = "3.13"
 
+warn_redundant_casts = true   # Предупреждает об избыточных cast(), которые ничего не меняют
+warn_unused_ignores = true    # Предупреждает о комментариях # type: ignore, которые уже не нужны
+warn_no_return = true         # Предупреждает, если функция может завершиться без return
+warn_return_any = true        # Предупреждает, если функция возвращает Any в типизированном контексте
+warn_unreachable = true       # Предупреждает о недостижимом коде
+
 [tool.ruff]
 target-version = "py313"
 line-length = 150

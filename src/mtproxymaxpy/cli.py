@@ -244,7 +244,7 @@ def doctor() -> None:
         name = r["name"]
         extras = {k: v for k, v in r.items() if k not in ("name", "ok")}
         detail = "  " + "  ".join(f"{k}={v}" for k, v in extras.items() if v is not None) if extras else ""
-        typer.echo(f"  [{colour}]{icon}[/{colour}] {name}{detail}", color=True)  # type: ignore[call-arg]
+        typer.echo(f"  [{colour}]{icon}[/{colour}] {name}{detail}", color=True)
 
     # Plain output for non-color terminals
     sys.stdout.flush()

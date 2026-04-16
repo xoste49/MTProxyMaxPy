@@ -13,6 +13,7 @@ import os
 import subprocess
 import tempfile
 import time
+from typing import Any, cast
 
 import httpx
 
@@ -73,10 +74,10 @@ def _download_cidrs(cc: str) -> list[str]:
         raise RuntimeError(f"Failed to download CIDRs for {cc}: {exc}") from exc
 
 
-def _load_state() -> dict:
+def _load_state() -> dict[str, Any]:
     if GEO_STATE_FILE.exists():
         try:
-            return json.loads(GEO_STATE_FILE.read_text())
+            return json.loads(GEO_STATE_FILE.read_text())  # type: ignore[no-any-return]
         except Exception:
             pass
     return {"countries": [], "mode": "blacklist"}
@@ -178,7 +179,8 @@ def remove_country(cc: str) -> None:
 
 
 def list_countries() -> list[str]:
-    return _load_state().get("countries", [])
+    result = _load_state().get("countries", [])
+    return cast(list[str], result)
 
 
 def clear_all() -> None:

@@ -143,7 +143,7 @@ def add_upstream(
 
     item = Upstream(
         name=name,
-        type=t,  # type: ignore[arg-type]
+        type=t,
         addr=normalized_addr,
         user=user,
         password=password,

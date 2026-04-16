@@ -267,7 +267,7 @@ def get_latest_version() -> str:
         resp = httpx.get(TELEMT_GITHUB_API, timeout=10)
         resp.raise_for_status()
         tag = resp.json().get("tag_name", f"v{TELEMT_VERSION}")
-        return tag.lstrip("v")
+        return str(tag).lstrip("v")
     except Exception:
         return TELEMT_VERSION
 
@@ -464,7 +464,7 @@ def status() -> dict:
         try:
             import time as _time
 
-            import psutil  # type: ignore[import]
+            import psutil  # type: ignore[import-untyped]
 
             p = psutil.Process(pid)
             uptime_sec = int(_time.time() - p.create_time())

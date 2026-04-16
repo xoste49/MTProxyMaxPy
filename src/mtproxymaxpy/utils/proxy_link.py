@@ -45,7 +45,7 @@ def render_qr_terminal(text: str) -> str | None:
     Returns None if qrcode is not available.
     """
     try:
-        import qrcode  # type: ignore[import]
+        import qrcode
 
         qr = qrcode.QRCode(border=1)
         qr.add_data(text)

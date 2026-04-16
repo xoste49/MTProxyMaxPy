@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 import time
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
@@ -182,4 +182,4 @@ def get_user_stats(label: str) -> dict[str, float]:
     stats = get_stats()
     if not stats.get("available"):
         return {}
-    return stats.get("user_stats", {}).get(label, {})
+    return cast(dict[str, float], stats.get("user_stats", {}).get(label, {}))

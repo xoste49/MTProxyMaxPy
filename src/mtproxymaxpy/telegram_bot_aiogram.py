@@ -96,7 +96,7 @@ def _polling_retry_delay_sec(attempt: int) -> int:
     if attempt < 1:
         return _POLLING_RETRY_BASE_SEC
     delay = _POLLING_RETRY_BASE_SEC * (2 ** (attempt - 1))
-    return min(delay, _POLLING_RETRY_MAX_SEC)
+    return int(min(delay, _POLLING_RETRY_MAX_SEC))
 
 
 async def _start_polling(dispatcher: Any, bot: Any) -> None:
@@ -187,7 +187,7 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
 
         def _content_kwargs(content: Any) -> dict[str, Any]:
             if hasattr(content, "as_kwargs"):
-                return content.as_kwargs()
+                return content.as_kwargs()  # type: ignore[no-any-return]
             return {"text": str(content)}
 
         def _join_content_lines(lines: list[Any]) -> Any:

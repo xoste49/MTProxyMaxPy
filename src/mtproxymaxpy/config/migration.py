@@ -176,7 +176,7 @@ def _parse_upstreams_conf(path: Path) -> list[Upstream]:
             items.append(
                 Upstream(
                     name=name.strip(),
-                    type=utype.strip() or "direct",  # type: ignore[arg-type]
+                    type=utype.strip() or "direct",
                     addr=addr.strip(),
                     user=user.strip(),
                     password=password.strip(),
