@@ -7,4 +7,4 @@ help:
 	@echo "  make test - Run pytest in Debian 13 Docker container"
 
 test:
-	docker compose run --rm test
+	docker compose run --build --rm test

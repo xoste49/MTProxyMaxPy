@@ -3,7 +3,3 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.test
-    working_dir: /work
-    volumes:
-      - .:/work
-    command: bash -lc "uv sync --dev && uv run pytest --maxfail=1 --cov=src/mtproxymaxpy --cov-report=term-missing:skip-covered"
