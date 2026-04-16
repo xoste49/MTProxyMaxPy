@@ -183,7 +183,7 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
         _set_runtime_state(_loop_ref, bot, dp)
 
         async def _authorised(msg: Message) -> bool:
-            return bool(msg.chat and str(msg.chat.id) == chat_id)
+            return str(msg.chat.id) == chat_id
 
         def _content_kwargs(content: Any) -> dict[str, Any]:
             if hasattr(content, "as_kwargs"):
@@ -230,7 +230,7 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
         @router.error()
         async def handle_router_error(event: ErrorEvent) -> None:
             exc = event.exception
-            if isinstance(exc, Exception) and _should_suppress_update_error(exc):
+            if _should_suppress_update_error(exc):
                 logger.warning("aiogram update timeout suppressed: %s", exc)
                 return
             raise exc
