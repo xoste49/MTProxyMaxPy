@@ -68,11 +68,7 @@ def test_status_screen_success_and_error(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setitem(
         sys.modules,
         "mtproxymaxpy.config.settings",
-        SimpleNamespace(
-            load_settings=lambda: SimpleNamespace(
-                proxy_port=443, proxy_domain="cf.com", custom_ip="", proxy_concurrency=1000
-            )
-        ),
+        SimpleNamespace(load_settings=lambda: SimpleNamespace(proxy_port=443, proxy_domain="cf.com", custom_ip="", proxy_concurrency=1000)),
     )
     monkeypatch.setitem(
         sys.modules,
@@ -151,9 +147,7 @@ def test_run_tui_main_loop_routes(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
     monkeypatch.setitem(
         sys.modules,
         "mtproxymaxpy.config.settings",
-        SimpleNamespace(
-            load_settings=lambda: SimpleNamespace(telegram_enabled=True, proxy_port=443, proxy_domain="cf.com")
-        ),
+        SimpleNamespace(load_settings=lambda: SimpleNamespace(telegram_enabled=True, proxy_port=443, proxy_domain="cf.com")),
     )
     monkeypatch.setitem(sys.modules, "mtproxymaxpy.geoblock", SimpleNamespace(list_countries=lambda: ["RU"]))
 
@@ -188,9 +182,7 @@ def test_run_tui_setup_and_migration_paths(monkeypatch: pytest.MonkeyPatch, tmp_
         SimpleNamespace(SETTINGS_FILE=settings_file, UPDATE_BADGE_FILE=tmp_path / "badge"),
     )
 
-    monkeypatch.setitem(
-        sys.modules, "mtproxymaxpy.config.migration", SimpleNamespace(detect_legacy=lambda: ["settings.conf"])
-    )
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.migration", SimpleNamespace(detect_legacy=lambda: ["settings.conf"]))
     called = {"mig": 0, "wiz": 0}
     monkeypatch.setattr(menu, "_migration_screen", lambda legacy: called.__setitem__("mig", called["mig"] + 1))
     monkeypatch.setattr(menu, "_setup_wizard", lambda: called.__setitem__("wiz", called["wiz"] + 1))
@@ -199,9 +191,7 @@ def test_run_tui_setup_and_migration_paths(monkeypatch: pytest.MonkeyPatch, tmp_
     monkeypatch.setitem(
         sys.modules,
         "mtproxymaxpy.config.settings",
-        SimpleNamespace(
-            load_settings=lambda: SimpleNamespace(telegram_enabled=False, proxy_port=443, proxy_domain="cf.com")
-        ),
+        SimpleNamespace(load_settings=lambda: SimpleNamespace(telegram_enabled=False, proxy_port=443, proxy_domain="cf.com")),
     )
     monkeypatch.setitem(sys.modules, "mtproxymaxpy.geoblock", SimpleNamespace(list_countries=lambda: []))
     monkeypatch.setattr(menu, "_ask_choice", lambda *a, **k: 0)

@@ -1,5 +1,6 @@
 """Global constants for MTProxyMaxPy."""
 
+import tempfile
 from pathlib import Path
 
 # ── Version ────────────────────────────────────────────────────────────────────
@@ -42,7 +43,7 @@ LEGACY_BASH_INSTANCES_FILE = LEGACY_BASH_DIR / "instances.conf"
 GITHUB_REPO = "xoste49/MTProxyMaxPy"
 GITHUB_API_COMMITS = "https://api.github.com/repos/xoste49/MTProxyMaxPy/commits/main"
 UPDATE_SHA_FILE = INSTALL_DIR / ".update_sha"
-UPDATE_BADGE_FILE = Path("/tmp/.mtproxymaxpy_update_available")
+UPDATE_BADGE_FILE = Path(tempfile.gettempdir()) / ".mtproxymaxpy_update_available"
 
 # ── Telemt binary ──────────────────────────────────────────────────────────────
 BINARY_DIR = INSTALL_DIR / "bin"
@@ -54,9 +55,7 @@ TELEMT_GITHUB_API = "https://api.github.com/repos/telemt/telemt/releases/latest"
 
 # Fallback download URL template: {version} and {arch} are substituted at runtime
 # Assets are named e.g. telemt-x86_64-linux-gnu.tar.gz (no 'v' prefix on tag)
-TELEMT_DOWNLOAD_URL_TEMPLATE = (
-    "https://github.com/telemt/telemt/releases/download/{version}/telemt-{arch}-linux-gnu.tar.gz"
-)
+TELEMT_DOWNLOAD_URL_TEMPLATE = "https://github.com/telemt/telemt/releases/download/{version}/telemt-{arch}-linux-gnu.tar.gz"
 
 # ── Defaults ───────────────────────────────────────────────────────────────────
 DEFAULT_PORT = 443

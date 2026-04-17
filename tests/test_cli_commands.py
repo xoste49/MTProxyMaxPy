@@ -65,9 +65,7 @@ def test_core_proxy_commands_and_status(monkeypatch: pytest.MonkeyPatch, capsys:
     saved: list[FakeSettings] = []
     settings = FakeSettings(proxy_port=443, proxy_domain="cloudflare.com")
 
-    set_mod = SimpleNamespace(
-        load_settings=lambda: settings, save_settings=lambda s: saved.append(s), Settings=FakeSettings
-    )
+    set_mod = SimpleNamespace(load_settings=lambda: settings, save_settings=lambda s: saved.append(s), Settings=FakeSettings)
     monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.settings", set_mod)
     mig_mod = SimpleNamespace(detect_legacy=lambda: [], run_migration=lambda _: None)
     monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.migration", mig_mod)
@@ -143,9 +141,7 @@ def test_core_proxy_commands_and_status(monkeypatch: pytest.MonkeyPatch, capsys:
     assert "Binary updated" in capsys.readouterr().out
 
 
-def test_doctor_health_logs_metrics_connections_traffic(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_doctor_health_logs_metrics_connections_traffic(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     _set_pkg_module(
         monkeypatch,
         "doctor",
@@ -294,9 +290,7 @@ def test_secret_commands(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys
     monkeypatch.setitem(
         sys.modules,
         "mtproxymaxpy.utils.proxy_link",
-        SimpleNamespace(
-            build_proxy_links=lambda *a, **k: ("tg://x", "https://x"), render_qr_terminal=lambda s: "##QR##"
-        ),
+        SimpleNamespace(build_proxy_links=lambda *a, **k: ("tg://x", "https://x"), render_qr_terminal=lambda s: "##QR##"),
     )
     monkeypatch.setitem(sys.modules, "mtproxymaxpy.utils.network", SimpleNamespace(get_public_ip=lambda: "1.1.1.1"))
     _set_pkg_module(
@@ -375,9 +369,7 @@ def test_secret_commands(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys
         cli.secret_stats()
 
 
-def test_upstream_backup_geo_telegram_and_misc(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_upstream_backup_geo_telegram_and_misc(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     monkeypatch.setattr(cli, "_restart_if_running", lambda: None)
     ups_mod = SimpleNamespace(
         add_upstream=lambda *a, **k: None,
@@ -422,9 +414,7 @@ def test_upstream_backup_geo_telegram_and_misc(
     out = capsys.readouterr().out
     assert "Restored" in out
 
-    gmod = SimpleNamespace(
-        add_country=lambda cc: 5, remove_country=lambda cc: None, list_countries=lambda: ["RU"], clear_all=lambda: None
-    )
+    gmod = SimpleNamespace(add_country=lambda cc: 5, remove_country=lambda cc: None, list_countries=lambda: ["RU"], clear_all=lambda: None)
     _set_pkg_module(monkeypatch, "geoblock", gmod)
     cli.geoblock_add("ru")
     cli.geoblock_remove("ru")
@@ -468,9 +458,7 @@ def test_upstream_backup_geo_telegram_and_misc(
         cli.telegram_test()
     with pytest.raises(typer.Exit):
         cli.telegram_enable()
-    monkeypatch.setitem(
-        sys.modules, "signal", SimpleNamespace(pause=lambda: (_ for _ in ()).throw(KeyboardInterrupt()))
-    )
+    monkeypatch.setitem(sys.modules, "signal", SimpleNamespace(pause=lambda: (_ for _ in ()).throw(KeyboardInterrupt())))
     settings_aiogram = FakeSettings(telegram_enabled=True, telegram_bot_token="tok", telegram_chat_id="1")
     monkeypatch.setitem(
         sys.modules,

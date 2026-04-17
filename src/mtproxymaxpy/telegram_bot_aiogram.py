@@ -615,17 +615,17 @@ def stop() -> None:
             try:
                 await _dispatcher.stop_polling()
             except Exception:
-                pass
+                logger.debug("stop_polling failed", exc_info=True)
             try:
                 if _bot is not None:
                     await _bot.session.close()
             except Exception:
-                pass
+                logger.debug("Bot session close failed", exc_info=True)
 
         try:
             _loop.call_soon_threadsafe(lambda: asyncio.create_task(_shutdown()))
         except Exception:
-            pass
+            logger.debug("call_soon_threadsafe failed", exc_info=True)
 
     logger.info("Telegram aiogram backend stop requested")
 

@@ -6,6 +6,7 @@ original bash script: box-drawing headers, coloured status, numbered choices.
 
 from __future__ import annotations
 
+import logging
 import os
 import time
 from pathlib import Path
@@ -23,6 +24,8 @@ if TYPE_CHECKING:
     from mtproxymaxpy.config.upstreams import Upstream
 
 from mtproxymaxpy.constants import APP_TITLE, VERSION
+
+logger = logging.getLogger(__name__)
 
 console = Console(highlight=False)
 
@@ -159,7 +162,7 @@ def _header_panel() -> Panel:
             combined.append("\n")
             combined.append("⬆ Update available - select [10]", style="bold yellow")
     except Exception:
-        pass
+        logger.debug("Failed to read update badge", exc_info=True)
 
     title = f"[bold cyan]{APP_TITLE} v{VERSION}[/bold cyan]  [dim]Telegram MTProto Proxy Manager[/dim]"
     return Panel(combined, title=title, border_style="cyan", padding=(0, 2))
@@ -197,7 +200,7 @@ def _manager_update_branch() -> str:
         if branch and not any(ch.isspace() for ch in branch):
             return branch
     except Exception:
-        pass
+        logger.debug("Failed to read update branch from settings", exc_info=True)
     return "main"
 
 
@@ -280,7 +283,7 @@ def _check_update_bg(wait_timeout: float = 3.0) -> None:
             else:
                 UPDATE_BADGE_FILE.unlink(missing_ok=True)
         except Exception:
-            pass
+            logger.debug("Background update check failed", exc_info=True)
 
     thread = threading.Thread(target=_worker, daemon=True)
     thread.start()
@@ -310,7 +313,7 @@ def run_tui() -> None:
                 _migration_screen(legacy)
                 migrated = True
         except Exception:
-            pass
+            logger.debug("Legacy config migration failed", exc_info=True)
         # Fresh install — run setup wizard
         if not migrated:
             _setup_wizard()
@@ -444,7 +447,7 @@ def _proxy_menu() -> None:
 
             running = _pm.is_running()
         except Exception:
-            pass
+            logger.debug("Failed to check proxy running state", exc_info=True)
 
         if running:
             console.print(_choice(1, "[red]Stop proxy[/red]"))
@@ -1582,7 +1585,7 @@ def _update_screen() -> None:  # noqa: C901
             if r_local.returncode == 0 and len(candidate) == 40 and all(c in "0123456789abcdef" for c in candidate):
                 local_sha = candidate
         except Exception:
-            pass
+            logger.debug("Failed to get local git SHA", exc_info=True)
 
         if not local_sha:
             local_sha = UPDATE_SHA_FILE.read_text().strip().lower() if UPDATE_SHA_FILE.exists() else ""
@@ -1802,7 +1805,7 @@ def _setup_wizard() -> None:  # noqa: C901
         with console.status("  Detecting public IP…"):
             detected_ip = get_public_ip() or ""
     except Exception:
-        pass
+        logger.debug("Failed to detect public IP", exc_info=True)
     if detected_ip:
         console.print(f"  Detected: [green]{detected_ip}[/green]")
     raw_ip = Prompt.ask(
@@ -1913,7 +1916,7 @@ def _setup_wizard() -> None:  # noqa: C901
         systemd.install()
         console.print("  [green][+] systemd service installed[/green]")
     except Exception:
-        pass
+        logger.debug("systemd install failed", exc_info=True)
 
     # ── Show proxy links ───────────────────────────────────────────────────────
     console.print()

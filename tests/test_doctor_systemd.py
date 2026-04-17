@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -143,7 +144,7 @@ def test_check_secrets_and_disk_and_metrics(monkeypatch: pytest.MonkeyPatch) -> 
 
     import mtproxymaxpy.constants as c
 
-    monkeypatch.setattr(c, "INSTALL_DIR", Path("/tmp/not-real"))
+    monkeypatch.setattr(c, "INSTALL_DIR", Path(tempfile.gettempdir()) / "not-real")
     monkeypatch.setattr(
         doctor.shutil,
         "disk_usage",

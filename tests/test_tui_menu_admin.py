@@ -87,9 +87,7 @@ def test_backup_menu_and_migration_screen(monkeypatch: pytest.MonkeyPatch, tmp_p
     monkeypatch.setattr(menu.Confirm, "ask", lambda *a, **k: True)
     menu._backup_menu()
 
-    monkeypatch.setitem(
-        sys.modules, "mtproxymaxpy.config.migration", SimpleNamespace(run_migration=lambda legacy: {"ok": True})
-    )
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.migration", SimpleNamespace(run_migration=lambda legacy: {"ok": True}))
     monkeypatch.setattr(menu.Confirm, "ask", lambda *a, **k: True)
     menu._migration_screen({"settings": tmp_path / "settings.conf"})
 
@@ -135,9 +133,7 @@ def test_telegram_menu_and_helpers(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     real_test = menu._telegram_test
     monkeypatch.setattr(menu, "_telegram_setup_wizard", lambda: calls.__setitem__("wizard", calls["wizard"] + 1))
     monkeypatch.setattr(menu, "_telegram_test", lambda: calls.__setitem__("test", calls["test"] + 1))
-    monkeypatch.setattr(
-        menu, "_stream_telegram_logs_screen", lambda: calls.__setitem__("tg_logs", calls["tg_logs"] + 1)
-    )
+    monkeypatch.setattr(menu, "_stream_telegram_logs_screen", lambda: calls.__setitem__("tg_logs", calls["tg_logs"] + 1))
     monkeypatch.setattr(menu.IntPrompt, "ask", lambda *a, **k: 12)
 
     choices = iter([1, 2, 3, 4, 5, 6, 7, 0])
@@ -280,9 +276,7 @@ def test_update_and_setup_wizard(monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 
     prompts = iter(["1.2.3.4", "my.domain", "TAG", "user1"])
     confirms = iter([True, True, False])  # masking yes, ad-tag yes, telegram setup no
-    monkeypatch.setattr(
-        menu.IntPrompt, "ask", lambda *a, **k: 443 if "port" in a[0].lower() else len(menu.FAKETLS_DOMAINS)
-    )
+    monkeypatch.setattr(menu.IntPrompt, "ask", lambda *a, **k: 443 if "port" in a[0].lower() else len(menu.FAKETLS_DOMAINS))
     monkeypatch.setattr(menu.Prompt, "ask", lambda *a, **k: next(prompts))
     monkeypatch.setattr(menu.Confirm, "ask", lambda *a, **k: next(confirms))
     menu._setup_wizard()

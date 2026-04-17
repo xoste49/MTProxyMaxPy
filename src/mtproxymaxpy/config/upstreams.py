@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import tempfile
@@ -12,6 +13,8 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from mtproxymaxpy.constants import UPSTREAMS_FILE
+
+_log = logging.getLogger(__name__)
 
 DEFAULT_UPSTREAM_WEIGHT = 10
 _NAME_RE = re.compile(r"^[a-zA-Z0-9_-]+$")
@@ -72,6 +75,7 @@ def load_upstreams(path: Path = UPSTREAMS_FILE) -> list[Upstream]:
         try:
             u = Upstream.model_validate(item)
         except Exception:
+            _log.debug("Skipping invalid upstream entry: %s", item)
             continue
         if u.type != "direct" and not u.addr.strip():
             continue

@@ -470,7 +470,7 @@ def status() -> dict[str, Any]:
             p = psutil.Process(pid)
             uptime_sec = int(_time.time() - p.create_time())
         except Exception:
-            pass
+            logger.debug("Failed to get process uptime", exc_info=True)
     return {
         "running": is_running(),
         "pid": pid,

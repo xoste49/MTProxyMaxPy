@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import sys
 from pathlib import Path
 from typing import Annotated, Any
@@ -10,6 +11,8 @@ from typing import Annotated, Any
 import typer
 
 from mtproxymaxpy.constants import VERSION
+
+logger = logging.getLogger(__name__)
 
 app = typer.Typer(
     name="mtproxymaxpy",
@@ -487,7 +490,7 @@ def manager_branch(
         raise typer.Exit(1)
 
     save_settings(settings.model_copy(update={"manager_update_branch": branch}))
-    typer.echo(f"[+] Manager update branch set to '{branch}'.")
+    typer.echo(f"[+] Manager update branch set to '{branch}'.")  # noqa: S608
 
 
 # ── secrets ────────────────────────────────────────────────────────────────────
@@ -1155,4 +1158,4 @@ def _restart_if_running() -> None:
         try:
             process_manager.write_toml_config()
         except Exception:
-            pass
+            logger.debug("Failed to regenerate TOML config", exc_info=True)

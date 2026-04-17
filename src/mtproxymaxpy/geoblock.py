@@ -79,7 +79,7 @@ def _load_state() -> dict[str, Any]:
         try:
             return json.loads(GEO_STATE_FILE.read_text())  # type: ignore[no-any-return]
         except Exception:
-            pass
+            logger.debug("Failed to load geo state file", exc_info=True)
     return {"countries": [], "mode": "blacklist"}
 
 

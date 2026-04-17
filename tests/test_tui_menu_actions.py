@@ -88,9 +88,7 @@ def test_secrets_action_dispatches(monkeypatch: pytest.MonkeyPatch) -> None:
         disable_expired_secrets=lambda: [1, 2],
     )
     monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.secrets", sec_mod)
-    monkeypatch.setitem(
-        sys.modules, "mtproxymaxpy.utils.validation", SimpleNamespace(parse_human_bytes=lambda x: 1024**3)
-    )
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.utils.validation", SimpleNamespace(parse_human_bytes=lambda x: 1024**3))
 
     secs = [SimpleNamespace(label="alice", key="a" * 32, enabled=True)]
     menu._secrets_action(1, secs)
@@ -260,9 +258,7 @@ def test_settings_menu_save_and_error(monkeypatch: pytest.MonkeyPatch) -> None:
         state["saved"].append(s)
         state["settings"] = s
 
-    monkeypatch.setitem(
-        sys.modules, "mtproxymaxpy.config.settings", SimpleNamespace(load_settings=_load, save_settings=_save)
-    )
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.settings", SimpleNamespace(load_settings=_load, save_settings=_save))
 
     choices = iter([1, 6, 18, 0])
     monkeypatch.setattr(menu, "_ask_choice", lambda *a, **k: next(choices))

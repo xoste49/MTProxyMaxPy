@@ -6,11 +6,14 @@ results so that both the CLI and TUI can display them.
 
 from __future__ import annotations
 
+import logging
 import shutil
 import socket
 import subprocess
 from datetime import date
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 # ── Individual checks ──────────────────────────────────────────────────────────
 
@@ -30,7 +33,7 @@ def check_binary() -> dict[str, Any]:
             )
             version = (res.stdout + res.stderr).strip().split()[-1]
         except Exception:
-            pass
+            logger.debug("Failed to get telemt version", exc_info=True)
     return {"ok": present, "version": version, "path": str(BINARY_PATH)}
 
 
@@ -55,7 +58,7 @@ def check_port_listening(port: int) -> dict[str, Any]:
             listening = f":{port}" in res.stdout or f" {port} " in res.stdout
             return {"ok": listening, "tool": "ss"}
         except Exception:
-            pass
+            logger.debug("ss port check failed", exc_info=True)
     # Fallback use netstat
     if shutil.which("netstat"):
         try:
@@ -68,7 +71,7 @@ def check_port_listening(port: int) -> dict[str, Any]:
             listening = f":{port}" in res.stdout
             return {"ok": listening, "tool": "netstat"}
         except Exception:
-            pass
+            logger.debug("netstat port check failed", exc_info=True)
     # Last resort: try connecting
     try:
         with socket.create_connection(("127.0.0.1", port), timeout=2):

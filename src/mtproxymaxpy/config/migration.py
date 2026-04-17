@@ -13,6 +13,7 @@ instances.conf  pipe-delimited, format varies but at minimum:
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -38,6 +39,8 @@ from mtproxymaxpy.constants import (
     SETTINGS_FILE,
     UPSTREAMS_FILE,
 )
+
+_log = logging.getLogger(__name__)
 
 # ── Known settings.conf key → Settings field mapping ────────────────────────
 
@@ -156,6 +159,7 @@ def _parse_secrets_conf(path: Path) -> list[Secret]:
                 )
             )
         except Exception:
+            _log.debug("Skipping malformed secret line: %s", line)
             continue
     return items
 
@@ -186,6 +190,7 @@ def _parse_upstreams_conf(path: Path) -> list[Upstream]:
                 )
             )
         except Exception:
+            _log.debug("Skipping malformed upstream line: %s", line)
             continue
     return items
 
@@ -212,6 +217,7 @@ def _parse_instances_conf(path: Path) -> list[Instance]:
                 )
             )
         except Exception:
+            _log.debug("Skipping malformed instance line: %s", line)
             continue
     return items
 

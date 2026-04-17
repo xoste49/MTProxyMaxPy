@@ -1,11 +1,13 @@
 """Network utilities: public IP detection, port availability."""
 
+import logging
 import time
 
 import httpx
 
 from mtproxymaxpy.constants import PUBLIC_IP_CACHE_TTL, PUBLIC_IP_ENDPOINTS
 
+_log = logging.getLogger(__name__)
 _ip_cache: tuple[str, float] | None = None
 
 
@@ -36,5 +38,6 @@ def get_public_ip(timeout: float = 5.0) -> str | None:
                 _ip_cache = (text, now)
                 return text
         except Exception:
+            _log.debug("IP lookup failed for endpoint", exc_info=True)
             continue
     return None

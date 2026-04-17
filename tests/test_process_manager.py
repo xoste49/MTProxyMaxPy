@@ -34,13 +34,9 @@ def test_build_toml_config_contains_expected_sections() -> None:
         masking_host="example.com",
         fake_cert_len=1024,
     )
-    sec1 = SimpleNamespace(
-        label="u1", key="a" * 32, enabled=True, max_conns=10, max_ips=2, quota_bytes=123, expires="2026-12-31"
-    )
+    sec1 = SimpleNamespace(label="u1", key="a" * 32, enabled=True, max_conns=10, max_ips=2, quota_bytes=123, expires="2026-12-31")
     sec2 = SimpleNamespace(label="u2", key="b" * 32, enabled=False, max_conns=0, max_ips=0, quota_bytes=0, expires="")
-    up1 = SimpleNamespace(
-        enabled=True, type="socks5", weight=10, addr="127.0.0.1:1080", user="user", password="pass", iface=""
-    )
+    up1 = SimpleNamespace(enabled=True, type="socks5", weight=10, addr="127.0.0.1:1080", user="user", password="pass", iface="")
     up2 = SimpleNamespace(enabled=True, type="direct", weight=10, addr="", user="", password="", iface="")
 
     text = pm._build_toml_config(settings, [sec1, sec2], [up1, up2], "")
@@ -296,9 +292,7 @@ def test_start_stop_restart_reload_and_status(monkeypatch: pytest.MonkeyPatch, t
     monkeypatch.setattr(pm, "is_running", lambda: True)
     monkeypatch.setattr(pm, "is_binary_present", lambda: True)
     monkeypatch.setattr(pm, "TOML_CONFIG_FILE", SimpleNamespace(exists=lambda: True))
-    monkeypatch.setitem(
-        sys.modules, "psutil", SimpleNamespace(Process=lambda pid: SimpleNamespace(create_time=lambda: 0))
-    )
+    monkeypatch.setitem(sys.modules, "psutil", SimpleNamespace(Process=lambda pid: SimpleNamespace(create_time=lambda: 0)))
     st = pm.status()
     assert st["running"] is True
     assert st["pid"] == 1
