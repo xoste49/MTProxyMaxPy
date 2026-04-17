@@ -119,6 +119,7 @@ select = [
     #"SIM",
     # isort
     "I",
+    "ERA", # Включить проверку наличия закоментированного кода https://docs.astral.sh/ruff/rules/#eradicate-era
 ]
 ignore = ["E741"]
 fixable = ["ALL"]

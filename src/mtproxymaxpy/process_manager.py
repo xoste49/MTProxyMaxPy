@@ -191,7 +191,7 @@ def _build_toml_config(
         for label, exp_str in expires.items():
             lines.append(f'"{label}" = "{exp_str}"')
 
-    # [[upstreams]]
+    # Upstreams
     active_ups = [u for u in upstreams if u.enabled and u.type != "direct"]
     if active_ups:
         for u in active_ups:

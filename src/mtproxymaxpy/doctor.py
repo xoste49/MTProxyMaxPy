@@ -56,7 +56,7 @@ def check_port_listening(port: int) -> dict[str, Any]:
             return {"ok": listening, "tool": "ss"}
         except Exception:
             pass
-    # Fallback: netstat
+    # Fallback use netstat
     if shutil.which("netstat"):
         try:
             res = subprocess.run(
