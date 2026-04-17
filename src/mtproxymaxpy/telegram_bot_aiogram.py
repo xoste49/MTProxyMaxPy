@@ -5,7 +5,12 @@ from __future__ import annotations
 import asyncio
 import logging
 import threading
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from aiogram import Bot, Dispatcher
+    from aiogram.types import BotCommand
+    from aiogram.utils.formatting import Text
 
 from mtproxymaxpy.config.secrets import load_secrets
 from mtproxymaxpy.config.settings import load_settings
@@ -57,7 +62,7 @@ def _md(text: str) -> str:
     return escape_md(text)
 
 
-def _build_bot_commands(bot_command_cls: Any) -> list[Any]:
+def _build_bot_commands(bot_command_cls: type[BotCommand]) -> list[BotCommand]:
     return [bot_command_cls(command=command, description=description) for command, description in _COMMAND_SPECS]
 
 
@@ -99,12 +104,12 @@ def _polling_retry_delay_sec(attempt: int) -> int:
     return int(min(delay, _POLLING_RETRY_MAX_SEC))
 
 
-async def _start_polling(dispatcher: Any, bot: Any) -> None:
+async def _start_polling(dispatcher: Dispatcher, bot: Bot) -> None:
     # Polling runs in a worker thread; aiogram signal handlers are main-thread only.
     await dispatcher.start_polling(bot, handle_signals=False)
 
 
-def _get_stats_text() -> Any:
+def _get_stats_text() -> Text:
     from aiogram.utils.formatting import Bold, Text
 
     from mtproxymaxpy import metrics as _metrics
@@ -143,7 +148,7 @@ def _get_stats_text() -> Any:
     return Text(*parts)
 
 
-def _get_health_text() -> Any:
+def _get_health_text() -> Text:
     from aiogram.utils.formatting import Bold, Text
 
     from mtproxymaxpy import doctor
@@ -185,12 +190,12 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
         async def _authorised(msg: Message) -> bool:
             return str(msg.chat.id) == chat_id
 
-        def _content_kwargs(content: Any) -> dict[str, Any]:
+        def _content_kwargs(content: str | Text) -> dict[str, Any]:
             if hasattr(content, "as_kwargs"):
-                return content.as_kwargs()  # type: ignore[no-any-return]
+                return content.as_kwargs()
             return {"text": str(content)}
 
-        def _join_content_lines(lines: list[Any]) -> Any:
+        def _join_content_lines(lines: list[Any]) -> Text:
             parts: list[Any] = []
             for idx, line in enumerate(lines):
                 if idx:
@@ -198,10 +203,10 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
                 parts.append(line)
             return Text(*parts)
 
-        async def _send_text(content: Any) -> None:
+        async def _send_text(content: str | Text) -> None:
             await bot.send_message(chat_id, **_content_kwargs(content))
 
-        async def _answer(msg: Message, content: Any) -> None:
+        async def _answer(msg: Message, content: str | Text) -> None:
             await msg.answer(**_content_kwargs(content))
 
         async def _send_chunked(lines: list[Any], limit: int = 3500) -> None:
@@ -547,7 +552,7 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
             _reset_runtime_state()
 
 
-def _set_runtime_state(loop: asyncio.AbstractEventLoop, bot: Any, dispatcher: Any) -> None:
+def _set_runtime_state(loop: asyncio.AbstractEventLoop, bot: Bot, dispatcher: Dispatcher) -> None:
     global _loop, _bot, _dispatcher
     _loop = loop
     _bot = bot

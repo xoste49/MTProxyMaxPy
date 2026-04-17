@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qs, urlparse
+
+if TYPE_CHECKING:
+    from mtproxymaxpy.config.secrets import Secret
 
 from aiogram.utils.formatting import Bold, Code, Text, TextLink
 
@@ -104,7 +107,7 @@ def build_mp_traffic_text(
 
 
 def build_mp_limits_text(
-    secret: Any,
+    secret: Secret,
     *,
     md: Callable[[str], str] | None = None,
     bytes_formatter: Callable[[float | int], str],

@@ -140,7 +140,7 @@ def disable_secret(label: str, path: Path = SECRETS_FILE) -> Secret:
     return _set_field(label, "enabled", False, path)
 
 
-def _set_field(label: str, field: str, value: Any, path: Path = SECRETS_FILE) -> Secret:
+def _set_field(label: str, field: str, value: bool | str, path: Path = SECRETS_FILE) -> Secret:
     items = load_secrets(path)
     for i, s in enumerate(items):
         if s.label == label:

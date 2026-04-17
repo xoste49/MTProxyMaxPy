@@ -100,7 +100,7 @@ def save_upstreams(items: list[Upstream], path: Path = UPSTREAMS_FILE) -> None:
 # ── Mutation helpers ───────────────────────────────────────────────────────────
 
 
-def _set_upstream_field(name: str, field: str, value: Any, path: Path = UPSTREAMS_FILE) -> Upstream:
+def _set_upstream_field(name: str, field: str, value: bool | str | int | None, path: Path = UPSTREAMS_FILE) -> Upstream:
     items = load_upstreams(path)
     for i, u in enumerate(items):
         if u.name == name:

@@ -438,10 +438,10 @@ def stop(timeout: float = 10.0) -> None:
     logger.info("telemt stopped (was PID %s)", pid)
 
 
-def restart(**start_kwargs: Any) -> int:
+def restart(*, regenerate_config: bool = True, public_ip: str = "") -> int:
     """Stop then start telemt."""
     stop()
-    return start(**start_kwargs)
+    return start(regenerate_config=regenerate_config, public_ip=public_ip)
 
 
 def reload_config() -> None:
