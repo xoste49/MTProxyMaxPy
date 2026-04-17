@@ -66,8 +66,9 @@ enable_error_code = [
     "possibly-undefined",  # Ловит переменные, которые могут быть не определены в ветке
     "redundant-expr",  # Предупреждает об избыточных выражениях в условиях
     "truthy-bool",  # Предупреждает, когда non-bool используется в boolean-контексте
-    "truthy-iterable",  # Ловит когда мутабельный атрибут подкласса переопределяет атрибут базового
-    "mutable-override",  # Требует `@override` при переопределении методов (Python 3.12+)
+    "truthy-iterable",  # Ловит `if queryset:` на итераторах, которые всегда truthy
+    "mutable-override",  # Ловит ковариантное переопределение мутабельного атрибута в подклассе
+    "explicit-override",  # Требует @override для всех переопределений методов (Python 3.12+
 ]
 
 disallow_untyped_calls = true
@@ -88,6 +89,8 @@ warn_unreachable = true       # Предупреждает о недостижи
 local_partial_types = true
 implicit_reexport = true
 strict_equality = true          # Ловит бессмысленные сравнения вроде str == int
+extra_checks = true             # Дополнительные проверки (strict concatenate, unneeded type params и др.)
+strict = true                   # Включает все строгие проверки
 
 [tool.ruff]
 target-version = "py313"
