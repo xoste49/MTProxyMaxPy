@@ -174,7 +174,7 @@ def test_download_binary_cleanup_on_error(monkeypatch: pytest.MonkeyPatch, tmp_p
             yield b"not a tar"
 
     monkeypatch.setattr(pm.httpx, "stream", lambda *a, **k: _Stream())
-    with pytest.raises(Exception):
+    with pytest.raises(tarfile.ReadError):
         pm.download_binary(force=True)
     assert not (bin_dir / "telemt.tmp").exists()
 

@@ -529,7 +529,7 @@ def secret_add(
             _restart_if_running()
     except ValueError as exc:
         typer.echo(f"[!] {exc}", err=True)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
 
 
 @secrets_app.command("add-batch")
@@ -602,7 +602,7 @@ def secret_rotate(
             _restart_if_running()
     except KeyError as exc:
         typer.echo(f"[!] {exc}", err=True)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
 
 
 @secrets_app.command("enable")

@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from mtproxymaxpy.config.settings import Settings, load_settings, save_settings
 
@@ -52,17 +53,17 @@ def test_missing_file_returns_defaults(tmp_path: Path) -> None:
 
 
 def test_invalid_geoblock_mode() -> None:
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         Settings(geoblock_mode="invalid")
 
 
 def test_invalid_sni_action() -> None:
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         Settings(unknown_sni_action="bogus")
 
 
 def test_invalid_manager_update_branch() -> None:
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         Settings(manager_update_branch="")
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         Settings(manager_update_branch="feature branch")

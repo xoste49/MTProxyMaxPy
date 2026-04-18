@@ -34,8 +34,8 @@ GEO_STATE_FILE = INSTALL_DIR / "geoblock.json"
 def _run(*cmd: str, check: bool = True) -> subprocess.CompletedProcess[str]:
     try:
         return subprocess.run(list(cmd), check=check, capture_output=True, text=True)
-    except FileNotFoundError:
-        raise RuntimeError(f"Command not found: {cmd[0]}")
+    except FileNotFoundError as exc:
+        raise RuntimeError(f"Command not found: {cmd[0]}") from exc
     except subprocess.CalledProcessError as exc:
         raise RuntimeError(f"{' '.join(cmd)} failed (exit {exc.returncode}): {exc.stderr.strip()}") from exc
 

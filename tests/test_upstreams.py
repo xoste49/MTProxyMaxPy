@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from mtproxymaxpy.config.upstreams import (
     Upstream,
@@ -47,7 +48,7 @@ def test_file_mode_600(tmp_path: Path) -> None:
 
 
 def test_invalid_type_raises() -> None:
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         Upstream(name="bad", type="ftp")  # type: ignore[arg-type]
 
 

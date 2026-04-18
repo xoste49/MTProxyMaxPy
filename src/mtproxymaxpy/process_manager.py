@@ -452,9 +452,9 @@ def reload_config() -> None:
     try:
         os.kill(pid, signal.SIGHUP)  # type: ignore[attr-defined]
         logger.info("Sent SIGHUP to telemt (PID %s)", pid)
-    except ProcessLookupError:
+    except ProcessLookupError as exc:
         _clear_pid()
-        raise RuntimeError("telemt process not found")
+        raise RuntimeError("telemt process not found") from exc
 
 
 def status() -> dict[str, Any]:

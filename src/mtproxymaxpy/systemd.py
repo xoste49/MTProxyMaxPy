@@ -132,8 +132,8 @@ def uninstall(*, telegram: bool = True) -> None:
 def _systemctl(*args: str, check: bool = True) -> subprocess.CompletedProcess[bytes]:
     try:
         return subprocess.run(["systemctl"] + list(args), check=check, capture_output=True)
-    except FileNotFoundError:
-        raise RuntimeError("systemctl not found — systemd is not available on this system")
+    except FileNotFoundError as exc:
+        raise RuntimeError("systemctl not found — systemd is not available on this system") from exc
     except subprocess.CalledProcessError as exc:
         stderr = (exc.stderr or b"").decode(errors="replace").strip()
         raise RuntimeError(f"systemctl {' '.join(args)} failed (exit {exc.returncode}): {stderr}") from exc
