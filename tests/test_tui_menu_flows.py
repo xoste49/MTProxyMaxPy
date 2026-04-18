@@ -142,7 +142,7 @@ def test_run_tui_main_loop_routes(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
     )
     monkeypatch.setitem(sys.modules, "mtproxymaxpy.geoblock", SimpleNamespace(list_countries=lambda: ["RU"]))
 
-    calls = {i: 0 for i in range(1, 11)}
+    calls = dict.fromkeys(range(1, 11), 0)
     monkeypatch.setattr(menu, "_proxy_menu", lambda: calls.__setitem__(1, calls[1] + 1))
     monkeypatch.setattr(menu, "_secrets_menu", lambda: calls.__setitem__(2, calls[2] + 1))
     monkeypatch.setattr(menu, "_links_menu", lambda: calls.__setitem__(3, calls[3] + 1))

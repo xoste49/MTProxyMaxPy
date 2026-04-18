@@ -10,7 +10,7 @@ import logging
 import shutil
 import socket
 import subprocess
-from datetime import date
+from datetime import UTC, datetime
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -106,7 +106,7 @@ def check_secrets() -> dict[str, Any]:
     from mtproxymaxpy.config.secrets import load_secrets
 
     all_secrets = load_secrets()
-    today = date.today().isoformat()
+    today = datetime.now(tz=UTC).date().isoformat()
     expired = [s.label for s in all_secrets if s.expires and s.expires < today]
     enabled = [s for s in all_secrets if s.enabled]
     return {

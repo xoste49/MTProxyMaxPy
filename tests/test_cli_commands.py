@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import io
 import sys
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -393,7 +393,7 @@ def test_upstream_backup_geo_telegram_and_misc(monkeypatch: pytest.MonkeyPatch, 
 
     bmod = SimpleNamespace(
         create_backup=lambda label="": tmp_path / "b.tar.gz",
-        list_backups=lambda: [{"mtime": datetime(2026, 1, 1), "size": 1024, "name": "b.tar.gz"}],
+        list_backups=lambda: [{"mtime": datetime(2026, 1, 1, tzinfo=UTC), "size": 1024, "name": "b.tar.gz"}],
         restore_backup=lambda path: {"version": "1", "date": "now", "pre_restore_backup": "pre.tar.gz"},
     )
     _set_pkg_module(monkeypatch, "backup", bmod)

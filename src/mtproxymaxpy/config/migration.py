@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -128,7 +128,7 @@ def _parse_settings_conf(path: Path) -> dict[str, Any]:
 def _ts_to_date(ts: str) -> str:
     """Convert a Unix timestamp string to YYYY-MM-DD, or return '' on failure."""
     try:
-        return datetime.fromtimestamp(int(ts)).date().isoformat()
+        return datetime.fromtimestamp(int(ts), tz=UTC).date().isoformat()
     except (ValueError, OverflowError, OSError):
         return ""
 

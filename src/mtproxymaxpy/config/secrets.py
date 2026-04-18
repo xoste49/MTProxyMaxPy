@@ -8,7 +8,7 @@ import json
 import os
 import secrets
 import tempfile
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -20,7 +20,7 @@ from mtproxymaxpy.constants import SECRETS_FILE
 class Secret(BaseModel):
     label: str
     key: str = Field(default_factory=lambda: secrets.token_hex(16))
-    created: str = Field(default_factory=lambda: date.today().isoformat())
+    created: str = Field(default_factory=lambda: datetime.now(tz=UTC).date().isoformat())
     enabled: bool = True
     max_conns: int = Field(0, ge=0)  # 0 = unlimited
     max_ips: int = Field(0, ge=0)  # 0 = unlimited
@@ -195,7 +195,7 @@ def extend_secret(label: str, days: int, path: Path = SECRETS_FILE) -> Secret:
             if s.expires:
                 base = date.fromisoformat(s.expires)
             else:
-                base = date.today()
+                base = datetime.now(tz=UTC).date()
             new_expires = (base + timedelta(days=days)).isoformat()
             items[i] = s.model_copy(update={"expires": new_expires})
             save_secrets(items, path)
@@ -208,7 +208,7 @@ def bulk_extend_secrets(days: int, path: Path = SECRETS_FILE) -> list[Secret]:
     items = load_secrets(path)
     updated = []
     for i, s in enumerate(items):
-        base = date.fromisoformat(s.expires) if s.expires else date.today()
+        base = date.fromisoformat(s.expires) if s.expires else datetime.now(tz=UTC).date()
         items[i] = s.model_copy(update={"expires": (base + timedelta(days=days)).isoformat()})
         updated.append(items[i])
     save_secrets(items, path)
@@ -250,7 +250,7 @@ def clone_secret(src_label: str, new_label: str, path: Path = SECRETS_FILE) -> S
                 update={
                     "label": new_label,
                     "key": secrets.token_hex(16),
-                    "created": date.today().isoformat(),
+                    "created": datetime.now(tz=UTC).date().isoformat(),
                 },
             )
             items.append(new_s)
@@ -264,14 +264,14 @@ def clone_secret(src_label: str, new_label: str, path: Path = SECRETS_FILE) -> S
 
 def get_expired_secrets(path: Path = SECRETS_FILE) -> list[Secret]:
     """Return all secrets whose expiry date has passed."""
-    today = date.today().isoformat()
+    today = datetime.now(tz=UTC).date().isoformat()
     return [s for s in load_secrets(path) if s.expires and s.expires < today]
 
 
 def disable_expired_secrets(path: Path = SECRETS_FILE) -> list[Secret]:
     """Disable all expired secrets. Returns the list of newly-disabled ones."""
     items = load_secrets(path)
-    today = date.today().isoformat()
+    today = datetime.now(tz=UTC).date().isoformat()
     changed: list[Secret] = []
     for i, s in enumerate(items):
         if s.enabled and s.expires and s.expires < today:
@@ -334,7 +334,7 @@ def import_secrets_csv(
         s = Secret(
             label=label,
             key=row.get("key") or secrets.token_hex(16),
-            created=row.get("created") or date.today().isoformat(),
+            created=row.get("created") or datetime.now(tz=UTC).date().isoformat(),
             enabled=(row.get("enabled", "true").lower() in ("1", "true", "yes")),
             max_conns=int(row.get("max_conns") or 0),
             max_ips=int(row.get("max_ips") or 0),

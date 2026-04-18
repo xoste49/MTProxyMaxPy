@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -71,7 +71,7 @@ def test_backup_menu_and_migration_screen(monkeypatch: pytest.MonkeyPatch, tmp_p
     import mtproxymaxpy as pkg
 
     bkp = SimpleNamespace(
-        list_backups=lambda: [{"name": "b.tar.gz", "size": 1024, "mtime": datetime(2026, 1, 1)}],
+        list_backups=lambda: [{"name": "b.tar.gz", "size": 1024, "mtime": datetime(2026, 1, 1, tzinfo=UTC)}],
         create_backup=lambda label="": tmp_path / "b.tar.gz",
         restore_backup=lambda path: {"version": "1.0"},
     )

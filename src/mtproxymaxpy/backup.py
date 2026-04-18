@@ -83,7 +83,7 @@ def list_backups() -> list[dict[str, Any]]:
                 "path": f,
                 "name": f.name,
                 "size": stat.st_size,
-                "mtime": datetime.fromtimestamp(stat.st_mtime),
+                "mtime": datetime.fromtimestamp(stat.st_mtime, tz=UTC),
             },
         )
     return sorted(backups, key=lambda x: x["mtime"], reverse=True)
