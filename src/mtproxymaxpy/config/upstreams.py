@@ -104,7 +104,7 @@ def save_upstreams(items: list[Upstream], path: Path = UPSTREAMS_FILE) -> None:
 # ── Mutation helpers ───────────────────────────────────────────────────────────
 
 
-def _set_upstream_field(name: str, field: str, value: bool | str | int | None, path: Path = UPSTREAMS_FILE) -> Upstream:
+def _set_upstream_field(name: str, field: str, *, value: bool | str | int | None, path: Path = UPSTREAMS_FILE) -> Upstream:
     items = load_upstreams(path)
     for i, u in enumerate(items):
         if u.name == name:
@@ -179,7 +179,7 @@ def remove_upstream(name: str, path: Path = UPSTREAMS_FILE) -> Upstream:
     return removed
 
 
-def set_upstream_enabled(name: str, enabled: bool, path: Path = UPSTREAMS_FILE) -> Upstream:
+def set_upstream_enabled(name: str, *, enabled: bool, path: Path = UPSTREAMS_FILE) -> Upstream:
     items = load_upstreams(path)
     idx = next((i for i, u in enumerate(items) if u.name == name), -1)
     if idx < 0:
@@ -196,11 +196,11 @@ def set_upstream_enabled(name: str, enabled: bool, path: Path = UPSTREAMS_FILE) 
 
 
 def enable_upstream(name: str, path: Path = UPSTREAMS_FILE) -> Upstream:
-    return set_upstream_enabled(name, True, path)
+    return set_upstream_enabled(name, enabled=True, path=path)
 
 
 def disable_upstream(name: str, path: Path = UPSTREAMS_FILE) -> Upstream:
-    return set_upstream_enabled(name, False, path)
+    return set_upstream_enabled(name, enabled=False, path=path)
 
 
 def toggle_upstream(name: str, path: Path = UPSTREAMS_FILE) -> Upstream:
@@ -208,7 +208,7 @@ def toggle_upstream(name: str, path: Path = UPSTREAMS_FILE) -> Upstream:
     current = next((u for u in items if u.name == name), None)
     if current is None:
         raise KeyError(f"Upstream {name!r} not found")
-    return set_upstream_enabled(name, not current.enabled, path)
+    return set_upstream_enabled(name, enabled=not current.enabled, path=path)
 
 
 def test_upstream(name: str, timeout: float = 10.0) -> dict[str, Any]:

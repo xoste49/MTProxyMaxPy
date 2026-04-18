@@ -29,6 +29,7 @@ app = typer.Typer(
 def install(
     port: Annotated[int, typer.Option("--port", "-p", help="Proxy listen port")] = 443,
     domain: Annotated[str, typer.Option(help="FakeTLS domain")] = "cloudflare.com",
+    *,
     systemd: Annotated[bool, typer.Option(help="Install systemd service")] = True,
 ) -> None:
     """Download telemt binary and set up the proxy."""
@@ -78,6 +79,7 @@ def install(
 
 @app.command()
 def uninstall(
+    *,
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
 ) -> None:
     """Stop and remove MTProxyMaxPy (stops proxy, removes systemd units, removes files)."""
@@ -118,6 +120,7 @@ def uninstall(
 
 @app.command()
 def start(
+    *,
     no_tui: Annotated[bool, typer.Option("--no-tui", hidden=True)] = False,
 ) -> None:
     """Start the proxy."""
@@ -131,6 +134,7 @@ def start(
 
 @app.command()
 def stop(
+    *,
     no_tui: Annotated[bool, typer.Option("--no-tui", hidden=True)] = False,
 ) -> None:
     """Stop the proxy."""
@@ -142,6 +146,7 @@ def stop(
 
 @app.command()
 def restart(
+    *,
     no_tui: Annotated[bool, typer.Option("--no-tui", hidden=True)] = False,
 ) -> None:
     """Restart the proxy."""
@@ -167,6 +172,7 @@ def reload() -> None:
 
 @app.command()
 def status(
+    *,
     output_json: Annotated[bool, typer.Option("--json", help="Output machine-readable JSON")] = False,
 ) -> None:
     """Show proxy status."""
@@ -276,6 +282,7 @@ def health() -> None:
 @app.command()
 def logs(
     lines: Annotated[int, typer.Option("-n", help="Number of lines to show")] = 50,
+    *,
     follow: Annotated[bool, typer.Option("-f", "--follow", help="Follow log output")] = False,
 ) -> None:
     """Show or follow the proxy log file."""
@@ -507,6 +514,7 @@ def secret_add(
     quota: Annotated[str, typer.Option(help="Traffic quota e.g. 5G (0=unlimited)")] = "0",
     expires: Annotated[str, typer.Option(help="Expiry date YYYY-MM-DD")] = "",
     notes: Annotated[str, typer.Option()] = "",
+    *,
     no_restart: Annotated[bool, typer.Option("--no-restart", help="Don't restart proxy after adding")] = False,
 ) -> None:
     """Add a new user secret."""
@@ -563,6 +571,7 @@ def secret_list() -> None:
 @secrets_app.command("remove")
 def secret_remove(
     label: Annotated[str, typer.Argument()],
+    *,
     no_restart: Annotated[bool, typer.Option("--no-restart")] = False,
 ) -> None:
     """Remove a user secret by label."""
@@ -580,6 +589,7 @@ def secret_remove(
 @secrets_app.command("rotate")
 def secret_rotate(
     label: Annotated[str, typer.Argument()],
+    *,
     no_restart: Annotated[bool, typer.Option("--no-restart")] = False,
 ) -> None:
     """Generate a new key for an existing secret."""
@@ -847,6 +857,7 @@ def secret_export() -> None:
 @secrets_app.command("import")
 def secret_import(
     file: Annotated[typer.FileText, typer.Argument(help="CSV file path or - for stdin")] = sys.stdin,  # type: ignore[assignment]
+    *,
     overwrite: Annotated[bool, typer.Option(help="Overwrite existing entries")] = False,
 ) -> None:
     """Import secrets from a CSV file (as produced by 'secret export')."""
@@ -975,6 +986,7 @@ def backup_list() -> None:
 @backup_app.command("restore")
 def backup_restore(
     archive: Annotated[str, typer.Argument(help="Backup filename or full path")],
+    *,
     yes: Annotated[bool, typer.Option("--yes", "-y")] = False,
 ) -> None:
     """Restore from a backup archive."""
@@ -1031,6 +1043,7 @@ def geoblock_list() -> None:
 
 @geo_app.command("clear")
 def geoblock_clear(
+    *,
     yes: Annotated[bool, typer.Option("--yes", "-y")] = False,
 ) -> None:
     """Remove all geo-block rules."""
@@ -1115,6 +1128,7 @@ def telegram_enable() -> None:
 
 @app.command("telegram-bot")
 def run_telegram_bot(
+    *,
     no_tui: Annotated[bool, typer.Option("--no-tui", hidden=True)] = False,
 ) -> None:
     """Run the Telegram bot (blocking — intended for use by systemd)."""

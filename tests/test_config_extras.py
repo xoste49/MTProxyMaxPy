@@ -163,10 +163,10 @@ def test_upstreams_add_remove_enable_disable_test(tmp_path: Path, monkeypatch: p
         upstreams.add_upstream("u1", type_="direct", path=path)
 
     # field setter path
-    changed = upstreams._set_upstream_field("u1", "weight", 7, path)
+    changed = upstreams._set_upstream_field("u1", "weight", value=7, path=path)
     assert changed.weight == 7
     with pytest.raises(KeyError):
-        upstreams._set_upstream_field("missing", "weight", 1, path)
+        upstreams._set_upstream_field("missing", "weight", value=1, path=path)
 
     # remove/disable guards
     upstreams.disable_upstream("u1", path)
@@ -177,7 +177,7 @@ def test_upstreams_add_remove_enable_disable_test(tmp_path: Path, monkeypatch: p
     with pytest.raises(ValueError):
         upstreams.disable_upstream("u1", path)
     with pytest.raises(KeyError):
-        upstreams.set_upstream_enabled("missing", True, path)
+        upstreams.set_upstream_enabled("missing", enabled=True, path=path)
     with pytest.raises(KeyError):
         upstreams.toggle_upstream("missing", path)
 

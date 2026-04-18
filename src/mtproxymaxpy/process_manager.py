@@ -297,7 +297,7 @@ def is_binary_present() -> bool:
     return BINARY_PATH.exists() and os.access(BINARY_PATH, os.X_OK)
 
 
-def download_binary(version: str = TELEMT_VERSION, force: bool = False) -> None:
+def download_binary(version: str = TELEMT_VERSION, *, force: bool = False) -> None:
     """Download and extract the telemt binary. Skips if already present and *force* is False."""
     if is_binary_present() and not force:
         logger.info("telemt binary already present at %s", BINARY_PATH)

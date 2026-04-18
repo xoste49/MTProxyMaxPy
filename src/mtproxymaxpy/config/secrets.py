@@ -132,15 +132,15 @@ def rotate_secret(label: str, path: Path = SECRETS_FILE) -> Secret:
 
 def enable_secret(label: str, path: Path = SECRETS_FILE) -> Secret:
     """Enable a secret by label."""
-    return _set_field(label, "enabled", True, path)
+    return _set_field(label, "enabled", value=True, path=path)
 
 
 def disable_secret(label: str, path: Path = SECRETS_FILE) -> Secret:
     """Disable a secret by label."""
-    return _set_field(label, "enabled", False, path)
+    return _set_field(label, "enabled", value=False, path=path)
 
 
-def _set_field(label: str, field: str, value: bool | str, path: Path = SECRETS_FILE) -> Secret:
+def _set_field(label: str, field: str, *, value: bool | str, path: Path = SECRETS_FILE) -> Secret:
     items = load_secrets(path)
     for i, s in enumerate(items):
         if s.label == label:
@@ -220,7 +220,7 @@ def bulk_extend_secrets(days: int, path: Path = SECRETS_FILE) -> list[Secret]:
 
 def set_secret_note(label: str, text: str, path: Path = SECRETS_FILE) -> Secret:
     """Set or clear the notes field for a secret."""
-    return _set_field(label, "notes", text, path)
+    return _set_field(label, "notes", value=text, path=path)
 
 
 # ── Rename / clone ─────────────────────────────────────────────────────────────
@@ -311,6 +311,7 @@ def export_secrets_csv(path: Path = SECRETS_FILE) -> str:
 def import_secrets_csv(
     text: str,
     path: Path = SECRETS_FILE,
+    *,
     overwrite: bool = False,
 ) -> list[Secret]:
     """Parse a CSV string and merge secrets into the store.

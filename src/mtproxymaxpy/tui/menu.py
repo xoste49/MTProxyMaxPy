@@ -175,7 +175,7 @@ def _choice(n: int, label: str, hint: str = "") -> str:
     return f"  [bold cyan]{n}[/bold cyan]  {label}{hint_part}"
 
 
-def _ask_choice(max_n: int, allow_zero: bool = True) -> int:
+def _ask_choice(max_n: int, *, allow_zero: bool = True) -> int:
     """Prompt for a menu choice. Returns the integer selected."""
     zero_hint = "/0=back" if allow_zero else ""
     while True:
@@ -932,7 +932,7 @@ def _settings_menu() -> None:
         tbl.add_column("Setting", style="dim", width=34)
         tbl.add_column("Value")
 
-        def _yes_no(value: bool) -> str:
+        def _yes_no(*, value: bool) -> str:
             return "yes" if value else "no"
 
         menu_fields = [
@@ -945,7 +945,7 @@ def _settings_menu() -> None:
                 6,
                 "masking_enabled",
                 "Masking enabled",
-                _yes_no(settings.masking_enabled),
+                _yes_no(value=settings.masking_enabled),
                 lambda v: v.lower() in ("true", "1", "yes", "on"),
             ),
             (7, "masking_host", "Masking host", settings.masking_host or "(none)", str),
@@ -954,7 +954,7 @@ def _settings_menu() -> None:
                 9,
                 "proxy_protocol",
                 "Proxy protocol enabled",
-                _yes_no(settings.proxy_protocol),
+                _yes_no(value=settings.proxy_protocol),
                 lambda v: v.lower() in ("true", "1", "yes", "on"),
             ),
             (
@@ -970,7 +970,7 @@ def _settings_menu() -> None:
                 13,
                 "auto_update_enabled",
                 "Auto update enabled",
-                _yes_no(settings.auto_update_enabled),
+                _yes_no(value=settings.auto_update_enabled),
                 lambda v: v.lower() in ("true", "1", "yes", "on"),
             ),
             (14, "geoblock_mode", "Geoblock mode", settings.geoblock_mode, str),
@@ -978,7 +978,7 @@ def _settings_menu() -> None:
                 15,
                 "telegram_enabled",
                 "Telegram reports enabled",
-                _yes_no(settings.telegram_enabled),
+                _yes_no(value=settings.telegram_enabled),
                 lambda v: v.lower() in ("true", "1", "yes", "on"),
             ),
             (

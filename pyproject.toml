@@ -125,10 +125,11 @@ select = [
     "ASYNC", # flake8-async (ASYNC) https://docs.astral.sh/ruff/rules/#flake8-async-async
     "S", # flake8-bandit (S) https://docs.astral.sh/ruff/rules/#flake8-bandit-s
     "BLE", # flake8-blind-except (BLE) https://docs.astral.sh/ruff/rules/#flake8-blind-except-ble
+    "FBT", # flake8-boolean-trap (FBT) https://docs.astral.sh/ruff/rules/#flake8-boolean-trap-fbt
 ]
 ignore = ["E741", "S103", "S603", "S607"]
 fixable = ["ALL"]
-per-file-ignores = {"tests/**" = ["ANN", "S101", "S608", "S105", "S106"]}
+per-file-ignores = {"tests/**" = ["ANN", "FBT", "S101", "S608", "S105", "S106"]}
 
 [tool.ruff.format]
 quote-style = "double"
