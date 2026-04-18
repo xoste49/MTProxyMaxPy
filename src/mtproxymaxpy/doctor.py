@@ -32,7 +32,7 @@ def check_binary() -> dict[str, Any]:
                 timeout=5,
             )
             version = (res.stdout + res.stderr).strip().split()[-1]
-        except Exception:
+        except (OSError, subprocess.SubprocessError):
             logger.debug("Failed to get telemt version", exc_info=True)
     return {"ok": present, "version": version, "path": str(BINARY_PATH)}
 
@@ -57,7 +57,7 @@ def check_port_listening(port: int) -> dict[str, Any]:
             )
             listening = f":{port}" in res.stdout or f" {port} " in res.stdout
             return {"ok": listening, "tool": "ss"}
-        except Exception:
+        except (OSError, subprocess.SubprocessError):
             logger.debug("ss port check failed", exc_info=True)
     # Fallback use netstat
     if shutil.which("netstat"):
@@ -70,7 +70,7 @@ def check_port_listening(port: int) -> dict[str, Any]:
             )
             listening = f":{port}" in res.stdout
             return {"ok": listening, "tool": "netstat"}
-        except Exception:
+        except (OSError, subprocess.SubprocessError):
             logger.debug("netstat port check failed", exc_info=True)
     # Last resort: try connecting
     try:
@@ -98,7 +98,7 @@ def check_tls_handshake(host: str, port: int, domain: str = "") -> dict[str, Any
         return {"ok": ok, "output": (proc.stdout + proc.stderr)[:200].decode(errors="replace")}
     except subprocess.TimeoutExpired:
         return {"ok": False, "note": "timeout"}
-    except Exception as exc:
+    except (OSError, subprocess.SubprocessError) as exc:
         return {"ok": False, "note": str(exc)}
 
 

@@ -20,6 +20,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from pydantic import ValidationError
+
 from mtproxymaxpy.config.instances import Instance
 from mtproxymaxpy.config.secrets import Secret
 from mtproxymaxpy.config.settings import Settings
@@ -117,7 +119,7 @@ def _parse_settings_conf(path: Path) -> dict[str, Any]:
                 result[py_key] = int(raw_value)
             else:
                 result[py_key] = raw_value
-        except Exception:
+        except (ValueError, TypeError):
             result[py_key] = raw_value  # store as string, let Pydantic validate later
 
     return result
@@ -127,7 +129,7 @@ def _ts_to_date(ts: str) -> str:
     """Convert a Unix timestamp string to YYYY-MM-DD, or return '' on failure."""
     try:
         return datetime.fromtimestamp(int(ts)).date().isoformat()
-    except Exception:
+    except (ValueError, OverflowError, OSError):
         return ""
 
 
@@ -158,7 +160,7 @@ def _parse_secrets_conf(path: Path) -> list[Secret]:
                     notes=notes.strip(),
                 )
             )
-        except Exception:
+        except (ValueError, ValidationError):
             _log.debug("Skipping malformed secret line: %s", line)
             continue
     return items
@@ -189,7 +191,7 @@ def _parse_upstreams_conf(path: Path) -> list[Upstream]:
                     enabled=_parse_bool(enabled.strip()) if enabled.strip() else True,
                 )
             )
-        except Exception:
+        except (ValueError, ValidationError):
             _log.debug("Skipping malformed upstream line: %s", line)
             continue
     return items
@@ -216,7 +218,7 @@ def _parse_instances_conf(path: Path) -> list[Instance]:
                     notes=notes.strip(),
                 )
             )
-        except Exception:
+        except (ValueError, ValidationError):
             _log.debug("Skipping malformed instance line: %s", line)
             continue
     return items
@@ -287,7 +289,7 @@ def run_migration(
             settings = Settings.model_validate(raw)
             save_settings(settings, settings_out)
             result.settings_imported = True
-        except Exception as exc:
+        except (ValueError, OSError, RuntimeError, ValidationError) as exc:
             result.errors.append(f"settings: {exc}")
 
     if "secrets" in files:
@@ -295,7 +297,7 @@ def run_migration(
             items = _parse_secrets_conf(files["secrets"])
             save_secrets(items, secrets_out)
             result.secrets_count = len(items)
-        except Exception as exc:
+        except (ValueError, OSError, RuntimeError, ValidationError) as exc:
             result.errors.append(f"secrets: {exc}")
 
     if "upstreams" in files:
@@ -303,7 +305,7 @@ def run_migration(
             upstream_items = _parse_upstreams_conf(files["upstreams"])
             save_upstreams(upstream_items, upstreams_out)
             result.upstreams_count = len(upstream_items)
-        except Exception as exc:
+        except (ValueError, OSError, RuntimeError, ValidationError) as exc:
             result.errors.append(f"upstreams: {exc}")
 
     if "instances" in files:
@@ -311,7 +313,7 @@ def run_migration(
             instance_items = _parse_instances_conf(files["instances"])
             save_instances(instance_items, instances_out)
             result.instances_count = len(instance_items)
-        except Exception as exc:
+        except (ValueError, OSError, RuntimeError, ValidationError) as exc:
             result.errors.append(f"instances: {exc}")
 
     return result

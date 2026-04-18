@@ -10,7 +10,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from mtproxymaxpy.constants import UPSTREAMS_FILE
 
@@ -67,14 +67,14 @@ def load_upstreams(path: Path = UPSTREAMS_FILE) -> list[Upstream]:
     try:
         with open(path) as fh:
             data = json.load(fh)
-    except Exception:
+    except (OSError, json.JSONDecodeError):
         return [_default_direct_upstream()]
 
     items: list[Upstream] = []
     for item in data:
         try:
             u = Upstream.model_validate(item)
-        except Exception:
+        except ValidationError:
             _log.debug("Skipping invalid upstream entry: %s", item)
             continue
         if u.type != "direct" and not u.addr.strip():
@@ -237,12 +237,12 @@ def test_upstream(name: str, timeout: float = 10.0) -> dict[str, Any]:
     cmd += ["-o", "/dev/null", "-w", "%{http_code}", "https://api.ipify.org"]
 
     t0 = time.monotonic()
-    try:
-        import subprocess
+    import subprocess
 
+    try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout + 2)
         latency_ms = (time.monotonic() - t0) * 1000
         ok = result.returncode == 0
         return {"ok": ok, "error": result.stderr.strip() or None, "latency_ms": round(latency_ms, 1)}
-    except Exception as exc:
+    except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
         return {"ok": False, "error": str(exc), "latency_ms": None}

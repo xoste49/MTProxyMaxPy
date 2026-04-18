@@ -37,7 +37,7 @@ def get_public_ip(timeout: float = 5.0) -> str | None:
             if text:
                 _ip_cache = (text, now)
                 return text
-        except Exception:
+        except (httpx.HTTPError, OSError, ValueError, RuntimeError):
             _log.debug("IP lookup failed for endpoint", exc_info=True)
             continue
     return None

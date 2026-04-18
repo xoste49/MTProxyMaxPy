@@ -124,6 +124,7 @@ select = [
     "ANN", # flake8-annotations (ANN) https://docs.astral.sh/ruff/rules/#flake8-annotations-ann
     "ASYNC", # flake8-async (ASYNC) https://docs.astral.sh/ruff/rules/#flake8-async-async
     "S", # flake8-bandit (S) https://docs.astral.sh/ruff/rules/#flake8-bandit-s
+    "BLE", # flake8-blind-except (BLE) https://docs.astral.sh/ruff/rules/#flake8-blind-except-ble
 ]
 ignore = ["E741", "S103", "S603", "S607"]
 fixable = ["ALL"]

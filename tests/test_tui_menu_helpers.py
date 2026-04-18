@@ -40,14 +40,24 @@ def test_header_panel_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
 
     pm = SimpleNamespace(status=lambda: {"running": True, "pid": 123, "uptime_sec": 60})
     sd = SimpleNamespace(is_active=lambda name: True)
+    _mock_metrics = SimpleNamespace(
+        get_stats=lambda **_kw: {"available": True, "bytes_in": 0, "bytes_out": 0, "active_connections": 0, "total_connections": 0}
+    )
+    _mock_secrets = SimpleNamespace(load_secrets=lambda: [])
+    _mock_formatting = SimpleNamespace(format_bytes=lambda n: f"{n}B", format_duration=lambda s: "0s")
+
     monkeypatch.setattr(pkg, "process_manager", pm, raising=False)
     monkeypatch.setattr(pkg, "systemd", sd, raising=False)
+    monkeypatch.setattr(pkg, "metrics", _mock_metrics, raising=False)
     monkeypatch.setitem(sys.modules, "mtproxymaxpy.process_manager", pm)
     monkeypatch.setitem(sys.modules, "mtproxymaxpy.systemd", sd)
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.metrics", _mock_metrics)
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.secrets", _mock_secrets)
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.utils.formatting", _mock_formatting)
     monkeypatch.setitem(
         sys.modules,
         "mtproxymaxpy.config.settings",
-        SimpleNamespace(load_settings=lambda: SimpleNamespace(proxy_port=443, telegram_enabled=True)),
+        SimpleNamespace(load_settings=lambda: SimpleNamespace(proxy_port=443, telegram_enabled=True, proxy_metrics_port=9090, proxy_domain="cf.com")),
     )
 
     badge = tmp_path / "badge"
@@ -89,11 +99,16 @@ def test_check_update_bg(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Non
             INSTALL_DIR=tmp_path,
         ),
     )
+    monkeypatch.setitem(
+        sys.modules,
+        "mtproxymaxpy.config.settings",
+        SimpleNamespace(load_settings=lambda: SimpleNamespace(manager_update_branch="main")),
+    )
 
     class _Resp:
         text = "a" * 40
 
-    monkeypatch.setitem(sys.modules, "httpx", SimpleNamespace(get=lambda *a, **k: _Resp()))
+    monkeypatch.setattr(menu, "httpx", SimpleNamespace(get=lambda *a, **k: _Resp(), HTTPError=Exception))
 
     class _Thread:
         def __init__(self, target=None, daemon=True):
@@ -109,11 +124,7 @@ def test_check_update_bg(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Non
     monkeypatch.setattr(menu, "threading", SimpleNamespace(Thread=_Thread), raising=False)
 
     # No local git SHA and no stored SHA: should initialize stored SHA, no badge.
-    monkeypatch.setitem(
-        sys.modules,
-        "subprocess",
-        SimpleNamespace(run=lambda *a, **k: SimpleNamespace(returncode=1, stdout="", stderr="")),
-    )
+    monkeypatch.setattr("subprocess.run", lambda *a, **k: SimpleNamespace(returncode=1, stdout="", stderr=""))
     menu._check_update_bg(wait_timeout=0.1)
     assert sha_file.exists()
 

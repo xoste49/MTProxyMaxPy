@@ -8,10 +8,12 @@ from __future__ import annotations
 
 import logging
 import os
+import subprocess
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import httpx
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Confirm, IntPrompt, Prompt
@@ -58,7 +60,7 @@ def _read_last_lines(path: Path, limit: int, max_bytes: int = 262_144) -> list[s
             # First line may be cut if we started in the middle of the file.
             lines = lines[1:]
         return lines[-limit:]
-    except Exception:
+    except (OSError, ValueError):
         return []
 
 
@@ -88,7 +90,7 @@ def _header_panel() -> Panel:
         if callable(get_ver):
             try:
                 ver = str(get_ver())
-            except Exception:
+            except (OSError, subprocess.SubprocessError):
                 ver = "?"
         status_line.append(f"  Engine: telemt v{ver}", style="cyan")
         lines.append(status_line)
@@ -140,9 +142,9 @@ def _header_panel() -> Panel:
                         tg_line = Text("● TG RUNNING", style="bold green")
                     else:
                         tg_line = Text("○ TG STOPPED", style="bold red")
-                except Exception:
+                except (OSError, RuntimeError, subprocess.SubprocessError):
                     tg_line = Text("○ TG UNKNOWN", style="dim")
-    except Exception:
+    except (OSError, ValueError, RuntimeError):
         lines = [Text("○ UNKNOWN", style="dim")]
 
     combined = Text()
@@ -161,7 +163,7 @@ def _header_panel() -> Panel:
         if UPDATE_BADGE_FILE.exists():
             combined.append("\n")
             combined.append("⬆ Update available - select [10]", style="bold yellow")
-    except Exception:
+    except (OSError, ValueError):
         logger.debug("Failed to read update badge", exc_info=True)
 
     title = f"[bold cyan]{APP_TITLE} v{VERSION}[/bold cyan]  [dim]Telegram MTProto Proxy Manager[/dim]"
@@ -199,7 +201,7 @@ def _manager_update_branch() -> str:
         branch = str(getattr(settings, "manager_update_branch", "main") or "main").strip()
         if branch and not any(ch.isspace() for ch in branch):
             return branch
-    except Exception:
+    except (OSError, ValueError):
         logger.debug("Failed to read update branch from settings", exc_info=True)
     return "main"
 
@@ -229,8 +231,6 @@ def _check_update_bg(wait_timeout: float = 3.0) -> None:
 
     def _read_local_manager_sha() -> str:
         try:
-            import subprocess
-
             from mtproxymaxpy.constants import INSTALL_DIR, UPDATE_SHA_FILE
 
             res = subprocess.run(
@@ -243,13 +243,11 @@ def _check_update_bg(wait_timeout: float = 3.0) -> None:
             if res.returncode == 0 and len(sha) == 40 and all(c in "0123456789abcdef" for c in sha):
                 return sha
             return UPDATE_SHA_FILE.read_text().strip().lower() if UPDATE_SHA_FILE.exists() else ""
-        except Exception:
+        except (OSError, subprocess.SubprocessError):
             return ""
 
     def _worker() -> None:
         try:
-            import httpx
-
             from mtproxymaxpy.constants import UPDATE_BADGE_FILE, UPDATE_SHA_FILE
 
             branch = _manager_update_branch()
@@ -282,7 +280,7 @@ def _check_update_bg(wait_timeout: float = 3.0) -> None:
                 UPDATE_BADGE_FILE.write_text("new")
             else:
                 UPDATE_BADGE_FILE.unlink(missing_ok=True)
-        except Exception:
+        except (OSError, httpx.HTTPError, ValueError):
             logger.debug("Background update check failed", exc_info=True)
 
     thread = threading.Thread(target=_worker, daemon=True)
@@ -312,7 +310,7 @@ def run_tui() -> None:
             if legacy:
                 _migration_screen(legacy)
                 migrated = True
-        except Exception:
+        except (OSError, ImportError, ValueError):
             logger.debug("Legacy config migration failed", exc_info=True)
         # Fresh install — run setup wizard
         if not migrated:
@@ -335,7 +333,7 @@ def run_tui() -> None:
             settings = load_settings()
             tg_hint = "enabled" if settings.telegram_enabled else "disabled"
             cfg_hint = f"port {settings.proxy_port} · {settings.proxy_domain}"
-        except Exception:
+        except (OSError, ValueError, RuntimeError):
             n_secrets = n_upstreams = n_geo = 0
             tg_hint = cfg_hint = ""
 
@@ -343,7 +341,7 @@ def run_tui() -> None:
             from mtproxymaxpy.constants import UPDATE_BADGE_FILE
 
             update_hint = "[yellow]⬆ available![/yellow]" if UPDATE_BADGE_FILE.exists() else ""
-        except Exception:
+        except (OSError, ValueError):
             update_hint = ""
 
         console.print(
@@ -395,7 +393,7 @@ def _logs_screen() -> None:
                 console.print(f"  {line}")
         else:
             console.print("  [dim]Log file not found.[/dim]")
-    except Exception as exc:
+    except (OSError, ValueError) as exc:
         console.print(f"[red]Error: {exc}[/red]")
     _pause()
 
@@ -427,7 +425,7 @@ def _health_screen() -> None:
             details = "  ".join(f"{k}={v}" for k, v in extra.items()) if extra else ""
             tbl.add_row(r["name"], status, details)
         console.print(tbl)
-    except Exception as exc:
+    except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
         console.print(f"[red]Error: {exc}[/red]")
     _pause()
 
@@ -446,7 +444,7 @@ def _proxy_menu() -> None:
             from mtproxymaxpy import process_manager as _pm
 
             running = _pm.is_running()
-        except Exception:
+        except (OSError, RuntimeError):
             logger.debug("Failed to check proxy running state", exc_info=True)
 
         if running:
@@ -486,7 +484,7 @@ def _proxy_menu() -> None:
                     console.print(f"[green][+] Proxy started (PID {pid})[/green]")
                 else:
                     console.print("[yellow][!] Proxy is not running.[/yellow]")
-            except Exception as exc:
+            except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
                 console.print(f"[red][!] {exc}[/red]")
             _pause()
 
@@ -558,7 +556,7 @@ def _status_screen() -> None:
             console.print(f"  [dim]tg://[/dim]   {tg_link}")
             console.print(f"  [dim]https[/dim]   {web_link}")
 
-    except Exception as exc:
+    except (OSError, ValueError, KeyError, RuntimeError) as exc:
         console.print(f"[red]Error: {exc}[/red]")
 
     _pause()
@@ -575,7 +573,7 @@ def _secrets_menu() -> None:
             from mtproxymaxpy.config.secrets import load_secrets
 
             secs = load_secrets()
-        except Exception:
+        except (OSError, ValueError, RuntimeError):
             secs = []
 
         tbl = Table(show_header=True, box=None, padding=(0, 1))
@@ -617,7 +615,7 @@ def _secrets_menu() -> None:
             _secrets_action(ch, secs)
         except (KeyboardInterrupt, EOFError):
             return
-        except Exception as exc:
+        except (ValueError, KeyError, OSError, RuntimeError) as exc:
             console.print(f"[red]Error:[/red] {exc}")
             _pause()
 
@@ -765,7 +763,7 @@ def _links_menu() -> None:
             from mtproxymaxpy.config.secrets import load_secrets
 
             secs = load_secrets()
-        except Exception:
+        except (OSError, ValueError):
             secs = []
 
         enabled = [s for s in secs if s.enabled]
@@ -814,7 +812,7 @@ def _links_menu() -> None:
                 qr = render_qr_terminal(web_link)
                 if qr:
                     console.print(qr)
-        except Exception as exc:
+        except (OSError, ValueError, RuntimeError) as exc:
             console.print(f"[red]Error:[/red] {exc}")
         _pause()
 
@@ -857,7 +855,7 @@ def _upstreams_menu() -> None:
             return
         try:
             _upstreams_action(ch, ups)
-        except Exception as exc:
+        except (ValueError, KeyError, OSError, RuntimeError) as exc:
             console.print(f"[red]Error:[/red] {exc}")
             _pause()
 
@@ -1034,7 +1032,7 @@ def _settings_menu() -> None:
                 updated = settings.model_copy(update={field: new_val})
                 save_settings(updated)
                 console.print(f"[green][+] Saved {field} = {new_val}[/green]")
-            except Exception as exc:
+            except (ValueError, OSError) as exc:
                 console.print(f"[red][!] {exc}[/red]")
             _pause()
 
@@ -1081,7 +1079,7 @@ def _metrics_screen() -> None:
                         str(int(us.get("active", 0))),
                     )
                 console.print(utbl)
-    except Exception as exc:
+    except (OSError, ValueError, KeyError, RuntimeError) as exc:
         console.print(f"[red]Error: {exc}[/red]")
     _pause()
 
@@ -1145,7 +1143,7 @@ def _connection_log_screen() -> None:
                 console.print(f"  {line}")
         else:
             console.print("  [dim]Connection log is empty.[/dim]")
-    except Exception as exc:
+    except (OSError, ValueError) as exc:
         console.print(f"[red]Error: {exc}[/red]")
     _pause()
 
@@ -1176,7 +1174,7 @@ def _active_connections_screen() -> None:
             for key, active in active_rows:
                 tbl.add_row(key[:12] + "…", str(active))
             console.print(tbl)
-    except Exception as exc:
+    except (OSError, ValueError, KeyError) as exc:
         console.print(f"[red]Error: {exc}[/red]")
     _pause()
 
@@ -1276,7 +1274,7 @@ def _logs_traffic_screen() -> None:
             _metrics_live_screen()
         elif choice == 5:
             _active_connections_screen()
-    except Exception as exc:
+    except (OSError, ValueError, KeyError, RuntimeError) as exc:
         console.print(f"[red]Error: {exc}[/red]")
         _pause()
 
@@ -1331,7 +1329,7 @@ def _geoblock_menu() -> None:
                     geoblock.clear_all()
                     console.print("[green][+] All rules cleared[/green]")
                     _pause()
-        except Exception as exc:
+        except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
             console.print(f"[red]Error:[/red] {exc}")
             _pause()
 
@@ -1384,7 +1382,7 @@ def _backup_menu() -> None:
                     meta = backup.restore_backup(path)
                     console.print(f"[green][+] Restored. Original version: {meta.get('version', '?')}[/green]")
                     _pause()
-        except Exception as exc:
+        except (OSError, ValueError, RuntimeError) as exc:
             console.print(f"[red]Error:[/red] {exc}")
             _pause()
 
@@ -1409,7 +1407,7 @@ def _telegram_menu() -> None:
                 from mtproxymaxpy import systemd as _systemd
 
                 service_status = "[green]running[/green]" if _systemd.is_active(SYSTEMD_TELEGRAM_SERVICE) else "[red]stopped[/red]"
-            except Exception:
+            except (OSError, RuntimeError, subprocess.SubprocessError):
                 service_status = "[dim]unknown[/dim]"
 
         console.print(Rule("[cyan]Telegram Bot[/cyan]"))
@@ -1467,7 +1465,7 @@ def _telegram_menu() -> None:
                     elif service_unit.exists():
                         _systemd.stop_service(SYSTEMD_TELEGRAM_SERVICE)
                         console.print("[yellow][*] Telegram service stopped[/yellow]")
-                except Exception as exc:
+                except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
                     console.print(f"[yellow][!] Could not change service state: {exc}[/yellow]")
                 _pause()
             elif ch == 4:
@@ -1489,7 +1487,7 @@ def _telegram_menu() -> None:
                 _pause()
             elif ch == 7:
                 _stream_telegram_logs_screen()
-        except Exception as exc:
+        except (OSError, ValueError, RuntimeError) as exc:
             console.print(f"[red]Error:[/red] {exc}")
             _pause()
 
@@ -1543,7 +1541,7 @@ def _telegram_test() -> None:
 
         asyncio.run(_send_test())
         console.print("[green][+] Test message sent[/green]")
-    except Exception as exc:
+    except (OSError, RuntimeError) as exc:
         console.print(f"[red][!] Failed: {exc}[/red]")
     _pause()
 
@@ -1560,10 +1558,6 @@ def _update_screen() -> None:  # noqa: C901
     console.print("\n  [bold]1. MTProxyMaxPy manager[/bold]")
     self_updated = False
     try:
-        import subprocess
-
-        import httpx
-
         from mtproxymaxpy.constants import (
             INSTALL_DIR,
             UPDATE_BADGE_FILE,
@@ -1584,7 +1578,7 @@ def _update_screen() -> None:  # noqa: C901
             candidate = (r_local.stdout or "").strip().lower()
             if r_local.returncode == 0 and len(candidate) == 40 and all(c in "0123456789abcdef" for c in candidate):
                 local_sha = candidate
-        except Exception:
+        except (OSError, subprocess.SubprocessError):
             logger.debug("Failed to get local git SHA", exc_info=True)
 
         if not local_sha:
@@ -1717,14 +1711,14 @@ def _update_screen() -> None:  # noqa: C901
                                 if _svc.is_active(SYSTEMD_TELEGRAM_SERVICE):
                                     _svc.restart_service(SYSTEMD_TELEGRAM_SERVICE)
                                     console.print("[green][+] Telegram bot service restarted.[/green]")
-                            except Exception as exc:
+                            except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
                                 console.print(f"[yellow][!] Telegram bot service restart skipped: {exc}[/yellow]")
 
                             console.print("[bold yellow]  App will now close. Start 'mtproxymaxpy' again.[/bold yellow]")
                             self_updated = True
                         else:
                             console.print(f"[red][!] uv sync failed:\n{r2.stderr.strip()}[/red]")
-    except Exception as exc:
+    except (OSError, httpx.HTTPError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
         console.print(f"  [red]Error checking manager update: {exc}[/red]")
 
     # ── 2. Engine update (telemt binary) ─────────────────────────────────
@@ -1755,7 +1749,7 @@ def _update_screen() -> None:  # noqa: C901
                     ip = get_public_ip() or ""
                     pid = process_manager.start(public_ip=ip)
                     console.print(f"[green][+] Proxy restarted (PID {pid})[/green]")
-    except Exception as exc:
+    except (OSError, httpx.HTTPError, RuntimeError, subprocess.SubprocessError) as exc:
         console.print(f"  [red]Error checking engine update: {exc}[/red]")
 
     if self_updated:
@@ -1804,7 +1798,7 @@ def _setup_wizard() -> None:  # noqa: C901
 
         with console.status("  Detecting public IP…"):
             detected_ip = get_public_ip() or ""
-    except Exception:
+    except (OSError, httpx.HTTPError, ValueError):
         logger.debug("Failed to detect public IP", exc_info=True)
     if detected_ip:
         console.print(f"  Detected: [green]{detected_ip}[/green]")
@@ -1876,7 +1870,7 @@ def _setup_wizard() -> None:  # noqa: C901
         secret = add_secret(secret_label)
         console.print("  [green][+] Settings saved[/green]")
         console.print(f"  [green][+] Secret '{secret.label}' created: {secret.key}[/green]")
-    except Exception as exc:
+    except (OSError, ValueError, RuntimeError) as exc:
         console.print(f"  [red][!] Failed to save config: {exc}[/red]")
         _pause()
         return
@@ -1892,7 +1886,7 @@ def _setup_wizard() -> None:  # noqa: C901
             with console.status("  Downloading…"):
                 process_manager.download_binary()
             console.print("  [green][+] Binary downloaded[/green]")
-        except Exception as exc:
+        except (OSError, httpx.HTTPError, RuntimeError) as exc:
             console.print(f"  [red][!] Download failed: {exc}[/red]")
             console.print("  [dim]Run 'mtproxymaxpy install' to retry.[/dim]")
             _pause()
@@ -1906,7 +1900,7 @@ def _setup_wizard() -> None:  # noqa: C901
         srv_ip = custom_ip or detected_ip or ""
         pid = process_manager.start(public_ip=srv_ip)
         console.print(f"  [green][+] Proxy started (PID {pid})[/green]")
-    except Exception as exc:
+    except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
         console.print(f"  [red][!] Start failed: {exc}[/red]")
 
     # ── Install systemd ────────────────────────────────────────────────────────
@@ -1915,7 +1909,7 @@ def _setup_wizard() -> None:  # noqa: C901
 
         systemd.install()
         console.print("  [green][+] systemd service installed[/green]")
-    except Exception:
+    except (OSError, RuntimeError, subprocess.SubprocessError):
         logger.debug("systemd install failed", exc_info=True)
 
     # ── Show proxy links ───────────────────────────────────────────────────────
@@ -1933,7 +1927,7 @@ def _setup_wizard() -> None:  # noqa: C901
                 padding=(1, 4),
             )
         )
-    except Exception:
+    except (OSError, ValueError, RuntimeError):
         console.print("  [green][+] Installation complete![/green]")
 
     # ── Telegram bot setup (optional) ─────────────────────────────────────────
@@ -1966,6 +1960,6 @@ def _migration_screen(legacy: dict[str, Any]) -> None:
 
             result = run_migration(legacy)
             console.print(f"[green][+] Migration complete: {result}[/green]")
-        except Exception as exc:
+        except (OSError, ValueError, RuntimeError) as exc:
             console.print(f"[red][!] Migration failed: {exc}[/red]")
         _pause()

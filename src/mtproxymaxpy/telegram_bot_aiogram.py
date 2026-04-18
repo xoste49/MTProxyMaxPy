@@ -7,6 +7,8 @@ import logging
 import threading
 from typing import TYPE_CHECKING, Any
 
+import httpx
+
 if TYPE_CHECKING:
     from aiogram import Bot, Dispatcher
     from aiogram.types import BotCommand
@@ -229,7 +231,7 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
                 await asyncio.sleep(interval_hours * 3600)
                 try:
                     await _send_text(_get_stats_text())
-                except Exception as exc:
+                except (OSError, RuntimeError) as exc:
                     logger.warning("aiogram report loop send failed: %s", exc)
 
         @router.error()
@@ -262,7 +264,7 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
             try:
                 process_manager.restart()
                 await msg.answer("✅ Proxy restarted successfully", parse_mode="MarkdownV2")
-            except Exception as exc:
+            except (OSError, RuntimeError) as exc:
                 await msg.answer(f"❌ Proxy failed to restart: {_md(str(exc))}", parse_mode="MarkdownV2")
 
         @router.message(Command("help"))
@@ -349,7 +351,7 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
                     return
                 set_secret_limits(label, **kwargs)
                 await msg.answer(f"✅ Updated `{_md(field)}` for `{_md(label)}`", parse_mode="MarkdownV2")
-            except Exception as exc:
+            except (ValueError, KeyError) as exc:
                 await msg.answer(f"❌ {_md(str(exc))}", parse_mode="MarkdownV2")
 
         @router.message(Command("mp_upstreams"))
@@ -402,7 +404,7 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
             try:
                 secret = add_secret(label)
                 await msg.answer(f"✅ Added `{_md(secret.label)}`: `{_md(secret.key)}`", parse_mode="MarkdownV2")
-            except Exception as exc:
+            except (ValueError, KeyError) as exc:
                 await msg.answer(f"❌ {_md(str(exc))}", parse_mode="MarkdownV2")
 
         @router.message(Command("mp_remove"))
@@ -455,7 +457,7 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
             try:
                 enable_secret(label)
                 await msg.answer(f"✅ Enabled `{_md(label)}`", parse_mode="MarkdownV2")
-            except Exception as exc:
+            except (ValueError, KeyError) as exc:
                 await msg.answer(f"❌ {_md(str(exc))}", parse_mode="MarkdownV2")
 
         @router.message(Command("mp_disable"))
@@ -472,7 +474,7 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
             try:
                 disable_secret(label)
                 await msg.answer(f"✅ Disabled `{_md(label)}`", parse_mode="MarkdownV2")
-            except Exception as exc:
+            except (ValueError, KeyError) as exc:
                 await msg.answer(f"❌ {_md(str(exc))}", parse_mode="MarkdownV2")
 
         @router.message(Command("mp_update"))
@@ -504,13 +506,13 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
                     await msg.answer(f"✅ Updated and restarted \\(PID `{pid}`\\)", parse_mode="MarkdownV2")
                 else:
                     await msg.answer("✅ Binary updated\\.", parse_mode="MarkdownV2")
-            except Exception as exc:
+            except (OSError, RuntimeError, ValueError, httpx.HTTPError) as exc:
                 await msg.answer(f"❌ Update failed: `{_md(str(exc))}`", parse_mode="MarkdownV2")
 
         dp.include_router(router)
         try:
             await bot.set_my_commands(_build_bot_commands(BotCommand))
-        except Exception as exc:
+        except (OSError, RuntimeError) as exc:
             logger.warning("aiogram set_my_commands failed: %s", exc)
 
         _started_event.set()
@@ -589,7 +591,7 @@ def start() -> None:
 
     try:
         import aiogram  # noqa: F401
-    except Exception as exc:
+    except ImportError as exc:
         logger.warning("aiogram import failed: %s", exc)
         return
 
@@ -614,17 +616,17 @@ def stop() -> None:
         async def _shutdown() -> None:
             try:
                 await _dispatcher.stop_polling()
-            except Exception:
+            except (OSError, RuntimeError):
                 logger.debug("stop_polling failed", exc_info=True)
             try:
                 if _bot is not None:
                     await _bot.session.close()
-            except Exception:
+            except (OSError, RuntimeError):
                 logger.debug("Bot session close failed", exc_info=True)
 
         try:
             _loop.call_soon_threadsafe(lambda: asyncio.create_task(_shutdown()))
-        except Exception:
+        except RuntimeError:
             logger.debug("call_soon_threadsafe failed", exc_info=True)
 
     logger.info("Telegram aiogram backend stop requested")
@@ -644,5 +646,5 @@ def send_alert(text: str) -> None:
 
     try:
         _loop.call_soon_threadsafe(lambda: asyncio.create_task(_send_async()))
-    except Exception:
+    except RuntimeError:
         logger.warning("aiogram send_alert failed to schedule message")

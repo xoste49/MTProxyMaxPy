@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
+import mtproxymaxpy
 from mtproxymaxpy.tui import menu
 
 
@@ -25,18 +26,14 @@ def test_logs_and_health_screens(monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     log_file.unlink()
     menu._logs_screen()
 
-    monkeypatch.setitem(
-        sys.modules,
-        "mtproxymaxpy.doctor",
-        SimpleNamespace(run_full_doctor=lambda: [{"name": "A", "ok": True}, {"name": "B", "ok": False, "error": "x"}]),
-    )
+    _mock_doctor_ok = SimpleNamespace(run_full_doctor=lambda: [{"name": "A", "ok": True}, {"name": "B", "ok": False, "error": "x"}])
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.doctor", _mock_doctor_ok)
+    monkeypatch.setattr(mtproxymaxpy, "doctor", _mock_doctor_ok)
     menu._health_screen()
 
-    monkeypatch.setitem(
-        sys.modules,
-        "mtproxymaxpy.doctor",
-        SimpleNamespace(run_full_doctor=lambda: (_ for _ in ()).throw(RuntimeError("bad"))),
-    )
+    _mock_doctor_err = SimpleNamespace(run_full_doctor=lambda: (_ for _ in ()).throw(RuntimeError("bad")))
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.doctor", _mock_doctor_err)
+    monkeypatch.setattr(mtproxymaxpy, "doctor", _mock_doctor_err)
     menu._health_screen()
 
 
@@ -47,24 +44,20 @@ def test_status_screen_success_and_error(monkeypatch: pytest.MonkeyPatch) -> Non
     printed = []
     monkeypatch.setattr(menu.console, "print", lambda *a, **k: printed.append(a))
 
-    monkeypatch.setitem(
-        sys.modules,
-        "mtproxymaxpy.process_manager",
-        SimpleNamespace(status=lambda: {"running": True, "pid": 1, "uptime_sec": 60}),
+    _mock_pm = SimpleNamespace(status=lambda: {"running": True, "pid": 1, "uptime_sec": 60})
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.process_manager", _mock_pm)
+    monkeypatch.setattr(mtproxymaxpy, "process_manager", _mock_pm)
+    _mock_metrics = SimpleNamespace(
+        get_stats=lambda: {
+            "available": True,
+            "bytes_in": 1,
+            "bytes_out": 2,
+            "active_connections": 3,
+            "total_connections": 4,
+        }
     )
-    monkeypatch.setitem(
-        sys.modules,
-        "mtproxymaxpy.metrics",
-        SimpleNamespace(
-            get_stats=lambda: {
-                "available": True,
-                "bytes_in": 1,
-                "bytes_out": 2,
-                "active_connections": 3,
-                "total_connections": 4,
-            }
-        ),
-    )
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.metrics", _mock_metrics)
+    monkeypatch.setattr(mtproxymaxpy, "metrics", _mock_metrics)
     monkeypatch.setitem(
         sys.modules,
         "mtproxymaxpy.config.settings",
@@ -89,11 +82,9 @@ def test_status_screen_success_and_error(monkeypatch: pytest.MonkeyPatch) -> Non
     menu._status_screen()
     assert printed
 
-    monkeypatch.setitem(
-        sys.modules,
-        "mtproxymaxpy.process_manager",
-        SimpleNamespace(status=lambda: (_ for _ in ()).throw(RuntimeError("x"))),
-    )
+    _mock_pm_err = SimpleNamespace(status=lambda: (_ for _ in ()).throw(RuntimeError("x")))
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.process_manager", _mock_pm_err)
+    monkeypatch.setattr(mtproxymaxpy, "process_manager", _mock_pm_err)
     menu._status_screen()
 
 

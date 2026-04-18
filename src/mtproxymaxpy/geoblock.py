@@ -70,7 +70,7 @@ def _download_cidrs(cc: str) -> list[str]:
         cidrs = [l.strip() for l in resp.text.splitlines() if l.strip()]
         cache_file.write_text("\n".join(cidrs))
         return cidrs
-    except Exception as exc:
+    except (httpx.HTTPError, OSError, ValueError, RuntimeError) as exc:
         raise RuntimeError(f"Failed to download CIDRs for {cc}: {exc}") from exc
 
 
@@ -78,7 +78,7 @@ def _load_state() -> dict[str, Any]:
     if GEO_STATE_FILE.exists():
         try:
             return json.loads(GEO_STATE_FILE.read_text())  # type: ignore[no-any-return]
-        except Exception:
+        except (json.JSONDecodeError, OSError):
             logger.debug("Failed to load geo state file", exc_info=True)
     return {"countries": [], "mode": "blacklist"}
 
@@ -188,7 +188,7 @@ def clear_all() -> None:
     for cc in list(list_countries()):
         try:
             remove_country(cc)
-        except Exception as exc:
+        except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
             logger.warning("Failed to clear geoblock for %s: %s", cc, exc)
 
 
@@ -197,5 +197,5 @@ def reapply_all() -> None:
     for cc in list_countries():
         try:
             add_country(cc)
-        except Exception as exc:
+        except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
             logger.warning("Failed to reapply geoblock for %s: %s", cc, exc)

@@ -49,7 +49,12 @@ def test_update_screen_deep_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
     )
     monkeypatch.setitem(sys.modules, "mtproxymaxpy.process_manager", _pm)
     monkeypatch.setattr(pkg, "process_manager", _pm, raising=False)
-    monkeypatch.setitem(sys.modules, "httpx", SimpleNamespace(get=lambda *a, **k: SimpleNamespace(text="b" * 40)))
+    monkeypatch.setattr(menu, "httpx", SimpleNamespace(get=lambda *a, **k: SimpleNamespace(text="b" * 40), HTTPError=Exception))
+    monkeypatch.setitem(
+        sys.modules,
+        "mtproxymaxpy.config.settings",
+        SimpleNamespace(load_settings=lambda: SimpleNamespace(manager_update_branch="main")),
+    )
 
     # In Debian test containers, uv exists at ~/.local/bin/uv. Disable this
     # fallback so branch expectations (git/uv missing cases) stay deterministic.

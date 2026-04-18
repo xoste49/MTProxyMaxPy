@@ -27,4 +27,4 @@ COPY . /work
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --dev
 
-CMD ["uv", "run", "pytest", "--maxfail=1", "--cov=src/mtproxymaxpy", "--cov-report=term-missing:skip-covered"]
+CMD ["uv", "run", "pytest", "--cov=src/mtproxymaxpy"]

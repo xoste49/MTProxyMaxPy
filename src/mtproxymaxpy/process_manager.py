@@ -269,7 +269,7 @@ def get_latest_version() -> str:
         resp.raise_for_status()
         tag = resp.json().get("tag_name", f"v{TELEMT_VERSION}")
         return str(tag).lstrip("v")
-    except Exception:
+    except (httpx.HTTPError, OSError, ValueError, RuntimeError):
         return TELEMT_VERSION
 
 
@@ -285,7 +285,7 @@ def get_binary_version(default: str = TELEMT_VERSION) -> str:
             text=True,
             timeout=5,
         )
-    except Exception:
+    except (OSError, subprocess.SubprocessError):
         return default
 
     text = (res.stdout + res.stderr).strip()
@@ -349,7 +349,7 @@ def download_binary(version: str = TELEMT_VERSION, force: bool = False) -> None:
 def _read_pid() -> int | None:
     try:
         return int(PID_FILE.read_text().strip())
-    except Exception:
+    except (OSError, ValueError):
         return None
 
 
@@ -463,14 +463,15 @@ def status() -> dict[str, Any]:
     uptime_sec: int | None = None
     if pid:
         try:
-            import time as _time
-
-            import psutil  # type: ignore[import-untyped]
-
-            p = psutil.Process(pid)
-            uptime_sec = int(_time.time() - p.create_time())
-        except Exception:
-            logger.debug("Failed to get process uptime", exc_info=True)
+            import psutil  # type: ignore[import-untyped]  # noqa: PLC0415
+        except ImportError:
+            psutil = None
+        if psutil is not None:
+            try:
+                p = psutil.Process(pid)
+                uptime_sec = int(time.time() - p.create_time())
+            except (OSError, psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                logger.debug("Failed to get process uptime", exc_info=True)
     return {
         "running": is_running(),
         "pid": pid,

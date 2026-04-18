@@ -102,7 +102,7 @@ def uninstall(
     try:
         svc.uninstall(telegram=True)
         typer.echo("[+] systemd services removed.")
-    except Exception as exc:
+    except (OSError, RuntimeError) as exc:
         typer.echo(f"[!] systemd cleanup: {exc}", err=True)
 
     # Remove install directory
@@ -1157,5 +1157,5 @@ def _restart_if_running() -> None:
         # Regenerate config even if not running so it's ready on next start
         try:
             process_manager.write_toml_config()
-        except Exception:
+        except (OSError, ValueError, RuntimeError):
             logger.debug("Failed to regenerate TOML config", exc_info=True)
