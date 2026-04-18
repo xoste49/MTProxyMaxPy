@@ -43,7 +43,7 @@ def test_build_mp_secrets_lines_uses_label_keyed_user_stats() -> None:
                 "bytes_in": 1024,
                 "bytes_out": 2048,
                 "active": 3,
-            }
+            },
         },
     }
 
@@ -111,7 +111,7 @@ def test_build_mp_link_text_contains_all_parts() -> None:
             "tg://proxy",
             "https://t.me/proxy?server=1.2.3.4&port=443&secret=abc",
             "https://qr",
-        )
+        ),
     )
 
     assert "alice_user" in text

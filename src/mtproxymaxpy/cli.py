@@ -326,7 +326,8 @@ def metrics() -> None:
         typer.echo("\n  Per-user:")
         for key, us in user_stats.items():
             typer.echo(
-                f"    {key[:12]}…  ↑{format_bytes(us.get('bytes_out', 0))}  ↓{format_bytes(us.get('bytes_in', 0))}  active={int(us.get('active', 0))}"
+                f"    {key[:12]}…  ↑{format_bytes(us.get('bytes_out', 0))}"
+                f"  ↓{format_bytes(us.get('bytes_in', 0))}  active={int(us.get('active', 0))}",
             )
 
 
@@ -816,7 +817,7 @@ def secret_stats() -> None:
             f"  {label:<22} {key[:12] + '…':<14} "
             f"{format_bytes(us.get('bytes_in', 0)):>10} "
             f"{format_bytes(us.get('bytes_out', 0)):>10} "
-            f"{int(us.get('active', 0)):>8}"
+            f"{int(us.get('active', 0)):>8}",
         )
 
 

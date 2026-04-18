@@ -54,7 +54,7 @@ def test_status_screen_success_and_error(monkeypatch: pytest.MonkeyPatch) -> Non
             "bytes_out": 2,
             "active_connections": 3,
             "total_connections": 4,
-        }
+        },
     )
     monkeypatch.setitem(sys.modules, "mtproxymaxpy.metrics", _mock_metrics)
     monkeypatch.setattr(mtproxymaxpy, "metrics", _mock_metrics)

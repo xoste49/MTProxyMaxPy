@@ -134,7 +134,7 @@ def test_check_secrets_and_disk_and_metrics(monkeypatch: pytest.MonkeyPatch) -> 
         load_secrets=lambda: [
             SimpleNamespace(label="a", expires="1900-01-01", enabled=True),
             SimpleNamespace(label="b", expires=None, enabled=False),
-        ]
+        ],
     )
     monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.secrets", sec_mod)
     out = doctor.check_secrets()

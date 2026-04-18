@@ -84,7 +84,7 @@ def list_backups() -> list[dict[str, Any]]:
                 "name": f.name,
                 "size": stat.st_size,
                 "mtime": datetime.fromtimestamp(stat.st_mtime),
-            }
+            },
         )
     return sorted(backups, key=lambda x: x["mtime"], reverse=True)
 

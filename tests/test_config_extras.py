@@ -91,7 +91,7 @@ def test_secrets_csv_import_export_and_save_error(tmp_path: Path, monkeypatch: p
             "alice," + "a" * 32 + ",2020-01-01,true,1,2,3,2030-01-01,note",
             "bob,,2020-01-01,yes,0,0,0,,",
             "," + "c" * 32 + ",2020-01-01,true,0,0,0,,",
-        ]
+        ],
     )
     added = secrets.import_secrets_csv(to_import, path=path, overwrite=False)
     assert [s.label for s in added] == ["bob"]

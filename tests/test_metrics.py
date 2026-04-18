@@ -45,7 +45,7 @@ def test_get_stats_success_and_user_aggregation(monkeypatch: pytest.MonkeyPatch)
             'telemt_rx_bytes_total{user="alice"} 10',
             'telemt_tx_bytes_total{user="alice"} 20',
             'telemt_active_connections{user="alice"} 1',
-        ]
+        ],
     )
     monkeypatch.setattr(metrics, "fetch_raw", lambda timeout=5.0: raw)
 
@@ -70,7 +70,7 @@ def test_get_stats_supports_legacy_telemt_user_metric_names(monkeypatch: pytest.
             'telemt_user_octets_from_client{user="bob"} 300',
             'telemt_user_octets_to_client{user="bob"} 400',
             'telemt_user_connections_current{user="bob"} 3',
-        ]
+        ],
     )
     monkeypatch.setattr(metrics, "fetch_raw", lambda timeout=5.0: raw)
 

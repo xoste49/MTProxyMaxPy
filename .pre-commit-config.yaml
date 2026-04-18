@@ -28,8 +28,8 @@ repos:
         pass_filenames: false
         types_or: [python, pyi]
       - id: pytest
-        name: pytest (docker)
-        entry: make test
+        name: pytest (uv)
+        entry: uv run pytest --cov=src/mtproxymaxpy
         language: system
         pass_filenames: false
         always_run: true

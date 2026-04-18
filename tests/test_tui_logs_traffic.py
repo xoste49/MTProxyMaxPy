@@ -30,7 +30,7 @@ def test_metrics_screen_branches(monkeypatch: pytest.MonkeyPatch) -> None:
                 "active_connections": 3,
                 "total_connections": 4,
                 "user_stats": {"a" * 32: {"bytes_in": 10, "bytes_out": 20, "active": 1}},
-            }
+            },
         ),
     )
     menu._metrics_screen()
@@ -112,7 +112,7 @@ def test_metrics_live_screen_branches(monkeypatch: pytest.MonkeyPatch) -> None:
                 "bytes_out": 2,
                 "active_connections": 3,
                 "total_connections": 4,
-            }
+            },
         ),
     )
     monkeypatch.setattr(menu.time, "sleep", lambda s: (_ for _ in ()).throw(KeyboardInterrupt()))
@@ -157,7 +157,7 @@ def test_logs_traffic_screen_paths(monkeypatch: pytest.MonkeyPatch) -> None:
             "bytes_out": 2,
             "active_connections": 3,
             "user_stats": {"a" * 32: {"bytes_in": 1, "bytes_out": 2, "active": 1}},
-        }
+        },
     )
     monkeypatch.setitem(sys.modules, "mtproxymaxpy.metrics", met3)
     monkeypatch.setattr(pkg, "metrics", met3, raising=False)
@@ -205,7 +205,7 @@ def test_logs_traffic_screen_uses_label_keyed_user_stats(monkeypatch: pytest.Mon
             "user_stats": {
                 "me": {"bytes_in": 1, "bytes_out": 2, "active": 3},
             },
-        }
+        },
     )
 
     monkeypatch.setitem(sys.modules, "mtproxymaxpy.process_manager", pm)

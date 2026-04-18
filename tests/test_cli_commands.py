@@ -92,7 +92,7 @@ def test_core_proxy_commands_and_status(monkeypatch: pytest.MonkeyPatch, capsys:
                 "bytes_out": 2,
                 "active_connections": 3,
                 "total_connections": 4,
-            }
+            },
         ),
     )
     sec_mod = SimpleNamespace(load_secrets=lambda: [FakeSecret("u1", enabled=True), FakeSecret("u2", enabled=False)])
@@ -195,7 +195,7 @@ def test_doctor_health_logs_metrics_connections_traffic(monkeypatch: pytest.Monk
                 "active_connections": 3,
                 "total_connections": 4,
                 "user_stats": {"k": {"bytes_in": 1, "bytes_out": 2, "active": 1}},
-            }
+            },
         ),
     )
     cli.metrics()
@@ -300,7 +300,7 @@ def test_secret_commands(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys
             get_stats=lambda: {
                 "available": True,
                 "user_stats": {"a" * 32: {"bytes_in": 1, "bytes_out": 2, "active": 1}},
-            }
+            },
         ),
     )
 

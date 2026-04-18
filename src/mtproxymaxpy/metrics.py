@@ -22,7 +22,7 @@ _SAMPLE_RE = re.compile(
     r"^(?P<name>[a-zA-Z_:][a-zA-Z0-9_:]*)"
     r"(?:\{(?P<labels>[^}]*)\})?\s+"
     r"(?P<value>[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?|[+-]?Inf|NaN)"
-    r"(?:\s+\d+)?$"
+    r"(?:\s+\d+)?$",
 )
 
 

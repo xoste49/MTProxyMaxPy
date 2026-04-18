@@ -101,7 +101,7 @@ def test_parse_secrets_multiple(tmp_path: Path) -> None:
         [
             "alice|" + "a" * 32 + "|0|true|0|0|0||",
             "bob|" + "b" * 32 + "|0|false|5|2|1000000||vip",
-        ]
+        ],
     )
     f = _write(tmp_path / "secrets.conf", lines)
     items = _parse_secrets_conf(f)

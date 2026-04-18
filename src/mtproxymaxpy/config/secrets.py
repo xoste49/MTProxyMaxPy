@@ -251,7 +251,7 @@ def clone_secret(src_label: str, new_label: str, path: Path = SECRETS_FILE) -> S
                     "label": new_label,
                     "key": secrets.token_hex(16),
                     "created": date.today().isoformat(),
-                }
+                },
             )
             items.append(new_s)
             save_secrets(items, path)

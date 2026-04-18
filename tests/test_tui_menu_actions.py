@@ -68,7 +68,7 @@ def test_secrets_action_dispatches(monkeypatch: pytest.MonkeyPatch) -> None:
             "c",  # ch7 clone
             "alice",
             "memo",  # ch8
-        ]
+        ],
     )
     ints = iter([3, 2, 30])
     monkeypatch.setattr(menu.Prompt, "ask", lambda *a, **k: next(prompts))

@@ -158,7 +158,7 @@ def _parse_secrets_conf(path: Path) -> list[Secret]:
                     quota_bytes=int(quota.strip() or 0),
                     expires=expires.strip() if expires.strip() not in ("", "0") else "",
                     notes=notes.strip(),
-                )
+                ),
             )
         except (ValueError, ValidationError):
             _log.debug("Skipping malformed secret line: %s", line)
@@ -189,7 +189,7 @@ def _parse_upstreams_conf(path: Path) -> list[Upstream]:
                     weight=int(weight.strip() or 100),
                     iface=iface.strip(),
                     enabled=_parse_bool(enabled.strip()) if enabled.strip() else True,
-                )
+                ),
             )
         except (ValueError, ValidationError):
             _log.debug("Skipping malformed upstream line: %s", line)
@@ -216,7 +216,7 @@ def _parse_instances_conf(path: Path) -> list[Instance]:
                     port=int(port.strip()),
                     enabled=_parse_bool(enabled.strip()) if enabled.strip() else True,
                     notes=notes.strip(),
-                )
+                ),
             )
         except (ValueError, ValidationError):
             _log.debug("Skipping malformed instance line: %s", line)

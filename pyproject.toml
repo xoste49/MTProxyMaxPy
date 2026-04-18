@@ -127,6 +127,8 @@ select = [
     "BLE", # flake8-blind-except (BLE) https://docs.astral.sh/ruff/rules/#flake8-blind-except-ble
     "FBT", # flake8-boolean-trap (FBT) https://docs.astral.sh/ruff/rules/#flake8-boolean-trap-fbt
     "B", # flake8-bugbear (B) https://docs.astral.sh/ruff/rules/#flake8-bugbear-b
+    "A", # flake8-builtins (A) https://docs.astral.sh/ruff/rules/#flake8-builtins-a
+    "COM", # flake8-commas (COM) https://docs.astral.sh/ruff/rules/#flake8-commas-com
 ]
 ignore = ["E741", "S103", "S603", "S607"]
 fixable = ["ALL"]

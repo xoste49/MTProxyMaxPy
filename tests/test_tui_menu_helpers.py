@@ -41,7 +41,7 @@ def test_header_panel_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
     pm = SimpleNamespace(status=lambda: {"running": True, "pid": 123, "uptime_sec": 60})
     sd = SimpleNamespace(is_active=lambda name: True)
     _mock_metrics = SimpleNamespace(
-        get_stats=lambda **_kw: {"available": True, "bytes_in": 0, "bytes_out": 0, "active_connections": 0, "total_connections": 0}
+        get_stats=lambda **_kw: {"available": True, "bytes_in": 0, "bytes_out": 0, "active_connections": 0, "total_connections": 0},
     )
     _mock_secrets = SimpleNamespace(load_secrets=lambda: [])
     _mock_formatting = SimpleNamespace(format_bytes=lambda n: f"{n}B", format_duration=lambda s: "0s")

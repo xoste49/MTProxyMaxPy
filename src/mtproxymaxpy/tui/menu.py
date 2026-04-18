@@ -744,7 +744,7 @@ def _secret_show_link(secs: list[Secret]) -> None:
         Panel(
             f"[bold]{target.label}[/bold]\n\n[dim]tg://[/dim]\n{tg_link}\n\n[dim]https[/dim]\n{web_link}",
             border_style="cyan",
-        )
+        ),
     )
     qr = render_qr_terminal(web_link)
     if qr:
@@ -1511,7 +1511,7 @@ def _telegram_setup_wizard() -> None:
             "telegram_bot_token": token,
             "telegram_chat_id": chat_id,
             "telegram_server_label": label,
-        }
+        },
     )
     save_settings(updated)
     console.print("[green][+] Telegram bot configured and enabled[/green]")
@@ -1662,7 +1662,7 @@ def _update_screen() -> None:  # noqa: C901
                                     (r0.stdout or "").strip(),
                                     (r0.stderr or "").strip(),
                                 ],
-                            )
+                            ),
                         )
                         if out0:
                             console.print(f"  {out0}")
@@ -1777,7 +1777,7 @@ def _setup_wizard() -> None:  # noqa: C901
             title="[bold]First-Run Setup[/bold]",
             border_style="cyan",
             padding=(1, 4),
-        )
+        ),
     )
     console.print()
 
@@ -1925,7 +1925,7 @@ def _setup_wizard() -> None:  # noqa: C901
                 title="[green]Installation Complete[/green]",
                 border_style="green",
                 padding=(1, 4),
-            )
+            ),
         )
     except (OSError, ValueError, RuntimeError):
         console.print("  [green][+] Installation complete![/green]")
@@ -1950,7 +1950,7 @@ def _migration_screen(legacy: dict[str, Any]) -> None:
             "Original files will NOT be modified.",
             title="[bold]Migration from MTProxyMax (bash)[/bold]",
             border_style="yellow",
-        )
+        ),
     )
     files = "\n".join(f"  • {p}" for p in legacy.values() if p)
     console.print(f"\nDetected files:\n{files}\n")
