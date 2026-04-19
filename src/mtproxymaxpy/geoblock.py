@@ -72,9 +72,10 @@ def _download_cidrs(cc: str) -> list[str]:
         resp.raise_for_status()
         cidrs = [l.strip() for l in resp.text.splitlines() if l.strip()]
         cache_file.write_text("\n".join(cidrs))
-        return cidrs
     except (httpx.HTTPError, OSError, ValueError, RuntimeError) as exc:
         raise RuntimeError(f"Failed to download CIDRs for {cc}: {exc}") from exc
+    else:
+        return cidrs
 
 
 def _load_state() -> dict[str, Any]:

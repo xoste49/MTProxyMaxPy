@@ -167,9 +167,10 @@ def get_stats(*, timeout: float = 5.0, max_age: float = 0.0) -> dict[str, Any]:
         }
         if max_age > 0:
             _stats_cache = (result, time.monotonic())
-        return result
     except (ValueError, KeyError, OSError, RuntimeError, httpx.HTTPError) as exc:
         return {"available": False, "error": str(exc)}
+    else:
+        return result
 
 
 def get_user_stats(label: str) -> dict[str, float]:

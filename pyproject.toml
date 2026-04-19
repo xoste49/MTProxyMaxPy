@@ -155,10 +155,10 @@ select = [
     "F", # Pyflakes (F) https://docs.astral.sh/ruff/rules/#pyflakes-f
     "PGH", # pygrep-hooks (PGH) https://docs.astral.sh/ruff/rules/#pygrep-hooks-pgh
     "PLC", "PLE", "PLR", "PLW", # Pylint (PL) https://docs.astral.sh/ruff/rules/#pylint-pl
-    #"UP", # pyupgrade (UP) https://docs.astral.sh/ruff/rules/#pyupgrade-up
-    #"FURB", # refurb (FURB) https://docs.astral.sh/ruff/rules/#refurb-furb
+    "UP", # pyupgrade (UP) https://docs.astral.sh/ruff/rules/#pyupgrade-up
+    "FURB", # refurb (FURB) https://docs.astral.sh/ruff/rules/#refurb-furb
     #"RUF", # Ruff-specific rules (RUF) https://docs.astral.sh/ruff/rules/#ruff-specific-rules-ruf
-    #"TRY", # tryceratops (TRY) https://docs.astral.sh/ruff/rules/#tryceratops-try
+    "TRY", # tryceratops (TRY) https://docs.astral.sh/ruff/rules/#tryceratops-try
 ]
 ignore = [
     "COM812", # Конфликтующие с форматером
@@ -172,6 +172,8 @@ ignore = [
     "PLR2004", # magic-value-comparison
     "PLR0915", # too-many-statements
     "PLR0912", # too-many-branches
+    "TRY003", # inline exception messages — acceptable for this project
+    "TRY301", # abstract raise to inner function — over-engineering
     ]
 fixable = ["ALL"]
 per-file-ignores = {"tests/**" = ["ANN", "ARG", "FBT", "S101", "S608", "S105", "S106", "INP", "SLF001", "D100", "D101", "D102", "D103", "D107", "PLW0108",]}

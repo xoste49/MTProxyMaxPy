@@ -61,9 +61,10 @@ def check_port_listening(port: int) -> dict[str, Any]:
                 check=False,
             )
             listening = f":{port}" in res.stdout or f" {port} " in res.stdout
-            return {"ok": listening, "tool": "ss"}
         except (OSError, subprocess.SubprocessError):
             logger.debug("ss port check failed", exc_info=True)
+        else:
+            return {"ok": listening, "tool": "ss"}
     # Fallback use netstat
     if shutil.which("netstat"):
         try:
@@ -75,9 +76,10 @@ def check_port_listening(port: int) -> dict[str, Any]:
                 check=False,
             )
             listening = f":{port}" in res.stdout
-            return {"ok": listening, "tool": "netstat"}
         except (OSError, subprocess.SubprocessError):
             logger.debug("netstat port check failed", exc_info=True)
+        else:
+            return {"ok": listening, "tool": "netstat"}
     # Last resort: try connecting
     try:
         with socket.create_connection(("127.0.0.1", port), timeout=2):

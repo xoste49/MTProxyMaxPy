@@ -380,9 +380,10 @@ def is_running() -> bool:
         return False
     try:
         os.kill(pid, 0)
-        return True
     except (ProcessLookupError, PermissionError):
         return False
+    else:
+        return True
 
 
 def get_pid() -> int | None:

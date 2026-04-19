@@ -577,7 +577,7 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
                 )
                 _stop_event.wait(delay)
                 continue
-            logger.exception("aiogram polling thread crashed: %s", exc)
+            logger.exception("aiogram polling thread crashed")
             break
         finally:
             _reset_runtime_state()

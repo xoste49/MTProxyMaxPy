@@ -48,6 +48,7 @@ def is_port_available(port: int, host: str = "127.0.0.1") -> bool:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
             s.bind((host, port))
-            return True
         except OSError:
             return False
+        else:
+            return True
