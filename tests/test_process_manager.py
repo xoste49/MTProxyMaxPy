@@ -194,7 +194,7 @@ def test_pid_and_running_helpers(monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     assert pm.is_running() is True
 
     def _dead(pid, sig):
-        raise ProcessLookupError()
+        raise ProcessLookupError
 
     monkeypatch.setattr(pm.os, "kill", _dead)
     assert pm.is_running() is False
@@ -259,7 +259,7 @@ def test_start_stop_restart_reload_and_status(monkeypatch: pytest.MonkeyPatch, t
     def _kill(pid, sig):
         calls.append((pid, sig))
         if sig == 0:
-            raise ProcessLookupError()
+            raise ProcessLookupError
 
     monkeypatch.setattr(pm.os, "kill", _kill)
     pm.stop(timeout=0.1)
@@ -281,7 +281,7 @@ def test_start_stop_restart_reload_and_status(monkeypatch: pytest.MonkeyPatch, t
     pm.reload_config()
 
     def _gone(pid, sig):
-        raise ProcessLookupError()
+        raise ProcessLookupError
 
     monkeypatch.setattr(pm.os, "kill", _gone)
     monkeypatch.setattr(pm, "_clear_pid", lambda: None)

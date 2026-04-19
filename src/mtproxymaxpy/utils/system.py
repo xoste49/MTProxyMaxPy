@@ -65,8 +65,7 @@ def check_dependencies() -> list[str]:
             capture_output=True,
         )
         # Re-check after install
-        still_missing = [cmd for cmd in (required + ["ss"]) if not shutil.which(cmd)]
-        return still_missing
+        return [cmd for cmd in (required + ["ss"]) if not shutil.which(cmd)]
     except subprocess.CalledProcessError:
         return missing
 

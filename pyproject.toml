@@ -131,9 +131,9 @@ select = [
     "T20", # flake8-print (T20) https://docs.astral.sh/ruff/rules/#flake8-print-t20
     "PYI", # flake8-pyi (PYI) https://docs.astral.sh/ruff/rules/#flake8-print-t20
     "PT", # flake8-pytest-style (PT) https://docs.astral.sh/ruff/rules/#flake8-pytest-style-pt
-    #"Q", # flake8-quotes (Q) https://docs.astral.sh/ruff/rules/#flake8-quotes-q
-    #"RSE", # flake8-raise (RSE) https://docs.astral.sh/ruff/rules/#flake8-raise-rse
-    #"RET", # flake8-return (RET) https://docs.astral.sh/ruff/rules/#flake8-return-ret
+    "Q", # flake8-quotes (Q) https://docs.astral.sh/ruff/rules/#flake8-quotes-q
+    "RSE", # flake8-raise (RSE) https://docs.astral.sh/ruff/rules/#flake8-raise-rse
+    "RET", # flake8-return (RET) https://docs.astral.sh/ruff/rules/#flake8-return-ret
 ]
 ignore = ["E741", "S103", "S603", "S607"]
 fixable = ["ALL"]
