@@ -754,10 +754,7 @@ def secret_link(
     from mtproxymaxpy.utils.proxy_link import build_proxy_links
 
     secs = load_secrets()
-    if label:
-        s = next((x for x in secs if x.label == label), None)
-    else:
-        s = next((x for x in secs if x.enabled), None)
+    s = next((x for x in secs if x.label == label), None) if label else next((x for x in secs if x.enabled), None)
     if s is None:
         typer.echo("[!] No matching secret found.", err=True)
         raise typer.Exit(1)

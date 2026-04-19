@@ -26,6 +26,7 @@ from mtproxymaxpy.telegram_messages import (
     build_users_text,
 )
 from mtproxymaxpy.utils.formatting import escape_md, format_bytes, format_duration
+import contextlib
 
 logger = logging.getLogger(__name__)
 
@@ -521,10 +522,8 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
             await _start_polling(dp, bot)
         finally:
             report_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await report_task
-            except asyncio.CancelledError:
-                pass
             await bot.session.close()
 
     timeout_retry_attempt = 0

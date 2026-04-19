@@ -26,6 +26,7 @@ from mtproxymaxpy.constants import (
     UPSTREAMS_FILE,
     VERSION,
 )
+import contextlib
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -133,10 +134,8 @@ def restore_backup(archive: Path) -> dict[str, Any]:
                     os.chmod(tmp, 0o600)
                     os.replace(tmp, dest)
                 except Exception:
-                    try:
+                    with contextlib.suppress(OSError):
                         os.unlink(tmp)
-                    except OSError:
-                        pass
                     raise
             elif member.isdir() and member.name == "relay_stats":
                 (INSTALL_DIR / "relay_stats").mkdir(exist_ok=True)

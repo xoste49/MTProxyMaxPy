@@ -22,6 +22,7 @@ from mtproxymaxpy.constants import (
     DEFAULT_TELEGRAM_INTERVAL_HOURS,
     SETTINGS_FILE,
 )
+import contextlib
 
 
 class Settings(BaseModel):
@@ -107,8 +108,6 @@ def save_settings(settings: Settings, path: Path = SETTINGS_FILE) -> None:
         os.chmod(tmp, 0o600)
         os.replace(tmp, path)
     except Exception:
-        try:
+        with contextlib.suppress(OSError):
             os.unlink(tmp)
-        except OSError:
-            pass
         raise

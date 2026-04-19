@@ -13,6 +13,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field, ValidationError
 
 from mtproxymaxpy.constants import UPSTREAMS_FILE
+import contextlib
 
 _log = logging.getLogger(__name__)
 
@@ -94,10 +95,8 @@ def save_upstreams(items: list[Upstream], path: Path = UPSTREAMS_FILE) -> None:
         os.chmod(tmp, 0o600)
         os.replace(tmp, path)
     except Exception:
-        try:
+        with contextlib.suppress(OSError):
             os.unlink(tmp)
-        except OSError:
-            pass
         raise
 
 

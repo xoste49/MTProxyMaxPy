@@ -134,10 +134,12 @@ select = [
     "Q", # flake8-quotes (Q) https://docs.astral.sh/ruff/rules/#flake8-quotes-q
     "RSE", # flake8-raise (RSE) https://docs.astral.sh/ruff/rules/#flake8-raise-rse
     "RET", # flake8-return (RET) https://docs.astral.sh/ruff/rules/#flake8-return-ret
+    "SLF", # flake8-self (SLF) https://docs.astral.sh/ruff/rules/#flake8-self-slf
+    "SIM", # flake8-simplify (SIM) https://docs.astral.sh/ruff/rules/#flake8-simplify-sim
 ]
 ignore = ["E741", "S103", "S603", "S607"]
 fixable = ["ALL"]
-per-file-ignores = {"tests/**" = ["ANN", "FBT", "S101", "S608", "S105", "S106", "INP"]}
+per-file-ignores = {"tests/**" = ["ANN", "FBT", "S101", "S608", "S105", "S106", "INP", "SLF001"]}
 
 [tool.ruff.format]
 quote-style = "double"

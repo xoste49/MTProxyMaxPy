@@ -10,6 +10,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 from mtproxymaxpy.constants import INSTANCES_FILE
+import contextlib
 
 
 class Instance(BaseModel):
@@ -37,8 +38,6 @@ def save_instances(items: list[Instance], path: Path = INSTANCES_FILE) -> None:
         os.chmod(tmp, 0o600)
         os.replace(tmp, path)
     except Exception:
-        try:
+        with contextlib.suppress(OSError):
             os.unlink(tmp)
-        except OSError:
-            pass
         raise

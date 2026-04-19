@@ -18,6 +18,7 @@ from typing import Any, cast
 import httpx
 
 from mtproxymaxpy.constants import INSTALL_DIR
+import contextlib
 
 logger = logging.getLogger(__name__)
 
@@ -93,10 +94,8 @@ def _save_state(state: dict[str, Any]) -> None:
         os.chmod(tmp, 0o600)
         os.replace(tmp, GEO_STATE_FILE)
     except Exception:
-        try:
+        with contextlib.suppress(OSError):
             os.unlink(tmp)
-        except OSError:
-            pass
         raise
 
 

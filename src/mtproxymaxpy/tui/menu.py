@@ -726,10 +726,7 @@ def _secret_show_link(secs: list[Secret]) -> None:
 
     label = Prompt.ask("  Label (blank = first enabled)", default="", console=console)
     target = None
-    if label:
-        target = next((s for s in secs if s.label == label), None)
-    else:
-        target = next((s for s in secs if s.enabled), None)
+    target = next((s for s in secs if s.label == label), None) if label else next((s for s in secs if s.enabled), None)
     if target is None:
         console.print("[red][!] Secret not found[/red]")
         _pause()

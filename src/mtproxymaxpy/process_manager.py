@@ -38,6 +38,7 @@ from mtproxymaxpy.constants import (
     TELEMT_VERSION,
     TOML_CONFIG_FILE,
 )
+import contextlib
 
 logger = logging.getLogger(__name__)
 
@@ -241,10 +242,8 @@ def write_toml_config(
         os.chmod(tmp, 0o600)
         os.replace(tmp, TOML_CONFIG_FILE)
     except Exception:
-        try:
+        with contextlib.suppress(OSError):
             os.unlink(tmp)
-        except OSError:
-            pass
         raise
 
 
@@ -429,10 +428,8 @@ def stop(timeout: float = 10.0) -> None:
             break
         time.sleep(0.2)
     else:
-        try:
+        with contextlib.suppress(ProcessLookupError):
             os.kill(pid, signal.SIGKILL)  # type: ignore[attr-defined]
-        except ProcessLookupError:
-            pass
 
     _clear_pid()
     logger.info("telemt stopped (was PID %s)", pid)

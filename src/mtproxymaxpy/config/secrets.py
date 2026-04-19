@@ -15,6 +15,7 @@ from typing import Any
 from pydantic import BaseModel, Field, field_validator
 
 from mtproxymaxpy.constants import SECRETS_FILE
+import contextlib
 
 
 class Secret(BaseModel):
@@ -72,10 +73,8 @@ def save_secrets(items: list[Secret], path: Path = SECRETS_FILE) -> None:
         os.chmod(tmp, 0o600)
         os.replace(tmp, path)
     except Exception:
-        try:
+        with contextlib.suppress(OSError):
             os.unlink(tmp)
-        except OSError:
-            pass
         raise
 
 
@@ -192,10 +191,7 @@ def extend_secret(label: str, days: int, path: Path = SECRETS_FILE) -> Secret:
     items = load_secrets(path)
     for i, s in enumerate(items):
         if s.label == label:
-            if s.expires:
-                base = date.fromisoformat(s.expires)
-            else:
-                base = datetime.now(tz=UTC).date()
+            base = date.fromisoformat(s.expires) if s.expires else datetime.now(tz=UTC).date()
             new_expires = (base + timedelta(days=days)).isoformat()
             items[i] = s.model_copy(update={"expires": new_expires})
             save_secrets(items, path)
