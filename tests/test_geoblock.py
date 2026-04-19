@@ -3,11 +3,11 @@ from __future__ import annotations
 import subprocess
 import sys
 from types import SimpleNamespace
+from typing import TYPE_CHECKING
 
 import pytest
 
 from mtproxymaxpy import geoblock
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pathlib import Path

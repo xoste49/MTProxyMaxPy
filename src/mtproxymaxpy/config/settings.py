@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import contextlib
 import os
-from pathlib import Path
 import tempfile
 import tomllib
+from pathlib import Path
 
 import tomli_w
 from pydantic import BaseModel, Field, field_validator

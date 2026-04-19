@@ -22,6 +22,7 @@ from rich.text import Text
 
 if TYPE_CHECKING:
     from pathlib import Path
+
     from mtproxymaxpy.config.secrets import Secret
     from mtproxymaxpy.config.upstreams import Upstream
 

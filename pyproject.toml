@@ -142,8 +142,8 @@ select = [
     "TC", # flake8-type-checking (TC) https://docs.astral.sh/ruff/rules/#flake8-type-checking-tc
     "ARG", # flake8-unused-arguments (ARG) https://docs.astral.sh/ruff/rules/#flake8-unused-arguments-arg
     "PTH", # flake8-use-pathlib (PTH) https://docs.astral.sh/ruff/rules/#flake8-use-pathlib-pth
-    #"FLY", # flynt (FLY) https://docs.astral.sh/ruff/rules/#flynt-fly
-    #"I", # isort (I) https://docs.astral.sh/ruff/rules/#isort-i
+    "FLY", # flynt (FLY) https://docs.astral.sh/ruff/rules/#flynt-fly
+    "I", # isort (I) https://docs.astral.sh/ruff/rules/#isort-i
     #"C90", # mccabe (C90) https://docs.astral.sh/ruff/rules/#mccabe-c90
     #"NPY", # NumPy-specific rules (NPY) https://docs.astral.sh/ruff/rules/#numpy-specific-rules-npy
     #"PD", # pandas-vet (PD) https://docs.astral.sh/ruff/rules/#pandas-vet-pd

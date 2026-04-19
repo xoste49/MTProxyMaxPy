@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import sys
 from types import SimpleNamespace
-
-
-from mtproxymaxpy.tui import menu
 from typing import TYPE_CHECKING
 
+from mtproxymaxpy.tui import menu
+
 if TYPE_CHECKING:
-    import pytest
     from pathlib import Path
+
+    import pytest
 
 
 def test_metrics_screen_branches(monkeypatch: pytest.MonkeyPatch) -> None:

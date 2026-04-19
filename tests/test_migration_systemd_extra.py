@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import subprocess
 from types import SimpleNamespace
+from typing import TYPE_CHECKING
 
 import pytest
 
 from mtproxymaxpy import systemd
 from mtproxymaxpy.config import migration
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pathlib import Path

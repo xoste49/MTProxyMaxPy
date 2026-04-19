@@ -3,11 +3,11 @@ from __future__ import annotations
 import io
 import json
 import tarfile
+from typing import TYPE_CHECKING
 
 import pytest
 
 from mtproxymaxpy import backup
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pathlib import Path

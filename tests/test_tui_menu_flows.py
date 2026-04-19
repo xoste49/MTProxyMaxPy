@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import sys
 from types import SimpleNamespace
-
+from typing import TYPE_CHECKING
 
 import mtproxymaxpy
 from mtproxymaxpy.tui import menu
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    import pytest
     from pathlib import Path
+
+    import pytest
 
 
 def test_logs_and_health_screens(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
