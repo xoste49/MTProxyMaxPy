@@ -10,6 +10,7 @@ Responsibilities
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import re
@@ -38,7 +39,6 @@ from mtproxymaxpy.constants import (
     TELEMT_VERSION,
     TOML_CONFIG_FILE,
 )
-import contextlib
 
 logger = logging.getLogger(__name__)
 
@@ -312,8 +312,7 @@ def download_binary(version: str = TELEMT_VERSION, *, force: bool = False) -> No
         with httpx.stream("GET", url, timeout=120, follow_redirects=True) as resp:
             resp.raise_for_status()
             with open(tar_tmp, "wb") as fh:
-                for chunk in resp.iter_bytes(chunk_size=65536):
-                    fh.write(chunk)
+                fh.writelines(resp.iter_bytes(chunk_size=65536))
 
         # Extract the 'telemt' binary from the archive
         with tarfile.open(tar_tmp, "r:gz") as tf:

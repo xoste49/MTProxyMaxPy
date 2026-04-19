@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import subprocess
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 from mtproxymaxpy import systemd
 from mtproxymaxpy.config import migration
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_migration_parse_bool_and_settings_fallback(tmp_path: Path) -> None:

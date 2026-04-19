@@ -10,7 +10,6 @@ import logging
 import os
 import subprocess
 import time
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import httpx
@@ -22,6 +21,7 @@ from rich.table import Table
 from rich.text import Text
 
 if TYPE_CHECKING:
+    from pathlib import Path
     from mtproxymaxpy.config.secrets import Secret
     from mtproxymaxpy.config.upstreams import Upstream
 
@@ -226,6 +226,7 @@ def _check_update_bg(wait_timeout: float = 3.0) -> None:
     Args:
         wait_timeout: Maximum seconds to wait for the check to complete before returning (default: 3.0).
                       Prevents blocking the TUI startup while still ensuring the badge is set on first run.
+
     """
     import threading
 
@@ -659,7 +660,7 @@ def _secrets_action(ch: int, secs: list[Secret]) -> None:
 
         qb = parse_human_bytes(qb_str) if qb_str != "0" else 0
         exp = Prompt.ask("  Expires (YYYY-MM-DD or blank)", default="", console=console)
-        set_secret_limits(label, max_conns=mc, max_ips=mi, quota_bytes=qb, expires=exp if exp else None)
+        set_secret_limits(label, max_conns=mc, max_ips=mi, quota_bytes=qb, expires=exp or None)
         console.print("[green][+] Limits updated[/green]")
         _pause()
     elif ch == 6:

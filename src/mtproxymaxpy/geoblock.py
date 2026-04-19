@@ -7,6 +7,7 @@ persisted to geoblock.json so rules can be re-applied after a reboot.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os
@@ -18,7 +19,6 @@ from typing import Any, cast
 import httpx
 
 from mtproxymaxpy.constants import INSTALL_DIR
-import contextlib
 
 logger = logging.getLogger(__name__)
 
@@ -179,7 +179,7 @@ def remove_country(cc: str) -> None:
 
 def list_countries() -> list[str]:
     result = _load_state().get("countries", [])
-    return cast(list[str], result)
+    return cast("list[str]", result)
 
 
 def clear_all() -> None:

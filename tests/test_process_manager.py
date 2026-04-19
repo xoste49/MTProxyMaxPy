@@ -3,12 +3,15 @@ from __future__ import annotations
 import io
 import sys
 import tarfile
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 from mtproxymaxpy import process_manager as pm
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_to_rfc3339_expiration() -> None:

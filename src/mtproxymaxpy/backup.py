@@ -6,6 +6,7 @@ instances, and stats snapshots.  A metadata.json is always included.
 
 from __future__ import annotations
 
+import contextlib
 import io
 import json
 import os
@@ -26,7 +27,6 @@ from mtproxymaxpy.constants import (
     UPSTREAMS_FILE,
     VERSION,
 )
-import contextlib
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 

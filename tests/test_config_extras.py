@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 from mtproxymaxpy.config import instances, secrets, upstreams
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_instances_roundtrip_and_save_error_cleanup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

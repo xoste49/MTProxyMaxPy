@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-import pytest
 
 from mtproxymaxpy import metrics
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import pytest
 
 
 def test_parse_metrics_skips_comments_and_invalid_lines() -> None:

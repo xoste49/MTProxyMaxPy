@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import csv
 import io
 import json
@@ -9,13 +10,14 @@ import os
 import secrets
 import tempfile
 from datetime import UTC, date, datetime, timedelta
-from pathlib import Path
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from pydantic import BaseModel, Field, field_validator
 
 from mtproxymaxpy.constants import SECRETS_FILE
-import contextlib
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class Secret(BaseModel):

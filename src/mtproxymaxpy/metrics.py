@@ -182,4 +182,4 @@ def get_user_stats(label: str) -> dict[str, float]:
     stats = get_stats()
     if not stats.get("available"):
         return {}
-    return cast(dict[str, float], stats.get("user_stats", {}).get(label, {}))
+    return cast("dict[str, float]", stats.get("user_stats", {}).get(label, {}))

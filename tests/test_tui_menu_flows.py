@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 from types import SimpleNamespace
 
-import pytest
 
 import mtproxymaxpy
 from mtproxymaxpy.tui import menu
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import pytest
+    from pathlib import Path
 
 
 def test_logs_and_health_screens(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

@@ -136,6 +136,29 @@ select = [
     "RET", # flake8-return (RET) https://docs.astral.sh/ruff/rules/#flake8-return-ret
     "SLF", # flake8-self (SLF) https://docs.astral.sh/ruff/rules/#flake8-self-slf
     "SIM", # flake8-simplify (SIM) https://docs.astral.sh/ruff/rules/#flake8-simplify-sim
+    #"SLOT", # flake8-slots (SLOT) https://docs.astral.sh/ruff/rules/#flake8-slots-slot - не совсем понятно, как применять к некоторым классам
+    "TID", # flake8-tidy-imports (TID) https://docs.astral.sh/ruff/rules/#flake8-tidy-imports-tid
+    "TD", # flake8-todos (TD) https://docs.astral.sh/ruff/rules/#flake8-todos-td
+    "TC", # flake8-type-checking (TC) https://docs.astral.sh/ruff/rules/#flake8-type-checking-tc
+    #"ARG", # flake8-unused-arguments (ARG) https://docs.astral.sh/ruff/rules/#flake8-unused-arguments-arg
+    #"PTH", # flake8-use-pathlib (PTH) https://docs.astral.sh/ruff/rules/#flake8-use-pathlib-pth
+    #"FLY", # flynt (FLY) https://docs.astral.sh/ruff/rules/#flynt-fly
+    #"I", # isort (I) https://docs.astral.sh/ruff/rules/#isort-i
+    #"C90", # mccabe (C90) https://docs.astral.sh/ruff/rules/#mccabe-c90
+    #"NPY", # NumPy-specific rules (NPY) https://docs.astral.sh/ruff/rules/#numpy-specific-rules-npy
+    #"PD", # pandas-vet (PD) https://docs.astral.sh/ruff/rules/#pandas-vet-pd
+    #"N", # pep8-naming (N) https://docs.astral.sh/ruff/rules/#pep8-naming-n
+    #"PERF", # Perflint (PERF) https://docs.astral.sh/ruff/rules/#perflint-perf
+    #"E", "W", # pycodestyle (E, W) https://docs.astral.sh/ruff/rules/#pycodestyle-e-w
+    #"DOC", # pydoclint (DOC) — в состоянии preview https://docs.astral.sh/ruff/rules/#pydoclint-doc поэтому используется само приложение pydoclint
+    #"D", # pydocstyle (D) https://docs.astral.sh/ruff/rules/#pydocstyle-d
+    #"F", # Pyflakes (F) https://docs.astral.sh/ruff/rules/#pyflakes-f
+    #"PGH", # pygrep-hooks (PGH) https://docs.astral.sh/ruff/rules/#pygrep-hooks-pgh
+    #"PLC", "PLE", "PLR", "PLW", # Pylint (PL) https://docs.astral.sh/ruff/rules/#pylint-pl
+    #"UP", # pyupgrade (UP) https://docs.astral.sh/ruff/rules/#pyupgrade-up
+    #"FURB", # refurb (FURB) https://docs.astral.sh/ruff/rules/#refurb-furb
+    #"RUF", # Ruff-specific rules (RUF) https://docs.astral.sh/ruff/rules/#ruff-specific-rules-ruf
+    #"TRY", # tryceratops (TRY) https://docs.astral.sh/ruff/rules/#tryceratops-try
 ]
 ignore = ["E741", "S103", "S603", "S607"]
 fixable = ["ALL"]

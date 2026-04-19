@@ -3,9 +3,12 @@ from __future__ import annotations
 import asyncio
 from types import SimpleNamespace
 
-import pytest
 
 from mtproxymaxpy import telegram_bot_aiogram as tga
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import pytest
 
 
 def test_start_noop_when_aiogram_missing(monkeypatch: pytest.MonkeyPatch) -> None:

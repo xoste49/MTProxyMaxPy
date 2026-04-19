@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
 from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qs, urlparse
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable
     from mtproxymaxpy.config.secrets import Secret
 
 from aiogram.utils.formatting import Bold, Code, Text, TextLink

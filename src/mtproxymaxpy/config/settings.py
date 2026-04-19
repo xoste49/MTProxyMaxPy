@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 import tempfile
 import tomllib
-from pathlib import Path
 
 import tomli_w
 from pydantic import BaseModel, Field, field_validator
@@ -22,7 +22,10 @@ from mtproxymaxpy.constants import (
     DEFAULT_TELEGRAM_INTERVAL_HOURS,
     SETTINGS_FILE,
 )
-import contextlib
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class Settings(BaseModel):

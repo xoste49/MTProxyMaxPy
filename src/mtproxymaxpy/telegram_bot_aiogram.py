@@ -14,6 +14,8 @@ if TYPE_CHECKING:
     from aiogram.types import BotCommand
     from aiogram.utils.formatting import Text
 
+import contextlib
+
 from mtproxymaxpy.config.secrets import load_secrets
 from mtproxymaxpy.config.settings import load_settings
 from mtproxymaxpy.telegram_messages import (
@@ -26,7 +28,6 @@ from mtproxymaxpy.telegram_messages import (
     build_users_text,
 )
 from mtproxymaxpy.utils.formatting import escape_md, format_bytes, format_duration
-import contextlib
 
 logger = logging.getLogger(__name__)
 

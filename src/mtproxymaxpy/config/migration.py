@@ -17,8 +17,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from pathlib import Path
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from pydantic import ValidationError
 
@@ -41,6 +40,9 @@ from mtproxymaxpy.constants import (
     SETTINGS_FILE,
     UPSTREAMS_FILE,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 _log = logging.getLogger(__name__)
 

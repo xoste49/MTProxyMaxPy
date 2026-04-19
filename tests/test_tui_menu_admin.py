@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import sys
 from datetime import UTC, datetime
-from pathlib import Path
 from types import SimpleNamespace
 
-import pytest
 
 from mtproxymaxpy.tui import menu
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import pytest
+    from pathlib import Path
 
 
 class _Settings:

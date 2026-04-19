@@ -112,8 +112,8 @@ def test_core_proxy_commands_and_status(monkeypatch: pytest.MonkeyPatch, capsys:
             SETTINGS_FILE=Path("missing.toml"),
             INSTALL_DIR=Path("x"),
             VERSION="X",
-            BACKUP_DIR=Path("."),
-            STATS_DIR=Path("."),
+            BACKUP_DIR=Path(),
+            STATS_DIR=Path(),
         ),
     )
 
