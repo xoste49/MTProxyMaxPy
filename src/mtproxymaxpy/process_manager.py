@@ -77,7 +77,7 @@ def _build_toml_config(
     settings: Settings,
     secrets: list[Secret],
     upstreams: list[Upstream],
-    public_ip: str = "",
+    _public_ip: str = "",
 ) -> str:
     """Return a config.toml string for telemt matching the bash-generated format."""
     active = [s for s in secrets if s.enabled]

@@ -121,7 +121,7 @@ def uninstall(
 @app.command()
 def start(
     *,
-    no_tui: Annotated[bool, typer.Option("--no-tui", hidden=True)] = False,
+    _no_tui: Annotated[bool, typer.Option("--no-tui", hidden=True)] = False,
 ) -> None:
     """Start the proxy."""
     from mtproxymaxpy import process_manager
@@ -135,7 +135,7 @@ def start(
 @app.command()
 def stop(
     *,
-    no_tui: Annotated[bool, typer.Option("--no-tui", hidden=True)] = False,
+    _no_tui: Annotated[bool, typer.Option("--no-tui", hidden=True)] = False,
 ) -> None:
     """Stop the proxy."""
     from mtproxymaxpy import process_manager
@@ -147,7 +147,7 @@ def stop(
 @app.command()
 def restart(
     *,
-    no_tui: Annotated[bool, typer.Option("--no-tui", hidden=True)] = False,
+    _no_tui: Annotated[bool, typer.Option("--no-tui", hidden=True)] = False,
 ) -> None:
     """Restart the proxy."""
     from mtproxymaxpy import process_manager
@@ -1127,7 +1127,7 @@ def telegram_enable() -> None:
 @app.command("telegram-bot")
 def run_telegram_bot(
     *,
-    no_tui: Annotated[bool, typer.Option("--no-tui", hidden=True)] = False,
+    _no_tui: Annotated[bool, typer.Option("--no-tui", hidden=True)] = False,
 ) -> None:
     """Run the Telegram bot (blocking — intended for use by systemd)."""
     import signal as _signal

@@ -140,7 +140,7 @@ select = [
     "TID", # flake8-tidy-imports (TID) https://docs.astral.sh/ruff/rules/#flake8-tidy-imports-tid
     "TD", # flake8-todos (TD) https://docs.astral.sh/ruff/rules/#flake8-todos-td
     "TC", # flake8-type-checking (TC) https://docs.astral.sh/ruff/rules/#flake8-type-checking-tc
-    #"ARG", # flake8-unused-arguments (ARG) https://docs.astral.sh/ruff/rules/#flake8-unused-arguments-arg
+    "ARG", # flake8-unused-arguments (ARG) https://docs.astral.sh/ruff/rules/#flake8-unused-arguments-arg
     #"PTH", # flake8-use-pathlib (PTH) https://docs.astral.sh/ruff/rules/#flake8-use-pathlib-pth
     #"FLY", # flynt (FLY) https://docs.astral.sh/ruff/rules/#flynt-fly
     #"I", # isort (I) https://docs.astral.sh/ruff/rules/#isort-i
@@ -162,7 +162,7 @@ select = [
 ]
 ignore = ["E741", "S103", "S603", "S607"]
 fixable = ["ALL"]
-per-file-ignores = {"tests/**" = ["ANN", "FBT", "S101", "S608", "S105", "S106", "INP", "SLF001"]}
+per-file-ignores = {"tests/**" = ["ANN", "ARG", "FBT", "S101", "S608", "S105", "S106", "INP", "SLF001"]}
 
 [tool.ruff.format]
 quote-style = "double"

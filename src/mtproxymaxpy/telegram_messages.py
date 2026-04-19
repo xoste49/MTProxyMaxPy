@@ -49,7 +49,7 @@ def build_help_text() -> Text:
     return _lines_to_text(lines)
 
 
-def build_users_text(secrets: Iterable[Any], *, md: Callable[[str], str] | None = None) -> Text:
+def build_users_text(secrets: Iterable[Any], *, _md: Callable[[str], str] | None = None) -> Text:
     """Build entity-based text for /users response."""
     secrets_list = list(secrets)
     if not secrets_list:
@@ -66,7 +66,7 @@ def build_mp_secrets_lines(
     secrets: Iterable[Any],
     metrics_stats: dict[str, Any],
     *,
-    md: Callable[[str], str] | None = None,
+    _md: Callable[[str], str] | None = None,
     bytes_formatter: Callable[[float | int], str],
 ) -> list[Text]:
     """Build entity-based lines for /mp_secrets response."""
@@ -92,7 +92,7 @@ def build_mp_secrets_lines(
 def build_mp_traffic_text(
     metrics_stats: dict[str, Any],
     *,
-    md: Callable[[str], str] | None = None,
+    _md: Callable[[str], str] | None = None,
     bytes_formatter: Callable[[float | int], str],
 ) -> Text:
     """Build entity-based text for /mp_traffic response."""
@@ -109,7 +109,7 @@ def build_mp_traffic_text(
 def build_mp_limits_text(
     secret: Secret,
     *,
-    md: Callable[[str], str] | None = None,
+    _md: Callable[[str], str] | None = None,
     bytes_formatter: Callable[[float | int], str],
 ) -> Text:
     """Build entity-based text for /mp_limits response."""
@@ -126,7 +126,7 @@ def build_mp_limits_text(
     return _lines_to_text(lines)
 
 
-def build_mp_upstreams_text(upstreams: Iterable[Any], *, md: Callable[[str], str] | None = None) -> Text:
+def build_mp_upstreams_text(upstreams: Iterable[Any], *, _md: Callable[[str], str] | None = None) -> Text:
     """Build entity-based text for /mp_upstreams response."""
     ups = list(upstreams)
     if not ups:
@@ -147,7 +147,7 @@ def build_mp_link_text(
     web_link: str,
     qr_url: str,
     *,
-    md: Callable[[str], str] | None = None,
+    _md: Callable[[str], str] | None = None,
 ) -> Text:
     """Build entity-based text for /mp_link response."""
     parsed = urlparse(web_link)

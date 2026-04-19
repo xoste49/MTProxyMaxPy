@@ -239,7 +239,7 @@ class MigrationResult:
     errors: list[str] = field(default_factory=list)
 
 
-def detect_legacy(install_dir: Path = INSTALL_DIR) -> dict[str, Path]:
+def detect_legacy(_install_dir: Path = INSTALL_DIR) -> dict[str, Path]:
     """Return a dict of legacy config files that exist.
 
     Keys are one of: 'settings', 'secrets', 'upstreams', 'instances'.

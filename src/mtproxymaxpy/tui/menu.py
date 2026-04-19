@@ -869,7 +869,7 @@ def _restart_proxy_if_running() -> None:
         console.print(f"[green][+] Proxy restarted (PID {pid})[/green]")
 
 
-def _upstreams_action(ch: int, ups: list[Upstream]) -> None:
+def _upstreams_action(ch: int, _ups: list[Upstream]) -> None:
     if ch == 1:
         from mtproxymaxpy.config.upstreams import add_upstream
 
