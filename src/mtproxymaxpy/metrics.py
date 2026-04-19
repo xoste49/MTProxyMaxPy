@@ -95,6 +95,46 @@ def _sum_names(samples: list[dict[str, Any]], *names: str, **label_filter: str) 
 # ── Public API ─────────────────────────────────────────────────────────────────
 
 
+def _resolve_global_metrics(samples: list[dict[str, Any]]) -> tuple[float, float, float, float]:
+    """Resolve the four global traffic counters from Prometheus samples."""
+    bytes_in = _first(samples, "telemt_bytes_in_total", "telemt_incoming_bytes_total", "telemt_rx_bytes_total")
+    if bytes_in <= 0:
+        bytes_in = _sum_names(samples, "telemt_user_octets_from_client")
+
+    bytes_out = _first(samples, "telemt_bytes_out_total", "telemt_outgoing_bytes_total", "telemt_tx_bytes_total")
+    if bytes_out <= 0:
+        bytes_out = _sum_names(samples, "telemt_user_octets_to_client")
+
+    active = _first(samples, "telemt_connections_active", "telemt_active_connections", "telemt_connections_current")
+    if active <= 0:
+        active = _sum_names(samples, "telemt_user_connections_current")
+
+    total_conns = _first(samples, "telemt_connections_total", "telemt_total_connections")
+    if total_conns <= 0:
+        total_conns = _sum_names(samples, "telemt_user_connections_total")
+
+    return bytes_in, bytes_out, active, total_conns
+
+
+def _aggregate_user_stats(samples: list[dict[str, Any]]) -> dict[str, dict[str, float]]:
+    """Aggregate per-user traffic stats from Prometheus samples."""
+    user_stats: dict[str, dict[str, float]] = {}
+    for s in samples:
+        user = s["labels"].get("user")
+        if not user:
+            continue
+        if user not in user_stats:
+            user_stats[user] = {"bytes_in": 0.0, "bytes_out": 0.0, "active": 0.0}
+        n = s["name"].lower()
+        if "incoming" in n or "rx" in n or "recv" in n or "bytes_in" in n or "octets_from_client" in n or "from_client" in n:
+            user_stats[user]["bytes_in"] += s["value"]
+        elif "outgoing" in n or "tx" in n or "sent" in n or "bytes_out" in n or "octets_to_client" in n or "to_client" in n:
+            user_stats[user]["bytes_out"] += s["value"]
+        elif "active" in n or "connections_current" in n:
+            user_stats[user]["active"] += s["value"]
+    return user_stats
+
+
 def get_stats(*, timeout: float = 5.0, max_age: float = 0.0) -> dict[str, Any]:
     """Return a structured stats dict from the live Prometheus endpoint.
 
@@ -111,56 +151,8 @@ def get_stats(*, timeout: float = 5.0, max_age: float = 0.0) -> dict[str, Any]:
         raw = fetch_raw(timeout=timeout)
         samples = parse_metrics(raw)
 
-        bytes_in = _first(
-            samples,
-            "telemt_bytes_in_total",
-            "telemt_incoming_bytes_total",
-            "telemt_rx_bytes_total",
-        )
-        if bytes_in <= 0:
-            bytes_in = _sum_names(samples, "telemt_user_octets_from_client")
-
-        bytes_out = _first(
-            samples,
-            "telemt_bytes_out_total",
-            "telemt_outgoing_bytes_total",
-            "telemt_tx_bytes_total",
-        )
-        if bytes_out <= 0:
-            bytes_out = _sum_names(samples, "telemt_user_octets_to_client")
-
-        active = _first(
-            samples,
-            "telemt_connections_active",
-            "telemt_active_connections",
-            "telemt_connections_current",
-        )
-        if active <= 0:
-            active = _sum_names(samples, "telemt_user_connections_current")
-
-        total_conns = _first(
-            samples,
-            "telemt_connections_total",
-            "telemt_total_connections",
-        )
-        if total_conns <= 0:
-            total_conns = _sum_names(samples, "telemt_user_connections_total")
-
-        # Per-user stats: aggregate all samples that carry a "user" label
-        user_stats: dict[str, dict[str, float]] = {}
-        for s in samples:
-            user = s["labels"].get("user")
-            if not user:
-                continue
-            if user not in user_stats:
-                user_stats[user] = {"bytes_in": 0.0, "bytes_out": 0.0, "active": 0.0}
-            n = s["name"].lower()
-            if "incoming" in n or "rx" in n or "recv" in n or "bytes_in" in n or "octets_from_client" in n or "from_client" in n:
-                user_stats[user]["bytes_in"] += s["value"]
-            elif "outgoing" in n or "tx" in n or "sent" in n or "bytes_out" in n or "octets_to_client" in n or "to_client" in n:
-                user_stats[user]["bytes_out"] += s["value"]
-            elif "active" in n or "connections_current" in n:
-                user_stats[user]["active"] += s["value"]
+        bytes_in, bytes_out, active, total_conns = _resolve_global_metrics(samples)
+        user_stats = _aggregate_user_stats(samples)
 
         result = {
             "available": True,

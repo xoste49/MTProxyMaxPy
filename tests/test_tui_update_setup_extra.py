@@ -16,6 +16,32 @@ def _mute_ui(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(menu.console, "print", lambda *a, **k: None)
 
 
+def _subprocess_pull_fail(cmd: list[str], **kwargs: object) -> SimpleNamespace:
+    if "rev-parse" in cmd:
+        return SimpleNamespace(returncode=0, stdout="a" * 40, stderr="")
+    if "pull" in cmd:
+        return SimpleNamespace(returncode=1, stdout="", stderr="pull failed")
+    return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+
+def _subprocess_sync_fail(cmd: list[str], **kwargs: object) -> SimpleNamespace:
+    if "rev-parse" in cmd:
+        return SimpleNamespace(returncode=0, stdout="a" * 40, stderr="")
+    if "pull" in cmd:
+        return SimpleNamespace(returncode=0, stdout="ok", stderr="")
+    if cmd and str(cmd[0]).endswith("uv"):
+        return SimpleNamespace(returncode=1, stdout="", stderr="sync fail")
+    return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+
+def _subprocess_all_ok(cmd: list[str], **kwargs: object) -> SimpleNamespace:
+    if "rev-parse" in cmd:
+        return SimpleNamespace(returncode=0, stdout="a" * 40, stderr="")
+    if cmd and str(cmd[0]).endswith("uv"):
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+    return SimpleNamespace(returncode=0, stdout="ok", stderr="")
+
+
 def test_update_screen_deep_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _mute_ui(monkeypatch)
     import mtproxymaxpy as pkg
@@ -73,28 +99,11 @@ def test_update_screen_deep_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
 
     # Case 3: git+uv exists, pull fails
     monkeypatch.setattr("shutil.which", lambda name: "C:/bin/git" if name == "git" else "C:/bin/uv")
-
-    def _pull_fail(cmd, **kwargs):
-        if "rev-parse" in cmd:
-            return SimpleNamespace(returncode=0, stdout="a" * 40, stderr="")
-        if "pull" in cmd:
-            return SimpleNamespace(returncode=1, stdout="", stderr="pull failed")
-        return SimpleNamespace(returncode=0, stdout="", stderr="")
-
-    monkeypatch.setattr("subprocess.run", _pull_fail)
+    monkeypatch.setattr("subprocess.run", _subprocess_pull_fail)
     menu._update_screen()
 
     # Case 4: pull ok, uv sync fails
-    def _sync_fail(cmd, **kwargs):
-        if "rev-parse" in cmd:
-            return SimpleNamespace(returncode=0, stdout="a" * 40, stderr="")
-        if "pull" in cmd:
-            return SimpleNamespace(returncode=0, stdout="ok", stderr="")
-        if cmd and str(cmd[0]).endswith("uv"):
-            return SimpleNamespace(returncode=1, stdout="", stderr="sync fail")
-        return SimpleNamespace(returncode=0, stdout="", stderr="")
-
-    monkeypatch.setattr("subprocess.run", _sync_fail)
+    monkeypatch.setattr("subprocess.run", _subprocess_sync_fail)
     menu._update_screen()
 
     # Case 5: successful self-update triggers SystemExit
@@ -102,14 +111,7 @@ def test_update_screen_deep_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
     monkeypatch.setitem(sys.modules, "mtproxymaxpy.systemd", _svc)
     monkeypatch.setattr(pkg, "systemd", _svc, raising=False)
 
-    def _all_ok(cmd, **kwargs):
-        if "rev-parse" in cmd:
-            return SimpleNamespace(returncode=0, stdout="a" * 40, stderr="")
-        if cmd and str(cmd[0]).endswith("uv"):
-            return SimpleNamespace(returncode=0, stdout="", stderr="")
-        return SimpleNamespace(returncode=0, stdout="ok", stderr="")
-
-    monkeypatch.setattr("subprocess.run", _all_ok)
+    monkeypatch.setattr("subprocess.run", _subprocess_all_ok)
     with pytest.raises(SystemExit):
         menu._update_screen()
 

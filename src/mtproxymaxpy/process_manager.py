@@ -74,6 +74,137 @@ def _to_rfc3339_expiration(value: str) -> str | None:
 # ── Config generation ─────────────────────────────────────────────────────────
 
 
+def _toml_general_section(settings: Settings, active: list[Secret]) -> list[str]:
+    lines: list[str] = [
+        "[general]",
+        "prefer_ipv6 = false",
+        "fast_mode = true",
+        "use_middle_proxy = true",
+        'log_level = "normal"',
+    ]
+    if settings.ad_tag:
+        lines.append(f'ad_tag = "{settings.ad_tag}"')
+    else:
+        lines.append('# ad_tag = ""  # Get from @MTProxyBot')
+    lines += [
+        "",
+        "[general.modes]",
+        "classic = false",
+        f"secure = {'true' if not settings.masking_enabled else 'false'}",
+        "tls = true",
+    ]
+    if active:
+        labels_quoted = ", ".join(f'"{s.label}"' for s in active)
+        lines += ["", "[general.links]", f"show = [{labels_quoted}]"]
+    return lines
+
+
+def _toml_server_section(settings: Settings) -> list[str]:
+    lines: list[str] = [
+        "",
+        "[server]",
+        f"port = {settings.proxy_port}",
+        'listen_addr_ipv4 = "0.0.0.0"',
+        'listen_addr_ipv6 = "::"',
+        f"proxy_protocol = {'true' if settings.proxy_protocol else 'false'}",
+    ]
+    if settings.proxy_protocol and settings.proxy_protocol_trusted_cidrs:
+        cidrs = [c.strip() for c in settings.proxy_protocol_trusted_cidrs.split(",") if c.strip()]
+        cidrs_str = ", ".join(f'"{c}"' for c in cidrs)
+        lines.append(f"proxy_protocol_trusted_cidrs = [{cidrs_str}]")
+    lines += [
+        f"metrics_port = {settings.proxy_metrics_port}",
+        'metrics_whitelist = ["127.0.0.1", "::1"]',
+        "",
+        "[timeouts]",
+        "client_handshake = 30",
+        "tg_connect = 10",
+        "client_keepalive = 15",
+        "client_ack = 90",
+    ]
+    return lines
+
+
+def _toml_censorship_section(settings: Settings) -> list[str]:
+    lines: list[str] = [
+        "",
+        "[censorship]",
+        f'tls_domain = "{settings.proxy_domain}"',
+        f'unknown_sni_action = "{settings.unknown_sni_action}"',
+        f"mask = {'true' if settings.masking_enabled else 'false'}",
+        f"mask_port = {settings.masking_port}",
+    ]
+    if settings.masking_enabled and settings.masking_host:
+        lines.append(f'mask_host = "{settings.masking_host}"')
+    lines.append(f"fake_cert_len = {settings.fake_cert_len}")
+    return lines
+
+
+def _collect_expiries(active: list[Secret]) -> dict[str, str]:
+    """Collect valid RFC 3339 expiration dates keyed by secret label."""
+    expires: dict[str, str] = {}
+    for s in active:
+        exp = _to_rfc3339_expiration(s.expires)
+        if exp:
+            expires[s.label] = exp
+        elif s.expires.strip() not in ("", "0"):
+            logger.warning("Skipping invalid expiry for secret label=%s: %r", s.label, s.expires)
+    return expires
+
+
+def _append_limit_section(lines: list[str], data: dict[str, Any], section: str, *, quoted_values: bool = False) -> None:
+    """Append a [section] block with label=value entries to lines if data is non-empty."""
+    if not data:
+        return
+    lines += ["", f"[{section}]"]
+    for label, val in data.items():
+        lines.append(f'"{label}" = "{val}"' if quoted_values else f'"{label}" = {val}')
+
+
+def _toml_access_section(active: list[Secret]) -> list[str]:
+    lines: list[str] = [
+        "",
+        "[access]",
+        "replay_check_len = 65536",
+        "replay_window_secs = 1800",
+        "ignore_time_skew = false",
+    ]
+    if active:
+        lines += ["", "[access.users]"]
+        for s in active:
+            lines.append(f'"{s.label}" = "{s.key}"')
+
+    max_conns = {s.label: s.max_conns for s in active if s.max_conns > 0}
+    max_ips = {s.label: s.max_ips for s in active if s.max_ips > 0}
+    quota = {s.label: s.quota_bytes for s in active if s.quota_bytes > 0}
+    expires = _collect_expiries(active)
+
+    _append_limit_section(lines, max_conns, "access.user_max_tcp_conns")
+    _append_limit_section(lines, max_ips, "access.user_max_unique_ips")
+    _append_limit_section(lines, quota, "access.user_data_quota")
+    _append_limit_section(lines, expires, "access.user_expirations", quoted_values=True)
+    return lines
+
+
+def _toml_upstreams_section(upstreams: list[Upstream]) -> list[str]:
+    lines: list[str] = []
+    active_ups = [u for u in upstreams if u.enabled and u.type != "direct"]
+    for u in active_ups:
+        lines += ["", "[[upstreams]]", f'type = "{u.type}"', f"weight = {u.weight}"]
+        if u.addr:
+            lines.append(f'address = "{u.addr}"')
+        if u.user:
+            if u.type == "socks4":
+                lines.append(f'user_id = "{u.user}"')
+            else:
+                lines.append(f'username = "{u.user}"')
+        if u.password:
+            lines.append(f'password = "{u.password}"')
+        if u.iface:
+            lines.append(f'interface = "{u.iface}"')
+    return lines
+
+
 def _build_toml_config(
     settings: Settings,
     secrets: list[Secret],
@@ -87,133 +218,12 @@ def _build_toml_config(
         "# Generated by MTProxyMaxPy — do not edit manually",
         f"# {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S UTC')}",
         "",
-        "[general]",
-        "prefer_ipv6 = false",
-        "fast_mode = true",
-        "use_middle_proxy = true",
-        'log_level = "normal"',
     ]
-
-    if settings.ad_tag:
-        lines.append(f'ad_tag = "{settings.ad_tag}"')
-    else:
-        lines.append('# ad_tag = ""  # Get from @MTProxyBot')
-
-    lines += [
-        "",
-        "[general.modes]",
-        "classic = false",
-        f"secure = {'true' if not settings.masking_enabled else 'false'}",
-        "tls = true",
-    ]
-
-    if active:
-        labels_quoted = ", ".join(f'"{s.label}"' for s in active)
-        lines += [
-            "",
-            "[general.links]",
-            f"show = [{labels_quoted}]",
-        ]
-
-    lines += [
-        "",
-        "[server]",
-        f"port = {settings.proxy_port}",
-        'listen_addr_ipv4 = "0.0.0.0"',
-        'listen_addr_ipv6 = "::"',
-        f"proxy_protocol = {'true' if settings.proxy_protocol else 'false'}",
-    ]
-
-    if settings.proxy_protocol and settings.proxy_protocol_trusted_cidrs:
-        cidrs = [c.strip() for c in settings.proxy_protocol_trusted_cidrs.split(",") if c.strip()]
-        cidrs_str = ", ".join(f'"{c}"' for c in cidrs)
-        lines.append(f"proxy_protocol_trusted_cidrs = [{cidrs_str}]")
-
-    lines += [
-        f"metrics_port = {settings.proxy_metrics_port}",
-        'metrics_whitelist = ["127.0.0.1", "::1"]',
-        "",
-        "[timeouts]",
-        "client_handshake = 30",
-        "tg_connect = 10",
-        "client_keepalive = 15",
-        "client_ack = 90",
-        "",
-        "[censorship]",
-        f'tls_domain = "{settings.proxy_domain}"',
-        f'unknown_sni_action = "{settings.unknown_sni_action}"',
-        f"mask = {'true' if settings.masking_enabled else 'false'}",
-        f"mask_port = {settings.masking_port}",
-    ]
-
-    if settings.masking_enabled and settings.masking_host:
-        lines.append(f'mask_host = "{settings.masking_host}"')
-
-    lines += [
-        f"fake_cert_len = {settings.fake_cert_len}",
-        "",
-        "[access]",
-        "replay_check_len = 65536",
-        "replay_window_secs = 1800",
-        "ignore_time_skew = false",
-    ]
-
-    # [access.users] — "label" = "hexkey"
-    if active:
-        lines += ["", "[access.users]"]
-        for s in active:
-            lines.append(f'"{s.label}" = "{s.key}"')
-
-    # Per-user limit sections keyed by label
-    max_conns = {s.label: s.max_conns for s in active if s.max_conns > 0}
-    max_ips = {s.label: s.max_ips for s in active if s.max_ips > 0}
-    quota = {s.label: s.quota_bytes for s in active if s.quota_bytes > 0}
-    expires: dict[str, str] = {}
-    for s in active:
-        exp = _to_rfc3339_expiration(s.expires)
-        if exp:
-            expires[s.label] = exp
-        elif s.expires.strip() not in ("", "0"):
-            logger.warning("Skipping invalid expiry for secret label=%s: %r", s.label, s.expires)
-
-    if max_conns:
-        lines += ["", "[access.user_max_tcp_conns]"]
-        for label, val in max_conns.items():
-            lines.append(f'"{label}" = {val}')
-    if max_ips:
-        lines += ["", "[access.user_max_unique_ips]"]
-        for label, val in max_ips.items():
-            lines.append(f'"{label}" = {val}')
-    if quota:
-        lines += ["", "[access.user_data_quota]"]
-        for label, val in quota.items():
-            lines.append(f'"{label}" = {val}')
-    if expires:
-        lines += ["", "[access.user_expirations]"]
-        for label, exp_str in expires.items():
-            lines.append(f'"{label}" = "{exp_str}"')
-
-    # Upstreams
-    active_ups = [u for u in upstreams if u.enabled and u.type != "direct"]
-    if active_ups:
-        for u in active_ups:
-            lines += [
-                "",
-                "[[upstreams]]",
-                f'type = "{u.type}"',
-                f"weight = {u.weight}",
-            ]
-            if u.addr:
-                lines.append(f'address = "{u.addr}"')
-            if u.user:
-                if u.type == "socks4":
-                    lines.append(f'user_id = "{u.user}"')
-                else:
-                    lines.append(f'username = "{u.user}"')
-            if u.password:
-                lines.append(f'password = "{u.password}"')
-            if u.iface:
-                lines.append(f'interface = "{u.iface}"')
+    lines += _toml_general_section(settings, active)
+    lines += _toml_server_section(settings)
+    lines += _toml_censorship_section(settings)
+    lines += _toml_access_section(active)
+    lines += _toml_upstreams_section(upstreams)
 
     return "\n".join(lines) + "\n"
 

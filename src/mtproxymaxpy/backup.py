@@ -90,6 +90,27 @@ def list_backups() -> list[dict[str, Any]]:
     return sorted(backups, key=lambda x: x["mtime"], reverse=True)
 
 
+_CONFIG_EXTS = (".toml", ".json", ".conf")
+
+
+def _extract_config_member(tf: tarfile.TarFile, member: tarfile.TarInfo, install_dir: Path) -> None:
+    """Atomically extract a single config file member from a backup archive."""
+    src = tf.extractfile(member)
+    if src is None:
+        return
+    dest = install_dir / Path(member.name).name
+    fd, tmp = tempfile.mkstemp(dir=install_dir, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(src.read())
+        Path(tmp).chmod(0o600)
+        Path(tmp).replace(dest)
+    except Exception:
+        with contextlib.suppress(OSError):
+            Path(tmp).unlink()
+        raise
+
+
 def restore_backup(archive: Path) -> dict[str, Any]:
     """Extract and restore a backup archive.
 
@@ -117,26 +138,11 @@ def restore_backup(archive: Path) -> dict[str, Any]:
         except KeyError:
             pass
 
-        # Extract config files atomically
-        _CONFIG_EXTS = (".toml", ".json", ".conf")
         for member in tf.getmembers():
             if member.name == "metadata.json":
                 continue
             if any(member.name.endswith(ext) for ext in _CONFIG_EXTS):
-                src = tf.extractfile(member)
-                if src is None:
-                    continue
-                dest = INSTALL_DIR / Path(member.name).name
-                fd, tmp = tempfile.mkstemp(dir=INSTALL_DIR, suffix=".tmp")
-                try:
-                    with os.fdopen(fd, "wb") as fh:
-                        fh.write(src.read())
-                    Path(tmp).chmod(0o600)
-                    Path(tmp).replace(dest)
-                except Exception:
-                    with contextlib.suppress(OSError):
-                        Path(tmp).unlink()
-                    raise
+                _extract_config_member(tf, member, INSTALL_DIR)
             elif member.isdir() and member.name == "relay_stats":
                 (INSTALL_DIR / "relay_stats").mkdir(exist_ok=True)
 

@@ -10,8 +10,10 @@ from typing import TYPE_CHECKING, Any
 import httpx
 
 if TYPE_CHECKING:
-    from aiogram import Bot, Dispatcher
-    from aiogram.types import BotCommand
+    from collections.abc import Sequence
+
+    from aiogram import Bot, Dispatcher, Router
+    from aiogram.types import BotCommand, ErrorEvent, Message
     from aiogram.utils.formatting import Text
 
 import contextlib
@@ -174,363 +176,392 @@ def _get_health_text() -> Text:
     return Text(*parts)
 
 
+def _content_kwargs(content: str | Text) -> dict[str, Any]:
+    """Convert a string or aiogram Text object to send_message keyword arguments."""
+    if hasattr(content, "as_kwargs"):
+        return content.as_kwargs()
+    return {"text": str(content)}
+
+
+def _join_content_lines(lines: Sequence[str | Text]) -> Text:
+    """Join a list of Text/str items into a single aiogram Text."""
+    from aiogram.utils.formatting import Text as _Text
+
+    parts: list[Any] = []
+    for idx, line in enumerate(lines):
+        if idx:
+            parts.append("\n")
+        parts.append(line)
+    return _Text(*parts)
+
+
+async def _send_msg(bot: Bot, chat_id: str, content: str | Text) -> None:
+    await bot.send_message(chat_id, **_content_kwargs(content))
+
+
+async def _reply_msg(msg: Message, content: str | Text) -> None:
+    await msg.answer(**_content_kwargs(content))
+
+
+async def _send_chunked_msg(bot: Bot, chat_id: str, lines: Sequence[str | Text], limit: int = 3500) -> None:
+    chunk: list[Any] = []
+    chunk_len = 0
+    for line in lines:
+        line_len = len(_content_kwargs(line)["text"]) + 1
+        if chunk and chunk_len + line_len > limit:
+            await _send_msg(bot, chat_id, _join_content_lines(chunk))
+            chunk = [line]
+            chunk_len = line_len
+        else:
+            chunk.append(line)
+            chunk_len += line_len
+    if chunk:
+        await _send_msg(bot, chat_id, _join_content_lines(chunk))
+
+
+async def _bot_report_loop(bot: Bot, chat_id: str, interval_hours: int) -> None:
+    while True:
+        await asyncio.sleep(interval_hours * 3600)
+        try:
+            await _send_msg(bot, chat_id, _get_stats_text())
+        except (OSError, RuntimeError) as exc:
+            logger.warning("aiogram report loop send failed: %s", exc)
+
+
+# ── Per-command handlers ────────────────────────────────────────────────────────
+
+
+async def _hdl_router_error(event: ErrorEvent) -> None:
+    exc = event.exception
+    if _should_suppress_update_error(exc):
+        logger.warning("aiogram update timeout suppressed: %s", exc)
+        return
+    raise exc
+
+
+async def _hdl_status(msg: Message, chat_id: str) -> None:
+    if str(msg.chat.id) != chat_id:
+        return
+    await _reply_msg(msg, _get_stats_text())
+
+
+async def _hdl_users(msg: Message, chat_id: str) -> None:
+    if str(msg.chat.id) != chat_id:
+        return
+    await _reply_msg(msg, build_users_text(load_secrets()))
+
+
+async def _hdl_restart(msg: Message, chat_id: str) -> None:
+    if str(msg.chat.id) != chat_id:
+        return
+    from mtproxymaxpy import process_manager
+
+    await msg.answer("🔄 Restarting proxy...", parse_mode="MarkdownV2")
+    try:
+        process_manager.restart()
+        await msg.answer("✅ Proxy restarted successfully", parse_mode="MarkdownV2")
+    except (OSError, RuntimeError) as exc:
+        await msg.answer(f"❌ Proxy failed to restart: {_md(str(exc))}", parse_mode="MarkdownV2")
+
+
+async def _hdl_help(msg: Message, chat_id: str) -> None:
+    if str(msg.chat.id) != chat_id:
+        return
+    await _reply_msg(msg, build_help_text())
+
+
+async def _hdl_mp_health(msg: Message, chat_id: str) -> None:
+    if str(msg.chat.id) != chat_id:
+        return
+    await _reply_msg(msg, _get_health_text())
+
+
+async def _hdl_mp_traffic(msg: Message, chat_id: str) -> None:
+    if str(msg.chat.id) != chat_id:
+        return
+    from mtproxymaxpy import metrics as _metrics
+
+    mst = _metrics.get_stats()
+    if not mst.get("available"):
+        await msg.answer("❌ Metrics unavailable\\.", parse_mode="MarkdownV2")
+        return
+    await _reply_msg(msg, build_mp_traffic_text(mst, bytes_formatter=format_bytes))
+
+
+async def _hdl_mp_secrets(msg: Message, bot: Bot, chat_id: str) -> None:
+    if str(msg.chat.id) != chat_id:
+        return
+    from mtproxymaxpy import metrics as _metrics
+
+    secrets = load_secrets()
+    mst = _metrics.get_stats(timeout=2.0, max_age=5.0)
+    lines = build_mp_secrets_lines(secrets, mst, bytes_formatter=format_bytes)
+    await _send_chunked_msg(bot, chat_id, lines)
+
+
+async def _hdl_mp_limits(msg: Message, chat_id: str) -> None:
+    if str(msg.chat.id) != chat_id:
+        return
+    parts = (msg.text or "").split(maxsplit=1)
+    if len(parts) < 2:
+        await msg.answer("Usage: /mp\\_limits \\<label\\>", parse_mode="MarkdownV2")
+        return
+    label = parts[1].strip()
+    secret = next((s for s in load_secrets() if s.label == label), None)
+    if secret is None:
+        await msg.answer(f"❌ Not found: `{_md(label)}`", parse_mode="MarkdownV2")
+        return
+    await _reply_msg(msg, build_mp_limits_text(secret, bytes_formatter=format_bytes))
+
+
+async def _hdl_mp_setlimit(msg: Message, chat_id: str) -> None:
+    if str(msg.chat.id) != chat_id:
+        return
+    from mtproxymaxpy.config.secrets import set_secret_limits
+    from mtproxymaxpy.utils.validation import parse_human_bytes
+
+    parts = (msg.text or "").split(maxsplit=3)
+    if len(parts) < 4:
+        await msg.answer(
+            "Usage: /mp\\_setlimit \\<label\\> \\<conns\\|ips\\|quota\\|expires\\> \\<value\\>",
+            parse_mode="MarkdownV2",
+        )
+        return
+
+    _, label, field, value = parts
+    try:
+        kwargs: dict[str, Any] = {}
+        if field == "conns":
+            kwargs["max_conns"] = int(value)
+        elif field == "ips":
+            kwargs["max_ips"] = int(value)
+        elif field == "quota":
+            kwargs["quota_bytes"] = parse_human_bytes(value)
+        elif field == "expires":
+            kwargs["expires"] = value
+        else:
+            await msg.answer(f"❌ Unknown field `{_md(field)}`", parse_mode="MarkdownV2")
+            return
+        set_secret_limits(label, **kwargs)
+        await msg.answer(f"✅ Updated `{_md(field)}` for `{_md(label)}`", parse_mode="MarkdownV2")
+    except (ValueError, KeyError) as exc:
+        await msg.answer(f"❌ {_md(str(exc))}", parse_mode="MarkdownV2")
+
+
+async def _hdl_mp_upstreams(msg: Message, chat_id: str) -> None:
+    if str(msg.chat.id) != chat_id:
+        return
+    from mtproxymaxpy.config.upstreams import load_upstreams
+
+    await _reply_msg(msg, build_mp_upstreams_text(load_upstreams()))
+
+
+async def _hdl_mp_link(msg: Message, chat_id: str) -> None:
+    if str(msg.chat.id) != chat_id:
+        return
+    from mtproxymaxpy.utils.network import get_public_ip
+    from mtproxymaxpy.utils.proxy_link import build_proxy_links, qr_api_url
+
+    args = (msg.text or "").split(maxsplit=1)
+    label = args[1].strip() if len(args) > 1 else None
+    secrets = load_secrets()
+    targets = _select_mp_link_targets(secrets, label)
+    if not targets:
+        await msg.answer("❌ Secret not found\\.", parse_mode="MarkdownV2")
+        return
+
+    settings = load_settings()
+    srv = settings.custom_ip or get_public_ip() or "?"
+    for secret in targets:
+        tg, web = build_proxy_links(secret.key, settings.proxy_domain, srv, settings.proxy_port)
+        qr_url = qr_api_url(web)
+        try:
+            await _reply_msg(msg, build_mp_link_text(secret.label, tg, web, qr_url))
+        except Exception as exc:
+            if _is_telegram_timeout_error(exc):
+                logger.warning("mp_link reply timeout for label=%s: %s", secret.label, exc)
+                continue
+            raise
+
+
+async def _hdl_mp_add(msg: Message, chat_id: str) -> None:
+    if str(msg.chat.id) != chat_id:
+        return
+    from mtproxymaxpy.config.secrets import add_secret
+
+    args = (msg.text or "").split(maxsplit=1)
+    if len(args) < 2:
+        await msg.answer("Usage: /mp\\_add \\<label\\>", parse_mode="MarkdownV2")
+        return
+    label = args[1].strip()
+    try:
+        secret = add_secret(label)
+        await msg.answer(f"✅ Added `{_md(secret.label)}`: `{_md(secret.key)}`", parse_mode="MarkdownV2")
+    except (ValueError, KeyError) as exc:
+        await msg.answer(f"❌ {_md(str(exc))}", parse_mode="MarkdownV2")
+
+
+async def _hdl_mp_remove(msg: Message, chat_id: str) -> None:
+    if str(msg.chat.id) != chat_id:
+        return
+    from mtproxymaxpy.config.secrets import remove_secret
+
+    args = (msg.text or "").split(maxsplit=1)
+    if len(args) < 2:
+        await msg.answer("Usage: /mp\\_remove \\<label\\>", parse_mode="MarkdownV2")
+        return
+    label = args[1].strip()
+    if remove_secret(label):
+        await msg.answer(f"✅ Removed `{_md(label)}`", parse_mode="MarkdownV2")
+    else:
+        await msg.answer(f"❌ Not found: `{_md(label)}`", parse_mode="MarkdownV2")
+
+
+async def _hdl_mp_rotate(msg: Message, chat_id: str) -> None:
+    if str(msg.chat.id) != chat_id:
+        return
+    from mtproxymaxpy.config.secrets import rotate_secret
+
+    args = (msg.text or "").split(maxsplit=1)
+    if len(args) < 2:
+        await msg.answer("Usage: /mp\\_rotate \\<label\\>", parse_mode="MarkdownV2")
+        return
+    label = args[1].strip()
+    try:
+        secret = rotate_secret(label)
+        await msg.answer(
+            f"✅ Rotated `{_md(secret.label)}`\\. New key: `{_md(secret.key)}`",
+            parse_mode="MarkdownV2",
+        )
+    except KeyError as exc:
+        await msg.answer(f"❌ {_md(str(exc))}", parse_mode="MarkdownV2")
+
+
+async def _hdl_mp_enable(msg: Message, chat_id: str) -> None:
+    if str(msg.chat.id) != chat_id:
+        return
+    from mtproxymaxpy.config.secrets import enable_secret
+
+    args = (msg.text or "").split(maxsplit=1)
+    if len(args) < 2:
+        await msg.answer("Usage: /mp\\_enable \\<label\\>", parse_mode="MarkdownV2")
+        return
+    label = args[1].strip()
+    try:
+        enable_secret(label)
+        await msg.answer(f"✅ Enabled `{_md(label)}`", parse_mode="MarkdownV2")
+    except (ValueError, KeyError) as exc:
+        await msg.answer(f"❌ {_md(str(exc))}", parse_mode="MarkdownV2")
+
+
+async def _hdl_mp_disable(msg: Message, chat_id: str) -> None:
+    if str(msg.chat.id) != chat_id:
+        return
+    from mtproxymaxpy.config.secrets import disable_secret
+
+    args = (msg.text or "").split(maxsplit=1)
+    if len(args) < 2:
+        await msg.answer("Usage: /mp\\_disable \\<label\\>", parse_mode="MarkdownV2")
+        return
+    label = args[1].strip()
+    try:
+        disable_secret(label)
+        await msg.answer(f"✅ Disabled `{_md(label)}`", parse_mode="MarkdownV2")
+    except (ValueError, KeyError) as exc:
+        await msg.answer(f"❌ {_md(str(exc))}", parse_mode="MarkdownV2")
+
+
+async def _hdl_mp_update(msg: Message, chat_id: str) -> None:
+    if str(msg.chat.id) != chat_id:
+        return
+    from mtproxymaxpy import process_manager
+    from mtproxymaxpy.constants import TELEMT_VERSION
+
+    await msg.answer("🔍 Checking for updates…", parse_mode="MarkdownV2")
+    try:
+        current = process_manager.get_binary_version() if hasattr(process_manager, "get_binary_version") else TELEMT_VERSION
+        latest = process_manager.get_latest_version()
+        if latest == current:
+            await msg.answer(f"✅ Already on latest: `{_md(current)}`", parse_mode="MarkdownV2")
+            return
+        await msg.answer(f"⬇️ Updating `{_md(current)}` → `{_md(latest)}`…", parse_mode="MarkdownV2")
+        was_running = process_manager.is_running()
+        if was_running:
+            process_manager.stop()
+        process_manager.download_binary(version=latest, force=True)
+        if was_running:
+            from mtproxymaxpy.utils.network import get_public_ip
+
+            pid = process_manager.start(public_ip=get_public_ip() or "")
+            await msg.answer(f"✅ Updated and restarted \\(PID `{pid}`\\)", parse_mode="MarkdownV2")
+        else:
+            await msg.answer("✅ Binary updated\\.", parse_mode="MarkdownV2")
+    except (OSError, RuntimeError, ValueError, httpx.HTTPError) as exc:
+        await msg.answer(f"❌ Update failed: `{_md(str(exc))}`", parse_mode="MarkdownV2")
+
+
+def _register_commands(router: Router, bot: Bot, chat_id: str) -> None:
+    """Register all bot command handlers on the given router."""
+    from functools import partial
+
+    from aiogram.filters import Command
+
+    router.error()(partial(_hdl_router_error))
+    router.message(Command("status"))(partial(_hdl_status, chat_id=chat_id))
+    router.message(Command("users"))(partial(_hdl_users, chat_id=chat_id))
+    router.message(Command("restart"))(partial(_hdl_restart, chat_id=chat_id))
+    for _cmd in ("help", "start", "mp_help"):
+        router.message(Command(_cmd))(partial(_hdl_help, chat_id=chat_id))
+    router.message(Command("mp_health"))(partial(_hdl_mp_health, chat_id=chat_id))
+    router.message(Command("mp_traffic"))(partial(_hdl_mp_traffic, chat_id=chat_id))
+    router.message(Command("mp_secrets"))(partial(_hdl_mp_secrets, bot=bot, chat_id=chat_id))
+    router.message(Command("mp_limits"))(partial(_hdl_mp_limits, chat_id=chat_id))
+    router.message(Command("mp_setlimit"))(partial(_hdl_mp_setlimit, chat_id=chat_id))
+    router.message(Command("mp_upstreams"))(partial(_hdl_mp_upstreams, chat_id=chat_id))
+    router.message(Command("mp_link"))(partial(_hdl_mp_link, chat_id=chat_id))
+    router.message(Command("mp_add"))(partial(_hdl_mp_add, chat_id=chat_id))
+    router.message(Command("mp_remove"))(partial(_hdl_mp_remove, chat_id=chat_id))
+    router.message(Command("mp_rotate"))(partial(_hdl_mp_rotate, chat_id=chat_id))
+    router.message(Command("mp_enable"))(partial(_hdl_mp_enable, chat_id=chat_id))
+    router.message(Command("mp_disable"))(partial(_hdl_mp_disable, chat_id=chat_id))
+    router.message(Command("mp_update"))(partial(_hdl_mp_update, chat_id=chat_id))
+
+
+async def _bot_main(token: str, chat_id: str, interval_hours: int) -> None:
+    from aiogram import Bot, Dispatcher, Router
+    from aiogram.types import BotCommand
+
+    bot = Bot(token=token)
+    dp = Dispatcher()
+    router = Router(name="mtproxymaxpy-aiogram")
+
+    _set_runtime_state(asyncio.get_running_loop(), bot, dp)
+    _register_commands(router, bot, chat_id)
+    dp.include_router(router)
+
+    try:
+        await bot.set_my_commands(_build_bot_commands(BotCommand))
+    except (OSError, RuntimeError) as exc:
+        logger.warning("aiogram set_my_commands failed: %s", exc)
+
+    _started_event.set()
+    report_task = asyncio.create_task(_bot_report_loop(bot, chat_id, interval_hours), name="tg-aiogram-report")
+    try:
+        await _start_polling(dp, bot)
+    finally:
+        report_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await report_task
+        await bot.session.close()
+
+
 def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
     global _loop, _bot, _dispatcher
-
-    async def _main() -> None:
-        nonlocal token, chat_id, interval_hours
-        from aiogram import Bot, Dispatcher, Router
-        from aiogram.filters import Command
-        from aiogram.types import BotCommand, ErrorEvent, Message
-        from aiogram.utils.formatting import Text
-
-        bot = Bot(token=token)
-        dp = Dispatcher()
-        router = Router(name="mtproxymaxpy-aiogram")
-
-        _loop_ref = asyncio.get_running_loop()
-        _set_runtime_state(_loop_ref, bot, dp)
-
-        async def _authorised(msg: Message) -> bool:
-            return str(msg.chat.id) == chat_id
-
-        def _content_kwargs(content: str | Text) -> dict[str, Any]:
-            if hasattr(content, "as_kwargs"):
-                return content.as_kwargs()
-            return {"text": str(content)}
-
-        def _join_content_lines(lines: list[Any]) -> Text:
-            parts: list[Any] = []
-            for idx, line in enumerate(lines):
-                if idx:
-                    parts.append("\n")
-                parts.append(line)
-            return Text(*parts)
-
-        async def _send_text(content: str | Text) -> None:
-            await bot.send_message(chat_id, **_content_kwargs(content))
-
-        async def _answer(msg: Message, content: str | Text) -> None:
-            await msg.answer(**_content_kwargs(content))
-
-        async def _send_chunked(lines: list[Any], limit: int = 3500) -> None:
-            chunk: list[Any] = []
-            chunk_len = 0
-            for line in lines:
-                line_len = len(_content_kwargs(line)["text"]) + 1
-                if chunk and chunk_len + line_len > limit:
-                    await _send_text(_join_content_lines(chunk))
-                    chunk = [line]
-                    chunk_len = line_len
-                else:
-                    chunk.append(line)
-                    chunk_len += line_len
-            if chunk:
-                await _send_text(_join_content_lines(chunk))
-
-        async def _report_loop() -> None:
-            while True:
-                await asyncio.sleep(interval_hours * 3600)
-                try:
-                    await _send_text(_get_stats_text())
-                except (OSError, RuntimeError) as exc:
-                    logger.warning("aiogram report loop send failed: %s", exc)
-
-        @router.error()
-        async def handle_router_error(event: ErrorEvent) -> None:
-            exc = event.exception
-            if _should_suppress_update_error(exc):
-                logger.warning("aiogram update timeout suppressed: %s", exc)
-                return
-            raise exc
-
-        @router.message(Command("status"))
-        async def handle_status(msg: Message) -> None:
-            if not await _authorised(msg):
-                return
-            await _answer(msg, _get_stats_text())
-
-        @router.message(Command("users"))
-        async def handle_users(msg: Message) -> None:
-            if not await _authorised(msg):
-                return
-            await _answer(msg, build_users_text(load_secrets()))
-
-        @router.message(Command("restart"))
-        async def handle_restart(msg: Message) -> None:
-            if not await _authorised(msg):
-                return
-            from mtproxymaxpy import process_manager
-
-            await msg.answer("🔄 Restarting proxy...", parse_mode="MarkdownV2")
-            try:
-                process_manager.restart()
-                await msg.answer("✅ Proxy restarted successfully", parse_mode="MarkdownV2")
-            except (OSError, RuntimeError) as exc:
-                await msg.answer(f"❌ Proxy failed to restart: {_md(str(exc))}", parse_mode="MarkdownV2")
-
-        @router.message(Command("help"))
-        @router.message(Command("start"))
-        @router.message(Command("mp_help"))
-        async def handle_help(msg: Message) -> None:
-            if not await _authorised(msg):
-                return
-            await _answer(msg, build_help_text())
-
-        @router.message(Command("mp_health"))
-        async def handle_mp_health(msg: Message) -> None:
-            if not await _authorised(msg):
-                return
-            await _answer(msg, _get_health_text())
-
-        @router.message(Command("mp_traffic"))
-        async def handle_mp_traffic(msg: Message) -> None:
-            if not await _authorised(msg):
-                return
-            from mtproxymaxpy import metrics as _metrics
-
-            mst = _metrics.get_stats()
-            if not mst.get("available"):
-                await msg.answer("❌ Metrics unavailable\\.", parse_mode="MarkdownV2")
-                return
-            text = build_mp_traffic_text(mst, bytes_formatter=format_bytes)
-            await _answer(msg, text)
-
-        @router.message(Command("mp_secrets"))
-        async def handle_mp_secrets(msg: Message) -> None:
-            if not await _authorised(msg):
-                return
-            from mtproxymaxpy import metrics as _metrics
-
-            secrets = load_secrets()
-            mst = _metrics.get_stats(timeout=2.0, max_age=5.0)
-            lines = build_mp_secrets_lines(secrets, mst, bytes_formatter=format_bytes)
-            await _send_chunked(lines)
-
-        @router.message(Command("mp_limits"))
-        async def handle_mp_limits(msg: Message) -> None:
-            if not await _authorised(msg):
-                return
-            parts = (msg.text or "").split(maxsplit=1)
-            if len(parts) < 2:
-                await msg.answer("Usage: /mp\\_limits \\<label\\>", parse_mode="MarkdownV2")
-                return
-            label = parts[1].strip()
-            secret = next((s for s in load_secrets() if s.label == label), None)
-            if secret is None:
-                await msg.answer(f"❌ Not found: `{_md(label)}`", parse_mode="MarkdownV2")
-                return
-            await _answer(msg, build_mp_limits_text(secret, bytes_formatter=format_bytes))
-
-        @router.message(Command("mp_setlimit"))
-        async def handle_mp_setlimit(msg: Message) -> None:
-            if not await _authorised(msg):
-                return
-            from mtproxymaxpy.config.secrets import set_secret_limits
-            from mtproxymaxpy.utils.validation import parse_human_bytes
-
-            parts = (msg.text or "").split(maxsplit=3)
-            if len(parts) < 4:
-                await msg.answer(
-                    "Usage: /mp\\_setlimit \\<label\\> \\<conns\\|ips\\|quota\\|expires\\> \\<value\\>",
-                    parse_mode="MarkdownV2",
-                )
-                return
-
-            _, label, field, value = parts
-            try:
-                kwargs: dict[str, Any] = {}
-                if field == "conns":
-                    kwargs["max_conns"] = int(value)
-                elif field == "ips":
-                    kwargs["max_ips"] = int(value)
-                elif field == "quota":
-                    kwargs["quota_bytes"] = parse_human_bytes(value)
-                elif field == "expires":
-                    kwargs["expires"] = value
-                else:
-                    await msg.answer(f"❌ Unknown field `{_md(field)}`", parse_mode="MarkdownV2")
-                    return
-                set_secret_limits(label, **kwargs)
-                await msg.answer(f"✅ Updated `{_md(field)}` for `{_md(label)}`", parse_mode="MarkdownV2")
-            except (ValueError, KeyError) as exc:
-                await msg.answer(f"❌ {_md(str(exc))}", parse_mode="MarkdownV2")
-
-        @router.message(Command("mp_upstreams"))
-        async def handle_mp_upstreams(msg: Message) -> None:
-            if not await _authorised(msg):
-                return
-            from mtproxymaxpy.config.upstreams import load_upstreams
-
-            await _answer(msg, build_mp_upstreams_text(load_upstreams()))
-
-        @router.message(Command("mp_link"))
-        async def handle_mp_link(msg: Message) -> None:
-            if not await _authorised(msg):
-                return
-            from mtproxymaxpy.utils.network import get_public_ip
-            from mtproxymaxpy.utils.proxy_link import build_proxy_links, qr_api_url
-
-            args = (msg.text or "").split(maxsplit=1)
-            label = args[1].strip() if len(args) > 1 else None
-            secrets = load_secrets()
-            targets = _select_mp_link_targets(secrets, label)
-            if not targets:
-                await msg.answer("❌ Secret not found\\.", parse_mode="MarkdownV2")
-                return
-
-            settings = load_settings()
-            srv = settings.custom_ip or get_public_ip() or "?"
-            for secret in targets:
-                tg, web = build_proxy_links(secret.key, settings.proxy_domain, srv, settings.proxy_port)
-                qr_url = qr_api_url(web)
-                try:
-                    await _answer(msg, build_mp_link_text(secret.label, tg, web, qr_url))
-                except Exception as exc:
-                    if _is_telegram_timeout_error(exc):
-                        logger.warning("mp_link reply timeout for label=%s: %s", secret.label, exc)
-                        continue
-                    raise
-
-        @router.message(Command("mp_add"))
-        async def handle_mp_add(msg: Message) -> None:
-            if not await _authorised(msg):
-                return
-            from mtproxymaxpy.config.secrets import add_secret
-
-            args = (msg.text or "").split(maxsplit=1)
-            if len(args) < 2:
-                await msg.answer("Usage: /mp\\_add \\<label\\>", parse_mode="MarkdownV2")
-                return
-            label = args[1].strip()
-            try:
-                secret = add_secret(label)
-                await msg.answer(f"✅ Added `{_md(secret.label)}`: `{_md(secret.key)}`", parse_mode="MarkdownV2")
-            except (ValueError, KeyError) as exc:
-                await msg.answer(f"❌ {_md(str(exc))}", parse_mode="MarkdownV2")
-
-        @router.message(Command("mp_remove"))
-        async def handle_mp_remove(msg: Message) -> None:
-            if not await _authorised(msg):
-                return
-            from mtproxymaxpy.config.secrets import remove_secret
-
-            args = (msg.text or "").split(maxsplit=1)
-            if len(args) < 2:
-                await msg.answer("Usage: /mp\\_remove \\<label\\>", parse_mode="MarkdownV2")
-                return
-            label = args[1].strip()
-            if remove_secret(label):
-                await msg.answer(f"✅ Removed `{_md(label)}`", parse_mode="MarkdownV2")
-            else:
-                await msg.answer(f"❌ Not found: `{_md(label)}`", parse_mode="MarkdownV2")
-
-        @router.message(Command("mp_rotate"))
-        async def handle_mp_rotate(msg: Message) -> None:
-            if not await _authorised(msg):
-                return
-            from mtproxymaxpy.config.secrets import rotate_secret
-
-            args = (msg.text or "").split(maxsplit=1)
-            if len(args) < 2:
-                await msg.answer("Usage: /mp\\_rotate \\<label\\>", parse_mode="MarkdownV2")
-                return
-            label = args[1].strip()
-            try:
-                secret = rotate_secret(label)
-                await msg.answer(
-                    f"✅ Rotated `{_md(secret.label)}`\\. New key: `{_md(secret.key)}`",
-                    parse_mode="MarkdownV2",
-                )
-            except KeyError as exc:
-                await msg.answer(f"❌ {_md(str(exc))}", parse_mode="MarkdownV2")
-
-        @router.message(Command("mp_enable"))
-        async def handle_mp_enable(msg: Message) -> None:
-            if not await _authorised(msg):
-                return
-            from mtproxymaxpy.config.secrets import enable_secret
-
-            args = (msg.text or "").split(maxsplit=1)
-            if len(args) < 2:
-                await msg.answer("Usage: /mp\\_enable \\<label\\>", parse_mode="MarkdownV2")
-                return
-            label = args[1].strip()
-            try:
-                enable_secret(label)
-                await msg.answer(f"✅ Enabled `{_md(label)}`", parse_mode="MarkdownV2")
-            except (ValueError, KeyError) as exc:
-                await msg.answer(f"❌ {_md(str(exc))}", parse_mode="MarkdownV2")
-
-        @router.message(Command("mp_disable"))
-        async def handle_mp_disable(msg: Message) -> None:
-            if not await _authorised(msg):
-                return
-            from mtproxymaxpy.config.secrets import disable_secret
-
-            args = (msg.text or "").split(maxsplit=1)
-            if len(args) < 2:
-                await msg.answer("Usage: /mp\\_disable \\<label\\>", parse_mode="MarkdownV2")
-                return
-            label = args[1].strip()
-            try:
-                disable_secret(label)
-                await msg.answer(f"✅ Disabled `{_md(label)}`", parse_mode="MarkdownV2")
-            except (ValueError, KeyError) as exc:
-                await msg.answer(f"❌ {_md(str(exc))}", parse_mode="MarkdownV2")
-
-        @router.message(Command("mp_update"))
-        async def handle_mp_update(msg: Message) -> None:
-            if not await _authorised(msg):
-                return
-            from mtproxymaxpy import process_manager
-            from mtproxymaxpy.constants import TELEMT_VERSION
-
-            await msg.answer("🔍 Checking for updates…", parse_mode="MarkdownV2")
-            try:
-                current = process_manager.get_binary_version() if hasattr(process_manager, "get_binary_version") else TELEMT_VERSION
-                latest = process_manager.get_latest_version()
-                if latest == current:
-                    await msg.answer(f"✅ Already on latest: `{_md(current)}`", parse_mode="MarkdownV2")
-                    return
-                await msg.answer(
-                    f"⬇️ Updating `{_md(current)}` → `{_md(latest)}`…",
-                    parse_mode="MarkdownV2",
-                )
-                was_running = process_manager.is_running()
-                if was_running:
-                    process_manager.stop()
-                process_manager.download_binary(version=latest, force=True)
-                if was_running:
-                    from mtproxymaxpy.utils.network import get_public_ip
-
-                    pid = process_manager.start(public_ip=get_public_ip() or "")
-                    await msg.answer(f"✅ Updated and restarted \\(PID `{pid}`\\)", parse_mode="MarkdownV2")
-                else:
-                    await msg.answer("✅ Binary updated\\.", parse_mode="MarkdownV2")
-            except (OSError, RuntimeError, ValueError, httpx.HTTPError) as exc:
-                await msg.answer(f"❌ Update failed: `{_md(str(exc))}`", parse_mode="MarkdownV2")
-
-        dp.include_router(router)
-        try:
-            await bot.set_my_commands(_build_bot_commands(BotCommand))
-        except (OSError, RuntimeError) as exc:
-            logger.warning("aiogram set_my_commands failed: %s", exc)
-
-        _started_event.set()
-        report_task = asyncio.create_task(_report_loop(), name="tg-aiogram-report")
-        try:
-            await _start_polling(dp, bot)
-        finally:
-            report_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await report_task
-            await bot.session.close()
 
     timeout_retry_attempt = 0
     while not _stop_event.is_set():
         try:
-            asyncio.run(_main())
+            asyncio.run(_bot_main(token, chat_id, interval_hours))
             if _stop_event.is_set():
                 break
             logger.warning("aiogram polling exited unexpectedly; restarting")
