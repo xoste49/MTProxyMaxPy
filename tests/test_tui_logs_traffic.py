@@ -134,7 +134,7 @@ def test_logs_traffic_screen_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(pkg, "process_manager", pm, raising=False)
     monkeypatch.setitem(sys.modules, "mtproxymaxpy.metrics", met)
     monkeypatch.setattr(pkg, "metrics", met, raising=False)
-    monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.secrets", SimpleNamespace(load_secrets=lambda: []))
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.secrets", SimpleNamespace(load_secrets=list))
     monkeypatch.setitem(sys.modules, "mtproxymaxpy.utils.formatting", SimpleNamespace(format_bytes=lambda n: f"{n}B"))
     menu._logs_traffic_screen()
 
@@ -145,7 +145,7 @@ def test_logs_traffic_screen_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(pkg, "process_manager", pm2, raising=False)
     monkeypatch.setitem(sys.modules, "mtproxymaxpy.metrics", met2)
     monkeypatch.setattr(pkg, "metrics", met2, raising=False)
-    monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.secrets", SimpleNamespace(load_secrets=lambda: []))
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.secrets", SimpleNamespace(load_secrets=list))
     monkeypatch.setattr(menu, "_ask_choice", lambda *a, **k: 0)
     menu._logs_traffic_screen()
 

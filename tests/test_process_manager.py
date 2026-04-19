@@ -58,8 +58,8 @@ def test_write_toml_config_and_atomic_failure(monkeypatch: pytest.MonkeyPatch, t
     monkeypatch.setattr(pm, "TOML_CONFIG_FILE", target)
     monkeypatch.setattr(pm, "_build_toml_config", lambda *a, **k: "x=1\n")
     monkeypatch.setattr(pm, "load_settings", lambda: object())
-    monkeypatch.setattr(pm, "load_secrets", lambda: [])
-    monkeypatch.setattr(pm, "load_upstreams", lambda: [])
+    monkeypatch.setattr(pm, "load_secrets", list)
+    monkeypatch.setattr(pm, "load_upstreams", list)
 
     pm.write_toml_config()
     assert target.read_text(encoding="utf-8") == "x=1\n"

@@ -10,7 +10,7 @@ from pathlib import Path
 def check_root() -> None:
     """Exit with an error message if the process is not running as root."""
     if os.geteuid() != 0:  # type: ignore[attr-defined]
-        print("Error: MTProxyMaxPy must be run as root.", file=sys.stderr)
+        print("Error: MTProxyMaxPy must be run as root.", file=sys.stderr)  # noqa: T201
         sys.exit(1)
 
 

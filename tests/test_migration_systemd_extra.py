@@ -11,7 +11,7 @@ from mtproxymaxpy.config import migration
 
 
 def test_migration_parse_bool_and_settings_fallback(tmp_path: Path) -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Cannot parse boolean"):
         migration._parse_bool("maybe")
 
     cfg = tmp_path / "settings.conf"

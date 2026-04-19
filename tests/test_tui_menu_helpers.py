@@ -21,7 +21,9 @@ def test_basic_menu_helpers(monkeypatch: pytest.MonkeyPatch) -> None:
     assert calls["print"] == 0
 
     line = menu._choice(3, "Label", "hint")
-    assert "3" in line and "Label" in line and "hint" in line
+    assert "3" in line
+    assert "Label" in line
+    assert "hint" in line
 
 
 def test_ask_choice_validation(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -43,7 +45,7 @@ def test_header_panel_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
     _mock_metrics = SimpleNamespace(
         get_stats=lambda **_kw: {"available": True, "bytes_in": 0, "bytes_out": 0, "active_connections": 0, "total_connections": 0},
     )
-    _mock_secrets = SimpleNamespace(load_secrets=lambda: [])
+    _mock_secrets = SimpleNamespace(load_secrets=list)
     _mock_formatting = SimpleNamespace(format_bytes=lambda n: f"{n}B", format_duration=lambda s: "0s")
 
     monkeypatch.setattr(pkg, "process_manager", pm, raising=False)

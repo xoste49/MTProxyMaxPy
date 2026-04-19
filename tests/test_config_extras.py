@@ -71,9 +71,9 @@ def test_secrets_mutation_flows(tmp_path: Path) -> None:
         secrets.rename_secret("missing", "x", path)
     with pytest.raises(KeyError):
         secrets.clone_secret("missing", "x", path)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="already exists"):
         secrets.rename_secret("alice2", "alice3", path)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="already exists"):
         secrets.clone_secret("alice2", "alice3", path)
 
 
@@ -136,30 +136,30 @@ def test_upstreams_add_remove_enable_disable_test(tmp_path: Path, monkeypatch: p
     path = tmp_path / "upstreams.json"
     upstreams.save_upstreams([upstreams.Upstream(name="direct", type="direct", enabled=True)], path)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Name must match"):
         upstreams.add_upstream("bad name", type_="direct", path=path)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Name must match"):
         upstreams.add_upstream("a" * 33, type_="direct", path=path)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Type must be"):
         upstreams.add_upstream("u1", type_="bad", path=path)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="is required"):
         upstreams.add_upstream("u1", type_="socks5", addr="", path=path)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="host:port format"):
         upstreams.add_upstream("u1", type_="socks5", addr="host:notnum", path=path)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Port must be"):
         upstreams.add_upstream("u1", type_="socks5", addr="host:99999", path=path)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="cannot contain"):
         upstreams.add_upstream("u1", type_="socks5", addr="h:1080", user="bad|x", path=path)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="cannot contain"):
         upstreams.add_upstream("u1", type_="socks5", addr="h:1080", password='bad"x', path=path)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="cannot contain"):
         upstreams.add_upstream("u1", type_="socks5", addr="h:1080", iface="bad\\x", path=path)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Weight must be"):
         upstreams.add_upstream("u1", type_="socks5", addr="h:1080", weight=101, path=path)
 
     u1 = upstreams.add_upstream("u1", type_="socks4", addr="127.0.0.1:1080", password="x", path=path)
     assert u1.password == ""
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="already exists"):
         upstreams.add_upstream("u1", type_="direct", path=path)
 
     # field setter path
@@ -170,11 +170,11 @@ def test_upstreams_add_remove_enable_disable_test(tmp_path: Path, monkeypatch: p
 
     # remove/disable guards
     upstreams.disable_upstream("u1", path)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Cannot remove"):
         upstreams.remove_upstream("direct", path)
     upstreams.enable_upstream("u1", path)
     upstreams.disable_upstream("direct", path)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Cannot disable"):
         upstreams.disable_upstream("u1", path)
     with pytest.raises(KeyError):
         upstreams.set_upstream_enabled("missing", enabled=True, path=path)

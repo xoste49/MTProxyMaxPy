@@ -26,7 +26,7 @@ def _module_names() -> list[str]:
         if "__pycache__" in mod:
             continue
         # Legacy Textual modules are no longer used by the Rich TUI.
-        if mod.startswith("mtproxymaxpy.tui.screens.") or mod.startswith("mtproxymaxpy.tui.widgets."):
+        if mod.startswith(("mtproxymaxpy.tui.screens.", "mtproxymaxpy.tui.widgets.")):
             continue
         names.append(mod)
     return names
@@ -96,7 +96,7 @@ def test_top_level_help(command: str) -> None:
     assert result.exit_code == 0, f"'{command} --help' exited {result.exit_code}:\n{result.output}"
 
 
-@pytest.mark.parametrize("group,command", _cli_groups())
+@pytest.mark.parametrize(("group", "command"), _cli_groups())
 def test_subcommand_help(group: str, command: str) -> None:
     """Every sub-command must respond to --help without crashing."""
     from typer.testing import CliRunner

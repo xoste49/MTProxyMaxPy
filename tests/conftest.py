@@ -20,7 +20,7 @@ def _running_in_docker() -> bool:
     return any(m in text for m in markers)
 
 
-@pytest.fixture()
+@pytest.fixture
 def tmp_config(tmp_path: Path) -> Path:
     """Return a tmp_path that can act as the config root."""
     return tmp_path

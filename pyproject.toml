@@ -106,19 +106,6 @@ exclude = [
 
 [tool.ruff.lint]
 select = [
-    # pycodestyle
-    "E",
-    "W",
-    # Pyflakes
-    "F",
-    # pyupgrade
-    "UP",
-    # flake8-bugbear
-    #"B",
-    # flake8-simplify
-    #"SIM",
-    # isort
-    "I",
     "ERA", # Включить проверку наличия закоментированного кода https://docs.astral.sh/ruff/rules/#eradicate-era
     "YTT", # flake8-2020 (YTT) https://docs.astral.sh/ruff/rules/#flake8-2020-ytt
     "ANN", # flake8-annotations (ANN) https://docs.astral.sh/ruff/rules/#flake8-annotations-ann
@@ -133,10 +120,24 @@ select = [
     "DTZ", # flake8-datetimez (DTZ) https://docs.astral.sh/ruff/rules/#flake8-datetimez-dtz
     # "T10", "DJ", "EM", "EXE" - не нужны
     "FIX", # flake8-fixme (FIX) https://docs.astral.sh/ruff/rules/#flake8-fixme-fix
+    # "FA" для старых версий python
+    "INT", # flake8-gettext (INT) https://docs.astral.sh/ruff/rules/#flake8-gettext-int
+    "ISC", # flake8-implicit-str-concat (ISC) https://docs.astral.sh/ruff/rules/#flake8-implicit-str-concat-isc
+    "ICN", # flake8-import-conventions (ICN) https://docs.astral.sh/ruff/rules/#flake8-import-conventions-icn
+    "LOG", # flake8-logging (LOG) https://docs.astral.sh/ruff/rules/#flake8-logging-log
+    "G", # flake8-logging-format (G) https://docs.astral.sh/ruff/rules/#flake8-logging-format-g
+    "INP", # flake8-no-pep420 (INP) https://docs.astral.sh/ruff/rules/#flake8-no-pep420-inp
+    "PIE", # flake8-pie (PIE) https://docs.astral.sh/ruff/rules/#flake8-pie-pie
+    "T20", # flake8-print (T20) https://docs.astral.sh/ruff/rules/#flake8-print-t20
+    "PYI", # flake8-pyi (PYI) https://docs.astral.sh/ruff/rules/#flake8-print-t20
+    "PT", # flake8-pytest-style (PT) https://docs.astral.sh/ruff/rules/#flake8-pytest-style-pt
+    #"Q", # flake8-quotes (Q) https://docs.astral.sh/ruff/rules/#flake8-quotes-q
+    #"RSE", # flake8-raise (RSE) https://docs.astral.sh/ruff/rules/#flake8-raise-rse
+    #"RET", # flake8-return (RET) https://docs.astral.sh/ruff/rules/#flake8-return-ret
 ]
 ignore = ["E741", "S103", "S603", "S607"]
 fixable = ["ALL"]
-per-file-ignores = {"tests/**" = ["ANN", "FBT", "S101", "S608", "S105", "S106"]}
+per-file-ignores = {"tests/**" = ["ANN", "FBT", "S101", "S608", "S105", "S106", "INP"]}
 
 [tool.ruff.format]
 quote-style = "double"

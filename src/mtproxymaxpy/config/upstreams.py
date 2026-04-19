@@ -211,7 +211,7 @@ def toggle_upstream(name: str, path: Path = UPSTREAMS_FILE) -> Upstream:
     return set_upstream_enabled(name, enabled=not current.enabled, path=path)
 
 
-def test_upstream(name: str, timeout: float = 10.0) -> dict[str, Any]:
+def test_upstream(name: str, timeout: float = 10.0) -> dict[str, Any]:  # noqa: PT028
     """Test connectivity through an upstream proxy.
 
     Returns ``{ok: bool, error: str|None, latency_ms: float|None}``.

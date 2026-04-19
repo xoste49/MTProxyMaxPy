@@ -14,7 +14,7 @@ from mtproxymaxpy.utils.validation import parse_human_bytes, validate_domain, va
 
 
 @pytest.mark.parametrize(
-    "n, expected",
+    ("n", "expected"),
     [
         (0, "0 B"),
         (512, "512 B"),
@@ -35,7 +35,7 @@ def test_format_bytes(n, expected):
 
 
 @pytest.mark.parametrize(
-    "secs, expected",
+    ("secs", "expected"),
     [
         (0, "0m"),
         (59, "0m"),
@@ -55,7 +55,7 @@ def test_format_duration(secs, expected):
 
 
 @pytest.mark.parametrize(
-    "n, expected",
+    ("n", "expected"),
     [
         (999, "999K"),  # edge — stays in K territory if < 1000
         (1000, "1K"),
@@ -75,7 +75,7 @@ def test_format_number(n, expected):
 
 
 @pytest.mark.parametrize(
-    "port, valid",
+    ("port", "valid"),
     [
         (1, True),
         (443, True),
@@ -95,7 +95,7 @@ def test_validate_port(port, valid):
 
 
 @pytest.mark.parametrize(
-    "domain, valid",
+    ("domain", "valid"),
     [
         ("cloudflare.com", True),
         ("sub.example.org", True),
@@ -114,7 +114,7 @@ def test_validate_domain(domain, valid):
 
 
 @pytest.mark.parametrize(
-    "value, expected",
+    ("value", "expected"),
     [
         ("0", 0),
         ("1024", 1024),
@@ -132,7 +132,7 @@ def test_parse_human_bytes_valid(value, expected):
 
 @pytest.mark.parametrize("value", ["abc", "5X", "-1", ""])
 def test_parse_human_bytes_invalid(value):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="byte value"):
         parse_human_bytes(value)
 
 

@@ -160,7 +160,7 @@ def test_links_menu_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     assert called["show"] == 1
 
     # ch=1 path with no enabled
-    monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.secrets", SimpleNamespace(load_secrets=lambda: []))
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.secrets", SimpleNamespace(load_secrets=list))
     choices = iter([1, 0])
     monkeypatch.setattr(menu, "_ask_choice", lambda *a, **k: next(choices))
     menu._links_menu()
