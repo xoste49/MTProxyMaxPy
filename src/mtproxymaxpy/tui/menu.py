@@ -244,6 +244,7 @@ def _read_local_manager_sha() -> str:
             capture_output=True,
             text=True,
             timeout=5,
+            check=False,
         )
         sha = (res.stdout or "").strip().lower()
         if res.returncode == 0 and len(sha) == 40 and all(c in "0123456789abcdef" for c in sha):
@@ -1625,6 +1626,7 @@ def _update_screen() -> None:  # noqa: C901
                 capture_output=True,
                 text=True,
                 timeout=5,
+                check=False,
             )
             candidate = (r_local.stdout or "").strip().lower()
             if r_local.returncode == 0 and len(candidate) == 40 and all(c in "0123456789abcdef" for c in candidate):
@@ -1677,16 +1679,19 @@ def _update_screen() -> None:  # noqa: C901
                         [git, "-C", str(INSTALL_DIR), "stash", "--quiet"],
                         capture_output=True,
                         text=True,
+                        check=False,
                     )
                     r_fetch = _sp.run(
                         [git, "-C", str(INSTALL_DIR), "fetch", "origin", branch],
                         capture_output=True,
                         text=True,
+                        check=False,
                     )
                     r0 = _sp.run(
                         [git, "-C", str(INSTALL_DIR), "checkout", branch],
                         capture_output=True,
                         text=True,
+                        check=False,
                     )
                     if r0.returncode != 0:
                         # Use FETCH_HEAD because origin/<branch> may be absent locally
@@ -1696,12 +1701,14 @@ def _update_screen() -> None:  # noqa: C901
                                 [git, "-C", str(INSTALL_DIR), "checkout", "-B", branch, "FETCH_HEAD"],
                                 capture_output=True,
                                 text=True,
+                                check=False,
                             )
                         else:
                             r0 = _sp.run(
                                 [git, "-C", str(INSTALL_DIR), "checkout", "-b", branch, f"origin/{branch}"],
                                 capture_output=True,
                                 text=True,
+                                check=False,
                             )
                     if r0.returncode != 0:
                         out0 = "\n".join(
@@ -1724,6 +1731,7 @@ def _update_screen() -> None:  # noqa: C901
                             [git, "-C", str(INSTALL_DIR), "pull", "--ff-only", "origin", branch],
                             capture_output=True,
                             text=True,
+                            check=False,
                         )
                     # Always drop any stash created above — generated files
                     # (uv.lock etc.) will be recreated by uv sync anyway.
@@ -1731,6 +1739,7 @@ def _update_screen() -> None:  # noqa: C901
                         [git, "-C", str(INSTALL_DIR), "stash", "drop", "--quiet"],
                         capture_output=True,
                         text=True,
+                        check=False,
                     )
                     if r1 is None:
                         pass
@@ -1747,6 +1756,7 @@ def _update_screen() -> None:  # noqa: C901
                             capture_output=True,
                             text=True,
                             cwd=str(INSTALL_DIR),
+                            check=False,
                         )
                         if r2.returncode == 0:
                             UPDATE_SHA_FILE.write_text(remote_sha)

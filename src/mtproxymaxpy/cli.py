@@ -296,11 +296,11 @@ def logs(
     if follow:
         import subprocess
 
-        subprocess.run(["tail", "-f", str(log_file)])
+        subprocess.run(["tail", "-f", str(log_file)], check=False)
     else:
         import subprocess
 
-        subprocess.run(["tail", f"-{lines}", str(log_file)])
+        subprocess.run(["tail", f"-{lines}", str(log_file)], check=False)
 
 
 # ── metrics ────────────────────────────────────────────────────────────────────

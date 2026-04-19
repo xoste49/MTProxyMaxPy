@@ -95,8 +95,8 @@ def _parse_bool(v: str) -> bool:
 def _parse_settings_conf(path: Path) -> dict[str, Any]:
     """Parse KEY='VALUE' shell-format settings.conf into a plain dict."""
     result: dict[str, Any] = {}
-    for line in path.read_text(errors="replace").splitlines():
-        line = line.strip()
+    for raw in path.read_text(errors="replace").splitlines():
+        line = raw.strip()
         if not line or line.startswith("#"):
             continue
         m = _KV_RE.match(line)
@@ -139,8 +139,8 @@ def _ts_to_date(ts: str) -> str:
 def _parse_secrets_conf(path: Path) -> list[Secret]:
     """Parse pipe-delimited secrets.conf (9 columns)."""
     items: list[Secret] = []
-    for line in path.read_text(errors="replace").splitlines():
-        line = line.strip()
+    for raw in path.read_text(errors="replace").splitlines():
+        line = raw.strip()
         if not line or line.startswith("#"):
             continue
         cols = line.split("|")
@@ -172,8 +172,8 @@ def _parse_secrets_conf(path: Path) -> list[Secret]:
 def _parse_upstreams_conf(path: Path) -> list[Upstream]:
     """Parse pipe-delimited upstreams.conf (8 columns)."""
     items: list[Upstream] = []
-    for line in path.read_text(errors="replace").splitlines():
-        line = line.strip()
+    for raw in path.read_text(errors="replace").splitlines():
+        line = raw.strip()
         if not line or line.startswith("#"):
             continue
         cols = line.split("|")
@@ -203,8 +203,8 @@ def _parse_upstreams_conf(path: Path) -> list[Upstream]:
 def _parse_instances_conf(path: Path) -> list[Instance]:
     """Parse pipe-delimited instances.conf (4 columns)."""
     items: list[Instance] = []
-    for line in path.read_text(errors="replace").splitlines():
-        line = line.strip()
+    for raw in path.read_text(errors="replace").splitlines():
+        line = raw.strip()
         if not line or line.startswith("#"):
             continue
         cols = line.split("|")

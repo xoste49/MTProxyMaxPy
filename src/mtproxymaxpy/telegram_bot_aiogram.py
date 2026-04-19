@@ -556,8 +556,6 @@ async def _bot_main(token: str, chat_id: str, interval_hours: int) -> None:
 
 
 def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
-    global _loop, _bot, _dispatcher
-
     timeout_retry_attempt = 0
     while not _stop_event.is_set():
         try:
@@ -586,14 +584,14 @@ def _run_polling(token: str, chat_id: str, interval_hours: int) -> None:
 
 
 def _set_runtime_state(loop: asyncio.AbstractEventLoop, bot: Bot, dispatcher: Dispatcher) -> None:
-    global _loop, _bot, _dispatcher
+    global _loop, _bot, _dispatcher  # noqa: PLW0603
     _loop = loop
     _bot = bot
     _dispatcher = dispatcher
 
 
 def _reset_runtime_state() -> None:
-    global _loop, _bot, _dispatcher, _poll_thread
+    global _loop, _bot, _dispatcher, _poll_thread  # noqa: PLW0603
     _loop = None
     _bot = None
     _dispatcher = None
@@ -603,7 +601,7 @@ def _reset_runtime_state() -> None:
 
 def start() -> None:
     """Start aiogram backend in a background polling thread."""
-    global _poll_thread
+    global _poll_thread  # noqa: PLW0603
 
     settings = load_settings()
     if not settings.telegram_enabled:

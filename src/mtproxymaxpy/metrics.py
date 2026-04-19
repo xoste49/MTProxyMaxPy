@@ -45,8 +45,8 @@ def parse_metrics(raw: str) -> list[dict[str, Any]]:
     Each dict: ``{name: str, labels: dict[str, str], value: float}``
     """
     samples: list[dict[str, Any]] = []
-    for line in raw.splitlines():
-        line = line.strip()
+    for raw_line in raw.splitlines():
+        line = raw_line.strip()
         if not line or line.startswith("#"):
             continue
         m = _SAMPLE_RE.match(line)
@@ -143,7 +143,7 @@ def get_stats(*, timeout: float = 5.0, max_age: float = 0.0) -> dict[str, Any]:
 
     Always returns a dict; ``available`` key indicates success.
     """
-    global _stats_cache
+    global _stats_cache  # noqa: PLW0603
 
     if max_age > 0 and _stats_cache is not None:
         cached, ts = _stats_cache

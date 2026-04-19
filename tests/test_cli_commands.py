@@ -172,7 +172,7 @@ def test_doctor_health_logs_metrics_connections_traffic(monkeypatch: pytest.Monk
         SimpleNamespace(INSTALL_DIR=tmp_path, STATS_DIR=tmp_path, BACKUP_DIR=tmp_path),
     )
     calls: list[list[str]] = []
-    monkeypatch.setitem(sys.modules, "subprocess", SimpleNamespace(run=lambda cmd: calls.append(cmd)))
+    monkeypatch.setitem(sys.modules, "subprocess", SimpleNamespace(run=lambda cmd, **_kw: calls.append(cmd)))
     cli.logs(lines=5, follow=False)
     cli.logs(lines=5, follow=True)
     assert calls[0][0] == "tail"

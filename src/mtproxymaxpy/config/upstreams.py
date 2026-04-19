@@ -250,7 +250,7 @@ def test_upstream(name: str, timeout: float = 10.0) -> dict[str, Any]:  # noqa: 
     import subprocess
 
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout + 2)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout + 2, check=False)
         latency_ms = (time.monotonic() - t0) * 1000
         ok = result.returncode == 0
         return {"ok": ok, "error": result.stderr.strip() or None, "latency_ms": round(latency_ms, 1)}

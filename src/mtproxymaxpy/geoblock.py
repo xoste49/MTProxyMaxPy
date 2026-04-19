@@ -128,6 +128,7 @@ def add_country(cc: str) -> int:
     probe = subprocess.run(
         ["iptables", "-C", "INPUT", "-m", "set", "--match-set", setname, "src", "-j", "DROP"],
         capture_output=True,
+        check=False,
     )
     if probe.returncode != 0:
         _run(

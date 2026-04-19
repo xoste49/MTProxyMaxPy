@@ -1,5 +1,6 @@
 """Network utilities: public IP detection, port availability."""
 
+import json
 import logging
 import time
 
@@ -18,7 +19,7 @@ def get_public_ip(timeout: float = 5.0) -> str | None:
     Results are cached for PUBLIC_IP_CACHE_TTL seconds.
     Returns None if all endpoints fail.
     """
-    global _ip_cache
+    global _ip_cache  # noqa: PLW0603
     now = time.monotonic()
     if _ip_cache is not None:
         ip, ts = _ip_cache
@@ -32,8 +33,6 @@ def get_public_ip(timeout: float = 5.0) -> str | None:
             text = resp.text.strip()
             # ipify returns JSON {"ip": "..."}
             if text.startswith("{"):
-                import json
-
                 text = json.loads(text).get("ip", "")
             if text:
                 _ip_cache = (text, now)

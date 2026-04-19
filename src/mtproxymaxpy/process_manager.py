@@ -295,6 +295,7 @@ def get_binary_version(default: str = TELEMT_VERSION) -> str:
             capture_output=True,
             text=True,
             timeout=5,
+            check=False,
         )
     except (OSError, subprocess.SubprocessError):
         return default

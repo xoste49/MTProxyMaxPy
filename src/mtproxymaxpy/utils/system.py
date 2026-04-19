@@ -1,6 +1,7 @@
 """System detection and dependency checks."""
 
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -78,8 +79,6 @@ def get_arch() -> str:
 
     Returns 'x86_64' or 'aarch64'; raises RuntimeError for unsupported arches.
     """
-    import platform
-
     machine = platform.machine().lower()
     mapping = {
         "x86_64": "x86_64",

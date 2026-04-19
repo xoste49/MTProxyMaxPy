@@ -32,6 +32,7 @@ def check_binary() -> dict[str, Any]:
                 capture_output=True,
                 text=True,
                 timeout=5,
+                check=False,
             )
             version = (res.stdout + res.stderr).strip().split()[-1]
         except (OSError, subprocess.SubprocessError):
@@ -57,6 +58,7 @@ def check_port_listening(port: int) -> dict[str, Any]:
                 capture_output=True,
                 text=True,
                 timeout=5,
+                check=False,
             )
             listening = f":{port}" in res.stdout or f" {port} " in res.stdout
             return {"ok": listening, "tool": "ss"}
@@ -70,6 +72,7 @@ def check_port_listening(port: int) -> dict[str, Any]:
                 capture_output=True,
                 text=True,
                 timeout=5,
+                check=False,
             )
             listening = f":{port}" in res.stdout
             return {"ok": listening, "tool": "netstat"}
@@ -96,6 +99,7 @@ def check_tls_handshake(host: str, port: int, domain: str = "") -> dict[str, Any
             input=b"",
             capture_output=True,
             timeout=10,
+            check=False,
         )
         ok = proc.returncode == 0 or b"Protocol" in proc.stdout
         return {"ok": ok, "output": (proc.stdout + proc.stderr)[:200].decode(errors="replace")}
