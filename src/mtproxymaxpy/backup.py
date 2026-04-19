@@ -68,7 +68,7 @@ def create_backup(label: str = "") -> Path:
         info.size = len(meta_bytes)
         tf.addfile(info, io.BytesIO(meta_bytes))
 
-    os.chmod(archive_path, 0o600)
+    archive_path.chmod(0o600)
     return archive_path
 
 
@@ -131,11 +131,11 @@ def restore_backup(archive: Path) -> dict[str, Any]:
                 try:
                     with os.fdopen(fd, "wb") as fh:
                         fh.write(src.read())
-                    os.chmod(tmp, 0o600)
-                    os.replace(tmp, dest)
+                    Path(tmp).chmod(0o600)
+                    Path(tmp).replace(dest)
                 except Exception:
                     with contextlib.suppress(OSError):
-                        os.unlink(tmp)
+                        Path(tmp).unlink()
                     raise
             elif member.isdir() and member.name == "relay_stats":
                 (INSTALL_DIR / "relay_stats").mkdir(exist_ok=True)

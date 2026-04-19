@@ -7,17 +7,15 @@ import csv
 import io
 import json
 import os
+from pathlib import Path
 import secrets
 import tempfile
 from datetime import UTC, date, datetime, timedelta
-from typing import Any, TYPE_CHECKING
+from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
 from mtproxymaxpy.constants import SECRETS_FILE
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 class Secret(BaseModel):
@@ -59,7 +57,7 @@ def load_secrets(path: Path = SECRETS_FILE) -> list[Secret]:
     """Load user secrets from a JSON file."""
     if not path.exists():
         return []
-    with open(path) as fh:
+    with path.open() as fh:
         data = json.load(fh)
     return [Secret.model_validate(item) for item in data]
 
@@ -72,11 +70,11 @@ def save_secrets(items: list[Secret], path: Path = SECRETS_FILE) -> None:
     try:
         with os.fdopen(fd, "w") as fh:
             json.dump(payload, fh, indent=2)
-        os.chmod(tmp, 0o600)
-        os.replace(tmp, path)
+        Path(tmp).chmod(0o600)
+        Path(tmp).replace(path)
     except Exception:
         with contextlib.suppress(OSError):
-            os.unlink(tmp)
+            Path(tmp).unlink()
         raise
 
 

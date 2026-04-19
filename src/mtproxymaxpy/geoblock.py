@@ -11,6 +11,7 @@ import contextlib
 import json
 import logging
 import os
+from pathlib import Path
 import subprocess
 import tempfile
 import time
@@ -91,11 +92,11 @@ def _save_state(state: dict[str, Any]) -> None:
     try:
         with os.fdopen(fd, "wb") as fh:
             fh.write(raw)
-        os.chmod(tmp, 0o600)
-        os.replace(tmp, GEO_STATE_FILE)
+        Path(tmp).chmod(0o600)
+        Path(tmp).replace(GEO_STATE_FILE)
     except Exception:
         with contextlib.suppress(OSError):
-            os.unlink(tmp)
+            Path(tmp).unlink()
         raise
 
 

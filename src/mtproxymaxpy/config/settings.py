@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import os
+from pathlib import Path
 import tempfile
 import tomllib
 
@@ -22,10 +23,6 @@ from mtproxymaxpy.constants import (
     DEFAULT_TELEGRAM_INTERVAL_HOURS,
     SETTINGS_FILE,
 )
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 class Settings(BaseModel):
@@ -95,7 +92,7 @@ def load_settings(path: Path = SETTINGS_FILE) -> Settings:
     """Load settings from a TOML file, returning defaults if missing."""
     if not path.exists():
         return Settings()
-    with open(path, "rb") as fh:
+    with path.open("rb") as fh:
         data = tomllib.load(fh)
     return Settings.model_validate(data)
 
@@ -108,9 +105,9 @@ def save_settings(settings: Settings, path: Path = SETTINGS_FILE) -> None:
     try:
         with os.fdopen(fd, "wb") as fh:
             tomli_w.dump(data, fh)
-        os.chmod(tmp, 0o600)
-        os.replace(tmp, path)
+        Path(tmp).chmod(0o600)
+        Path(tmp).replace(path)
     except Exception:
         with contextlib.suppress(OSError):
-            os.unlink(tmp)
+            Path(tmp).unlink()
         raise

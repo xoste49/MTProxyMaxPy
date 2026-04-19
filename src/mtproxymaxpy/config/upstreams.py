@@ -6,16 +6,14 @@ import contextlib
 import json
 import logging
 import os
+from pathlib import Path
 import re
 import tempfile
-from typing import Any, Literal, TYPE_CHECKING
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, ValidationError
 
 from mtproxymaxpy.constants import UPSTREAMS_FILE
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 _log = logging.getLogger(__name__)
 
@@ -68,7 +66,7 @@ def load_upstreams(path: Path = UPSTREAMS_FILE) -> list[Upstream]:
         return [_default_direct_upstream()]
 
     try:
-        with open(path) as fh:
+        with path.open() as fh:
             data = json.load(fh)
     except (OSError, json.JSONDecodeError):
         return [_default_direct_upstream()]
@@ -94,11 +92,11 @@ def save_upstreams(items: list[Upstream], path: Path = UPSTREAMS_FILE) -> None:
     try:
         with os.fdopen(fd, "w") as fh:
             json.dump(payload, fh, indent=2)
-        os.chmod(tmp, 0o600)
-        os.replace(tmp, path)
+        Path(tmp).chmod(0o600)
+        Path(tmp).replace(path)
     except Exception:
         with contextlib.suppress(OSError):
-            os.unlink(tmp)
+            Path(tmp).unlink()
         raise
 
 

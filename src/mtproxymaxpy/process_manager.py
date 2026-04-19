@@ -13,6 +13,7 @@ from __future__ import annotations
 import contextlib
 import logging
 import os
+from pathlib import Path
 import re
 import signal
 import subprocess
@@ -239,11 +240,11 @@ def write_toml_config(
     try:
         with os.fdopen(fd, "w") as fh:
             fh.write(content)
-        os.chmod(tmp, 0o600)
-        os.replace(tmp, TOML_CONFIG_FILE)
+        Path(tmp).chmod(0o600)
+        Path(tmp).replace(TOML_CONFIG_FILE)
     except Exception:
         with contextlib.suppress(OSError):
-            os.unlink(tmp)
+            Path(tmp).unlink()
         raise
 
 
@@ -311,7 +312,7 @@ def download_binary(version: str = TELEMT_VERSION, *, force: bool = False) -> No
     try:
         with httpx.stream("GET", url, timeout=120, follow_redirects=True) as resp:
             resp.raise_for_status()
-            with open(tar_tmp, "wb") as fh:
+            with tar_tmp.open("wb") as fh:
                 fh.writelines(resp.iter_bytes(chunk_size=65536))
 
         # Extract the 'telemt' binary from the archive
@@ -325,12 +326,12 @@ def download_binary(version: str = TELEMT_VERSION, *, force: bool = False) -> No
             src = tf.extractfile(member)
             if src is None:
                 raise RuntimeError(f"Failed to read '{BINARY_NAME}' from archive")
-            with open(bin_tmp, "wb") as fh:
+            with bin_tmp.open("wb") as fh:
                 fh.write(src.read())
 
         tar_tmp.unlink(missing_ok=True)
-        os.chmod(bin_tmp, 0o755)
-        os.replace(bin_tmp, BINARY_PATH)
+        bin_tmp.chmod(0o755)
+        bin_tmp.replace(BINARY_PATH)
         logger.info("telemt saved to %s", BINARY_PATH)
     except Exception:
         try:
@@ -389,7 +390,7 @@ def start(*, regenerate_config: bool = True, public_ip: str = "") -> int:
         write_toml_config(public_ip=public_ip)
 
     log_file = INSTALL_DIR / "telemt.log"
-    with open(log_file, "ab") as log_fh:
+    with log_file.open("ab") as log_fh:
         proc = subprocess.Popen(
             [str(BINARY_PATH), str(TOML_CONFIG_FILE)],
             stdout=log_fh,

@@ -5,15 +5,12 @@ from __future__ import annotations
 import contextlib
 import json
 import os
+from pathlib import Path
 import tempfile
 
 from pydantic import BaseModel, Field
 
 from mtproxymaxpy.constants import INSTANCES_FILE
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 class Instance(BaseModel):
@@ -26,7 +23,7 @@ class Instance(BaseModel):
 def load_instances(path: Path = INSTANCES_FILE) -> list[Instance]:
     if not path.exists():
         return []
-    with open(path) as fh:
+    with path.open() as fh:
         data = json.load(fh)
     return [Instance.model_validate(item) for item in data]
 
@@ -38,9 +35,9 @@ def save_instances(items: list[Instance], path: Path = INSTANCES_FILE) -> None:
     try:
         with os.fdopen(fd, "w") as fh:
             json.dump(payload, fh, indent=2)
-        os.chmod(tmp, 0o600)
-        os.replace(tmp, path)
+        Path(tmp).chmod(0o600)
+        Path(tmp).replace(path)
     except Exception:
         with contextlib.suppress(OSError):
-            os.unlink(tmp)
+            Path(tmp).unlink()
         raise
