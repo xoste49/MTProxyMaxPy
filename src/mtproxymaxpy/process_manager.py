@@ -1,4 +1,5 @@
-"""Native telemt process management.
+"""
+Native telemt process management.
 
 Responsibilities
 ----------------
@@ -304,6 +305,7 @@ def get_binary_version(default: str = TELEMT_VERSION) -> str:
 
 
 def is_binary_present() -> bool:
+    """Return True if the telemt binary exists and is executable."""
     return BINARY_PATH.exists() and os.access(BINARY_PATH, os.X_OK)
 
 
@@ -383,6 +385,7 @@ def is_running() -> bool:
 
 
 def get_pid() -> int | None:
+    """Return the PID of the running telemt process, or None if it is not running."""
     return _read_pid() if is_running() else None
 
 

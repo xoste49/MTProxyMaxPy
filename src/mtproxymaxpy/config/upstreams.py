@@ -23,6 +23,8 @@ _ADDR_RE = re.compile(r"^[a-zA-Z0-9._-]+:[0-9]+$")
 
 
 class Upstream(BaseModel):
+    """Pydantic model for a proxy upstream (direct, SOCKS5, or SOCKS4)."""
+
     name: str
     type: Literal["direct", "socks5", "socks4"] = "direct"
     addr: str = ""  # "host:port" for SOCKS
@@ -62,6 +64,7 @@ def _normalize_and_validate_addr(type_: str, addr: str) -> str:
 
 
 def load_upstreams(path: Path = UPSTREAMS_FILE) -> list[Upstream]:
+    """Load upstreams from *path*; return a default direct upstream if the file is absent or invalid."""
     if not path.exists():
         return [_default_direct_upstream()]
 
@@ -86,6 +89,7 @@ def load_upstreams(path: Path = UPSTREAMS_FILE) -> list[Upstream]:
 
 
 def save_upstreams(items: list[Upstream], path: Path = UPSTREAMS_FILE) -> None:
+    """Persist *items* to *path* atomically; falls back to a single direct upstream if *items* is empty."""
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = [item.model_dump() for item in (items or [_default_direct_upstream()])]
     fd, tmp = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
@@ -124,6 +128,7 @@ def add_upstream(
     iface: str = "",
     path: Path = UPSTREAMS_FILE,
 ) -> Upstream:
+    """Create and persist a new upstream; raises ValueError/KeyError on invalid input or duplicate name."""
     items = load_upstreams(path)
     _assert_valid_name(name)
     if any(u.name == name for u in items):
@@ -160,6 +165,7 @@ def add_upstream(
 
 
 def remove_upstream(name: str, path: Path = UPSTREAMS_FILE) -> Upstream:
+    """Remove the named upstream and return it; raises if it is the last (or last enabled) entry."""
     items = load_upstreams(path)
     if len(items) <= 1:
         raise ValueError("Cannot remove the last upstream")
@@ -179,6 +185,7 @@ def remove_upstream(name: str, path: Path = UPSTREAMS_FILE) -> Upstream:
 
 
 def set_upstream_enabled(name: str, *, enabled: bool, path: Path = UPSTREAMS_FILE) -> Upstream:
+    """Set the ``enabled`` flag on the named upstream; prevents disabling the last enabled entry."""
     items = load_upstreams(path)
     idx = next((i for i, u in enumerate(items) if u.name == name), -1)
     if idx < 0:
@@ -195,14 +202,17 @@ def set_upstream_enabled(name: str, *, enabled: bool, path: Path = UPSTREAMS_FIL
 
 
 def enable_upstream(name: str, path: Path = UPSTREAMS_FILE) -> Upstream:
+    """Enable the named upstream."""
     return set_upstream_enabled(name, enabled=True, path=path)
 
 
 def disable_upstream(name: str, path: Path = UPSTREAMS_FILE) -> Upstream:
+    """Disable the named upstream."""
     return set_upstream_enabled(name, enabled=False, path=path)
 
 
 def toggle_upstream(name: str, path: Path = UPSTREAMS_FILE) -> Upstream:
+    """Toggle the enabled state of the named upstream."""
     items = load_upstreams(path)
     current = next((u for u in items if u.name == name), None)
     if current is None:
@@ -211,7 +221,8 @@ def toggle_upstream(name: str, path: Path = UPSTREAMS_FILE) -> Upstream:
 
 
 def test_upstream(name: str, timeout: float = 10.0) -> dict[str, Any]:  # noqa: PT028
-    """Test connectivity through an upstream proxy.
+    """
+    Test connectivity through an upstream proxy.
 
     Returns ``{ok: bool, error: str|None, latency_ms: float|None}``.
     """

@@ -1,4 +1,5 @@
-"""Prometheus metrics fetching and parsing for telemt.
+"""
+Prometheus metrics fetching and parsing for telemt.
 
 Telemt exposes a Prometheus-compatible /metrics endpoint.  This module
 provides a thin wrapper that fetches, parses, and aggregates the raw samples
@@ -38,7 +39,8 @@ def fetch_raw(timeout: float = 5.0) -> str:
 
 
 def parse_metrics(raw: str) -> list[dict[str, Any]]:
-    """Parse Prometheus text format into a list of sample dicts.
+    """
+    Parse Prometheus text format into a list of sample dicts.
 
     Each dict: ``{name: str, labels: dict[str, str], value: float}``
     """
@@ -136,7 +138,8 @@ def _aggregate_user_stats(samples: list[dict[str, Any]]) -> dict[str, dict[str, 
 
 
 def get_stats(*, timeout: float = 5.0, max_age: float = 0.0) -> dict[str, Any]:
-    """Return a structured stats dict from the live Prometheus endpoint.
+    """
+    Return a structured stats dict from the live Prometheus endpoint.
 
     Always returns a dict; ``available`` key indicates success.
     """

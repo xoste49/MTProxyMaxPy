@@ -1,4 +1,5 @@
-"""Backup and restore of MTProxyMaxPy configuration files.
+"""
+Backup and restore of MTProxyMaxPy configuration files.
 
 Creates/extracts .tar.gz archives containing settings, secrets, upstreams,
 instances, and stats snapshots.  A metadata.json is always included.
@@ -112,7 +113,8 @@ def _extract_config_member(tf: tarfile.TarFile, member: tarfile.TarInfo, install
 
 
 def restore_backup(archive: Path) -> dict[str, Any]:
-    """Extract and restore a backup archive.
+    """
+    Extract and restore a backup archive.
 
     Returns the metadata dict from the archive.
     Automatically creates a safety backup of the current state before restoring.

@@ -14,6 +14,8 @@ from mtproxymaxpy.constants import INSTANCES_FILE
 
 
 class Instance(BaseModel):
+    """Pydantic model representing a named proxy instance with a port and enabled flag."""
+
     name: str
     port: int = Field(..., ge=1, le=65535)
     enabled: bool = True
@@ -21,6 +23,7 @@ class Instance(BaseModel):
 
 
 def load_instances(path: Path = INSTANCES_FILE) -> list[Instance]:
+    """Load instances from *path*; return an empty list if the file does not exist."""
     if not path.exists():
         return []
     with path.open() as fh:
@@ -29,6 +32,7 @@ def load_instances(path: Path = INSTANCES_FILE) -> list[Instance]:
 
 
 def save_instances(items: list[Instance], path: Path = INSTANCES_FILE) -> None:
+    """Persist *items* to *path* using an atomic write (tempfile + replace)."""
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = [item.model_dump() for item in items]
     fd, tmp = tempfile.mkstemp(dir=path.parent, suffix=".tmp")

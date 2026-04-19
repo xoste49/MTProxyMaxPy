@@ -24,7 +24,8 @@ def validate_domain(domain: str) -> bool:
 
 
 def parse_human_bytes(value: str) -> int:
-    """Parse a human-readable byte string like '5G', '500M', '2048' into bytes.
+    """
+    Parse a human-readable byte string like '5G', '500M', '2048' into bytes.
 
     Supported suffixes: B, K/KB, M/MB, G/GB, T/TB (case-insensitive).
     Raises ValueError for unrecognised input.

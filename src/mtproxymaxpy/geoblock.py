@@ -1,4 +1,5 @@
-"""Geo-blocking via iptables + ipset.
+"""
+Geo-blocking via iptables + ipset.
 
 Downloads country CIDR lists from ipdeny.com, creates an ipset hash:net per
 country, and applies DROP rules in the iptables INPUT chain.  State is
@@ -104,7 +105,8 @@ def _save_state(state: dict[str, Any]) -> None:
 
 
 def add_country(cc: str) -> int:
-    """Add a country to the geo-block list and apply iptables rules.
+    """
+    Add a country to the geo-block list and apply iptables rules.
 
     Returns the number of CIDRs loaded.
     """
@@ -179,6 +181,7 @@ def remove_country(cc: str) -> None:
 
 
 def list_countries() -> list[str]:
+    """Return the list of currently geo-blocked country codes."""
     result = _load_state().get("countries", [])
     return cast("list[str]", result)
 

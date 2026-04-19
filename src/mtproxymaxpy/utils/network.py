@@ -12,7 +12,8 @@ _ip_cache: tuple[str, float] | None = None
 
 
 def get_public_ip(timeout: float = 5.0) -> str | None:
-    """Return the server's public IPv4 address.
+    """
+    Return the server's public IPv4 address.
 
     Results are cached for PUBLIC_IP_CACHE_TTL seconds.
     Returns None if all endpoints fail.

@@ -140,22 +140,27 @@ def _systemctl(*args: str, check: bool = True) -> subprocess.CompletedProcess[by
 
 
 def start_service(name: str = SYSTEMD_SERVICE) -> None:
+    """Start the systemd service *name* via systemctl."""
     _systemctl("start", name)
 
 
 def stop_service(name: str = SYSTEMD_SERVICE) -> None:
+    """Stop the systemd service *name* via systemctl."""
     _systemctl("stop", name)
 
 
 def restart_service(name: str = SYSTEMD_SERVICE) -> None:
+    """Restart the systemd service *name* via systemctl."""
     _systemctl("restart", name)
 
 
 def is_active(name: str = SYSTEMD_SERVICE) -> bool:
+    """Return True if the systemd service *name* is currently active."""
     result = _systemctl("is-active", "--quiet", name, check=False)
     return result.returncode == 0
 
 
 def is_enabled(name: str = SYSTEMD_SERVICE) -> bool:
+    """Return True if the systemd service *name* is enabled (starts on boot)."""
     result = _systemctl("is-enabled", "--quiet", name, check=False)
     return result.returncode == 0

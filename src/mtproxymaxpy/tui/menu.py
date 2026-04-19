@@ -1,4 +1,5 @@
-"""Rich-based interactive terminal menu for MTProxyMaxPy.
+"""
+Rich-based interactive terminal menu for MTProxyMaxPy.
 
 Replaces the Textual GUI-style app with a numbered-menu TUI similar to the
 original bash script: box-drawing headers, coloured status, numbered choices.
@@ -46,7 +47,8 @@ def _pause() -> None:
 
 
 def _read_last_lines(path: Path, limit: int, max_bytes: int = 262_144) -> list[str]:
-    """Read only tail lines from a potentially large log file.
+    """
+    Read only tail lines from a potentially large log file.
 
     Limits bytes read from the end of file to avoid high memory usage in live screens.
     """
@@ -291,7 +293,8 @@ def _update_check_worker() -> None:
 
 
 def _check_update_bg(wait_timeout: float = 3.0) -> None:
-    """Fire a background thread to compare GitHub HEAD SHA with stored baseline.
+    """
+    Fire a background thread to compare GitHub HEAD SHA with stored baseline.
 
     Args:
         wait_timeout: Maximum seconds to wait for the check to complete before returning (default: 3.0).

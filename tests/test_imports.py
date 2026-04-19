@@ -1,4 +1,5 @@
-"""Smoke tests: every module must import cleanly and the CLI must be invocable.
+"""
+Smoke tests: every module must import cleanly and the CLI must be invocable.
 
 These tests exist to catch NameError / ImportError / SyntaxError regressions
 that surfaced during development (e.g. missing 'load_settings' import in cli.py).
@@ -79,8 +80,10 @@ def _cli_groups() -> list[tuple[str, str]]:
     pairs: list[tuple[str, str]] = []
     for group_name, grp_app in group_map.items():
         click_grp = typer.main.get_command(grp_app)
-        for sub_name in click_grp.commands:  # type: ignore[attr-defined]
-            pairs.append((group_name, sub_name))
+        pairs.extend(
+            (group_name, sub_name)
+            for sub_name in click_grp.commands  # type: ignore[attr-defined]
+        )
     return pairs
 
 

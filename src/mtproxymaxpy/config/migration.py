@@ -1,4 +1,5 @@
-"""Detection and import of legacy bash-based MTProxyMaxPy configuration files.
+"""
+Detection and import of legacy bash-based MTProxyMaxPy configuration files.
 
 Legacy formats
 --------------
@@ -231,6 +232,8 @@ def _parse_instances_conf(path: Path) -> list[Instance]:
 
 @dataclass
 class MigrationResult:
+    """Result summary returned by a legacy-config migration run."""
+
     settings_imported: bool = False
     secrets_count: int = 0
     upstreams_count: int = 0
@@ -240,7 +243,8 @@ class MigrationResult:
 
 
 def detect_legacy(_install_dir: Path = INSTALL_DIR) -> dict[str, Path]:
-    """Return a dict of legacy config files that exist.
+    """
+    Return a dict of legacy config files that exist.
 
     Keys are one of: 'settings', 'secrets', 'upstreams', 'instances'.
     Values are the resolved Path objects.
@@ -270,7 +274,8 @@ def run_migration(
     upstreams_out: Path = UPSTREAMS_FILE,
     instances_out: Path = INSTANCES_FILE,
 ) -> MigrationResult:
-    """Import legacy config files into the new TOML/JSON format.
+    """
+    Import legacy config files into the new TOML/JSON format.
 
     *files* should be the return value of :func:`detect_legacy`.
     If None, :func:`detect_legacy` is called automatically.

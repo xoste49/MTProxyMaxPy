@@ -15,7 +15,8 @@ def check_root() -> None:
 
 
 def detect_os() -> str:
-    """Return a normalised OS family string.
+    """
+    Return a normalised OS family string.
 
     Possible values: 'debian', 'rhel', 'alpine', 'unknown'.
     """
@@ -32,7 +33,8 @@ def detect_os() -> str:
 
 
 def check_dependencies() -> list[str]:
-    """Ensure curl, awk, openssl, and ss/netstat are available.
+    """
+    Ensure curl, awk, openssl, and ss/netstat are available.
 
     Attempts to install missing tools via the detected package manager.
     Returns a list of tool names that could not be installed.
@@ -71,7 +73,8 @@ def check_dependencies() -> list[str]:
 
 
 def get_arch() -> str:
-    """Return the architecture string used in telemt binary filenames.
+    """
+    Return the architecture string used in telemt binary filenames.
 
     Returns 'x86_64' or 'aarch64'; raises RuntimeError for unsupported arches.
     """

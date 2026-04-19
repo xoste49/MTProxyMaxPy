@@ -145,13 +145,13 @@ select = [
     "FLY", # flynt (FLY) https://docs.astral.sh/ruff/rules/#flynt-fly
     "I", # isort (I) https://docs.astral.sh/ruff/rules/#isort-i
     "C90", # mccabe (C90) https://docs.astral.sh/ruff/rules/#mccabe-c90
-    #"NPY", # NumPy-specific rules (NPY) https://docs.astral.sh/ruff/rules/#numpy-specific-rules-npy
-    #"PD", # pandas-vet (PD) https://docs.astral.sh/ruff/rules/#pandas-vet-pd
-    #"N", # pep8-naming (N) https://docs.astral.sh/ruff/rules/#pep8-naming-n
-    #"PERF", # Perflint (PERF) https://docs.astral.sh/ruff/rules/#perflint-perf
-    #"E", "W", # pycodestyle (E, W) https://docs.astral.sh/ruff/rules/#pycodestyle-e-w
+    "NPY", # NumPy-specific rules (NPY) https://docs.astral.sh/ruff/rules/#numpy-specific-rules-npy
+    "PD", # pandas-vet (PD) https://docs.astral.sh/ruff/rules/#pandas-vet-pd
+    "N", # pep8-naming (N) https://docs.astral.sh/ruff/rules/#pep8-naming-n
+    "PERF", # Perflint (PERF) https://docs.astral.sh/ruff/rules/#perflint-perf
+    "E", "W", # pycodestyle (E, W) https://docs.astral.sh/ruff/rules/#pycodestyle-e-w
     #"DOC", # pydoclint (DOC) — в состоянии preview https://docs.astral.sh/ruff/rules/#pydoclint-doc поэтому используется само приложение pydoclint
-    #"D", # pydocstyle (D) https://docs.astral.sh/ruff/rules/#pydocstyle-d
+    "D", # pydocstyle (D) https://docs.astral.sh/ruff/rules/#pydocstyle-d
     #"F", # Pyflakes (F) https://docs.astral.sh/ruff/rules/#pyflakes-f
     #"PGH", # pygrep-hooks (PGH) https://docs.astral.sh/ruff/rules/#pygrep-hooks-pgh
     #"PLC", "PLE", "PLR", "PLW", # Pylint (PL) https://docs.astral.sh/ruff/rules/#pylint-pl
@@ -160,9 +160,16 @@ select = [
     #"RUF", # Ruff-specific rules (RUF) https://docs.astral.sh/ruff/rules/#ruff-specific-rules-ruf
     #"TRY", # tryceratops (TRY) https://docs.astral.sh/ruff/rules/#tryceratops-try
 ]
-ignore = ["E741", "S103", "S603", "S607"]
+ignore = [
+    "COM812", # Конфликтующие с форматером
+    "E741", "S103", "S603", "S607",
+    "D104",   # Докстринги для пакетов (__init__.py) не требуются
+    "D105",   # Докстринги для магических методов не требуются
+    "D203",   # Конфликтует с D211 (Google convention требует D211 — без пустой строки перед докстрингом класса)
+    "D212",   # Конфликтует с D213 (Google convention требует D213 — summary на следующей строке после """)
+    ]
 fixable = ["ALL"]
-per-file-ignores = {"tests/**" = ["ANN", "ARG", "FBT", "S101", "S608", "S105", "S106", "INP", "SLF001"]}
+per-file-ignores = {"tests/**" = ["ANN", "ARG", "FBT", "S101", "S608", "S105", "S106", "INP", "SLF001", "D100", "D101", "D102", "D103", "D107"]}
 
 [tool.ruff.format]
 quote-style = "double"

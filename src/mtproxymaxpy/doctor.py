@@ -1,4 +1,5 @@
-"""Doctor — comprehensive system diagnostics.
+"""
+Doctor — comprehensive system diagnostics.
 
 Runs a series of checks against the local installation and returns structured
 results so that both the CLI and TUI can display them.
@@ -19,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 def check_binary() -> dict[str, Any]:
+    """Check whether the telemt binary is present and executable; return its version if available."""
     from mtproxymaxpy.constants import BINARY_PATH
 
     present = BINARY_PATH.exists() and bool(BINARY_PATH.stat().st_mode & 0o111)
@@ -38,6 +40,7 @@ def check_binary() -> dict[str, Any]:
 
 
 def check_process() -> dict[str, Any]:
+    """Check whether the telemt process is currently running and return its PID."""
     from mtproxymaxpy import process_manager
 
     running = process_manager.is_running()
@@ -103,6 +106,7 @@ def check_tls_handshake(host: str, port: int, domain: str = "") -> dict[str, Any
 
 
 def check_secrets() -> dict[str, Any]:
+    """Check that at least one secret is enabled and report any expired ones."""
     from mtproxymaxpy.config.secrets import load_secrets
 
     all_secrets = load_secrets()
@@ -118,6 +122,7 @@ def check_secrets() -> dict[str, Any]:
 
 
 def check_disk_space(min_mb: int = 500) -> dict[str, Any]:
+    """Check that free disk space on the install partition exceeds *min_mb* megabytes."""
     from mtproxymaxpy.constants import INSTALL_DIR
 
     path = str(INSTALL_DIR) if INSTALL_DIR.exists() else "/"
@@ -127,6 +132,7 @@ def check_disk_space(min_mb: int = 500) -> dict[str, Any]:
 
 
 def check_metrics_endpoint() -> dict[str, Any]:
+    """Check whether the telemt metrics HTTP endpoint is reachable."""
     from mtproxymaxpy import metrics as _metrics
 
     stats = _metrics.get_stats()
@@ -134,6 +140,7 @@ def check_metrics_endpoint() -> dict[str, Any]:
 
 
 def check_telegram_service() -> dict[str, Any]:
+    """Check whether the Telegram-bot systemd service is active (skipped if bot is disabled)."""
     from mtproxymaxpy.config.settings import load_settings
     from mtproxymaxpy.constants import SYSTEMD_TELEGRAM_SERVICE
 
@@ -152,7 +159,8 @@ def check_telegram_service() -> dict[str, Any]:
 
 
 def run_full_doctor() -> list[dict[str, Any]]:
-    """Run all diagnostic checks.
+    """
+    Run all diagnostic checks.
 
     Returns a list of dicts: ``{name, ok, **extras}``.
     ``ok`` is True/False/None (True=pass, False=fail, None=skipped/N/A).

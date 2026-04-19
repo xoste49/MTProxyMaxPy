@@ -19,6 +19,8 @@ from mtproxymaxpy.constants import SECRETS_FILE
 
 
 class Secret(BaseModel):
+    """Pydantic model for a user secret (MTProto key) with access-control metadata."""
+
     label: str
     key: str = Field(default_factory=lambda: secrets.token_hex(16))
     created: str = Field(default_factory=lambda: datetime.now(tz=UTC).date().isoformat())
@@ -184,7 +186,8 @@ def set_secret_limits(
 
 
 def extend_secret(label: str, days: int, path: Path = SECRETS_FILE) -> Secret:
-    """Extend a secret's expiry by *days* days.
+    """
+    Extend a secret's expiry by *days* days.
 
     If the secret has no expiry, extends from today.
     """
@@ -310,7 +313,8 @@ def import_secrets_csv(
     *,
     overwrite: bool = False,
 ) -> list[Secret]:
-    """Parse a CSV string and merge secrets into the store.
+    """
+    Parse a CSV string and merge secrets into the store.
 
     If *overwrite* is False, secrets with duplicate labels are skipped.
     Returns a list of newly-added Secret objects.

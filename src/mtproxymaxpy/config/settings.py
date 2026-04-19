@@ -26,6 +26,8 @@ from mtproxymaxpy.constants import (
 
 
 class Settings(BaseModel):
+    """Pydantic settings model persisted as TOML; covers all proxy configuration."""
+
     # ── Proxy core ────────────────────────────────────────────────────────────
     proxy_port: int = Field(DEFAULT_PORT, ge=1, le=65535)
     proxy_metrics_port: int = Field(DEFAULT_METRICS_PORT, ge=1, le=65535)

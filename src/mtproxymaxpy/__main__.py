@@ -6,6 +6,7 @@ import sys
 
 
 def main() -> None:
+    """Launch the TUI when run without arguments, or delegate to the Typer CLI."""
     # If any CLI arguments are passed (excluding the interpreter), hand off to Typer.
     if len(sys.argv) > 1:
         from mtproxymaxpy.cli import app
