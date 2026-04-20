@@ -475,7 +475,7 @@ def status() -> dict[str, Any]:
     uptime_sec: int | None = None
     if pid:
         try:
-            import psutil  # type: ignore[import-untyped]  # noqa: PLC0415
+            import psutil  # type: ignore[import-untyped]
         except ImportError:
             psutil = None
         if psutil is not None:

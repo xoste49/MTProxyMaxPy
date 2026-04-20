@@ -99,7 +99,7 @@ def _get_tg_status_text(settings: Settings, service_unit: Path) -> Text:
         return Text("○ TG UNKNOWN", style="dim")
 
 
-def _header_panel() -> Panel:  # noqa: C901
+def _header_panel() -> Panel:
     """Build the status header shown at the top of every screen."""
     lines: list[Text] = []
     tg_line = Text("○ TG UNKNOWN", style="dim")

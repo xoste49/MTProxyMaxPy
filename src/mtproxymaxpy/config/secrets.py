@@ -344,7 +344,7 @@ def import_secrets_csv(
         )
         if label in existing_labels:
             # Replace existing
-            existing = [s if s2.label != label else s for s2 in existing]
+            existing = [s2 if s2.label != label else s for s2 in existing]
         else:
             existing.append(s)
         existing_labels.add(label)
