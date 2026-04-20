@@ -2,25 +2,20 @@
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
-import pytest
+from typing import TYPE_CHECKING
 
 from mtproxymaxpy.config.migration import (
-    MigrationResult,
     _parse_secrets_conf,
     _parse_settings_conf,
     _parse_upstreams_conf,
     detect_legacy,
     run_migration,
 )
-from mtproxymaxpy.constants import (
-    LEGACY_INSTANCES_FILE,
-    LEGACY_SECRETS_FILE,
-    LEGACY_SETTINGS_FILE,
-    LEGACY_UPSTREAMS_FILE,
-)
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    import pytest
 
 # ── detect_legacy ─────────────────────────────────────────────────────────────
 
@@ -109,7 +104,7 @@ def test_parse_secrets_multiple(tmp_path: Path) -> None:
         [
             "alice|" + "a" * 32 + "|0|true|0|0|0||",
             "bob|" + "b" * 32 + "|0|false|5|2|1000000||vip",
-        ]
+        ],
     )
     f = _write(tmp_path / "secrets.conf", lines)
     items = _parse_secrets_conf(f)
@@ -190,8 +185,8 @@ def test_run_migration_full(tmp_path: Path) -> None:
     assert result.errors == []
 
     # Verify output files
-    from mtproxymaxpy.config.settings import load_settings
     from mtproxymaxpy.config.secrets import load_secrets
+    from mtproxymaxpy.config.settings import load_settings
 
     s = load_settings(out_dir / "settings.toml")
     assert s.proxy_port == 7443

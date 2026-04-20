@@ -1,18 +1,30 @@
 FROM debian:trixie-slim
 
-ENV DEBIAN_FRONTEND=noninteractive \
-    UV_PROJECT_ENVIRONMENT=/tmp/mtproxymaxpy-venv \
-    HOME=/tmp/mtproxymaxpy-home
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+ENV UV_PROJECT_ENVIRONMENT=/tmp/mtproxymaxpy-venv \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_PREFERENCE=only-managed \
+    UV_PYTHON_INSTALL_DIR=/python
 
 WORKDIR /work
 
-RUN apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 update -qq \
-    && apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y -qq \
-       curl ca-certificates python3 python3-venv \
-    && rm -rf /var/lib/apt/lists/* \
-    && mkdir -p "$HOME"
+# Install managed Python (cached unless .python-version changes)
+COPY .python-version ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv python install
 
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="/root/.local/bin:${PATH}"
+# Install deps (bind-mounted metadata — no extra COPY layer, BuildKit caches by content)
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    --mount=type=bind,source=src/mtproxymaxpy/__init__.py,target=src/mtproxymaxpy/__init__.py \
+    uv sync --locked --no-install-project --dev
 
-CMD ["bash", "-lc", "uv sync --dev && uv run pytest --maxfail=1 --cov=src/mtproxymaxpy --cov-report=term-missing:skip-covered"]
+# Copy project source and install it (fast — deps already present)
+COPY . /work
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --dev
+
+CMD ["uv", "run", "pytest", "--cov=src/mtproxymaxpy"]

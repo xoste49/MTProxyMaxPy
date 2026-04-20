@@ -3,11 +3,14 @@ from __future__ import annotations
 import io
 import json
 import tarfile
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from mtproxymaxpy import backup
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_create_backup_includes_configs_stats_and_metadata(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 import tempfile
-from pathlib import Path
-from typing import Optional
-
 import tomllib
+from pathlib import Path
+
 import tomli_w
 from pydantic import BaseModel, Field, field_validator
 
@@ -26,6 +26,8 @@ from mtproxymaxpy.constants import (
 
 
 class Settings(BaseModel):
+    """Pydantic settings model persisted as TOML; covers all proxy configuration."""
+
     # ── Proxy core ────────────────────────────────────────────────────────────
     proxy_port: int = Field(DEFAULT_PORT, ge=1, le=65535)
     proxy_metrics_port: int = Field(DEFAULT_METRICS_PORT, ge=1, le=65535)
@@ -38,8 +40,9 @@ class Settings(BaseModel):
     proxy_protocol: bool = False
     proxy_protocol_trusted_cidrs: str = ""
 
-    # ── Ad-tag ────────────────────────────────────────────────────────────────
+    # ── Ad-tag / Middle proxy ─────────────────────────────────────────────────
     ad_tag: str = ""
+    use_middle_proxy: bool = True
 
     # ── Geo-blocking ─────────────────────────────────────────────────────────
     geoblock_mode: str = "blacklist"
@@ -58,6 +61,7 @@ class Settings(BaseModel):
     telegram_interval: int = Field(DEFAULT_TELEGRAM_INTERVAL_HOURS, ge=1)
     telegram_alerts_enabled: bool = True
     telegram_server_label: str = "mtproxymaxpy"
+    telegram_bot_proxy: str = ""
 
     # ── Auto-update ───────────────────────────────────────────────────────────
     auto_update_enabled: bool = True
@@ -92,7 +96,7 @@ def load_settings(path: Path = SETTINGS_FILE) -> Settings:
     """Load settings from a TOML file, returning defaults if missing."""
     if not path.exists():
         return Settings()
-    with open(path, "rb") as fh:
+    with path.open("rb") as fh:
         data = tomllib.load(fh)
     return Settings.model_validate(data)
 
@@ -105,11 +109,9 @@ def save_settings(settings: Settings, path: Path = SETTINGS_FILE) -> None:
     try:
         with os.fdopen(fd, "wb") as fh:
             tomli_w.dump(data, fh)
-        os.chmod(tmp, 0o600)
-        os.replace(tmp, path)
+        Path(tmp).chmod(0o600)
+        Path(tmp).replace(path)
     except Exception:
-        try:
-            os.unlink(tmp)
-        except OSError:
-            pass
+        with contextlib.suppress(OSError):
+            Path(tmp).unlink()
         raise

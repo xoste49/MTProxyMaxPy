@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-
-import pytest
+from typing import TYPE_CHECKING
 
 from mtproxymaxpy import metrics
+
+if TYPE_CHECKING:
+    import pytest
 
 
 def test_parse_metrics_skips_comments_and_invalid_lines() -> None:
@@ -36,16 +38,12 @@ def test_total_and_first_helpers() -> None:
 
 def test_get_stats_success_and_user_aggregation(monkeypatch: pytest.MonkeyPatch) -> None:
     metrics._stats_cache = None
-    raw = "\n".join(
-        [
-            "telemt_incoming_bytes_total 100",
-            "telemt_outgoing_bytes_total 200",
-            "telemt_active_connections 3",
-            "telemt_total_connections 4",
-            'telemt_rx_bytes_total{user="alice"} 10',
-            'telemt_tx_bytes_total{user="alice"} 20',
-            'telemt_active_connections{user="alice"} 1',
-        ]
+    raw = (
+        "telemt_incoming_bytes_total 100\ntelemt_outgoing_bytes_total 200\n"
+        "telemt_active_connections 3\ntelemt_total_connections 4\n"
+        'telemt_rx_bytes_total{user="alice"} 10\n'
+        'telemt_tx_bytes_total{user="alice"} 20\n'
+        'telemt_active_connections{user="alice"} 1'
     )
     monkeypatch.setattr(metrics, "fetch_raw", lambda timeout=5.0: raw)
 
@@ -62,15 +60,13 @@ def test_get_stats_success_and_user_aggregation(monkeypatch: pytest.MonkeyPatch)
 
 def test_get_stats_supports_legacy_telemt_user_metric_names(monkeypatch: pytest.MonkeyPatch) -> None:
     metrics._stats_cache = None
-    raw = "\n".join(
-        [
-            'telemt_user_octets_from_client{user="alice"} 100',
-            'telemt_user_octets_to_client{user="alice"} 200',
-            'telemt_user_connections_current{user="alice"} 2',
-            'telemt_user_octets_from_client{user="bob"} 300',
-            'telemt_user_octets_to_client{user="bob"} 400',
-            'telemt_user_connections_current{user="bob"} 3',
-        ]
+    raw = (
+        'telemt_user_octets_from_client{user="alice"} 100\n'
+        'telemt_user_octets_to_client{user="alice"} 200\n'
+        'telemt_user_connections_current{user="alice"} 2\n'
+        'telemt_user_octets_from_client{user="bob"} 300\n'
+        'telemt_user_octets_to_client{user="bob"} 400\n'
+        'telemt_user_connections_current{user="bob"} 3'
     )
     monkeypatch.setattr(metrics, "fetch_raw", lambda timeout=5.0: raw)
 

@@ -1,6 +1,7 @@
 """System detection and dependency checks."""
 
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -9,13 +10,14 @@ from pathlib import Path
 
 def check_root() -> None:
     """Exit with an error message if the process is not running as root."""
-    if os.geteuid() != 0:
-        print("Error: MTProxyMaxPy must be run as root.", file=sys.stderr)
+    if os.geteuid() != 0:  # type: ignore[attr-defined]
+        print("Error: MTProxyMaxPy must be run as root.", file=sys.stderr)  # noqa: T201
         sys.exit(1)
 
 
 def detect_os() -> str:
-    """Return a normalised OS family string.
+    """
+    Return a normalised OS family string.
 
     Possible values: 'debian', 'rhel', 'alpine', 'unknown'.
     """
@@ -32,7 +34,8 @@ def detect_os() -> str:
 
 
 def check_dependencies() -> list[str]:
-    """Ensure curl, awk, openssl, and ss/netstat are available.
+    """
+    Ensure curl, awk, openssl, and ss/netstat are available.
 
     Attempts to install missing tools via the detected package manager.
     Returns a list of tool names that could not be installed.
@@ -65,19 +68,17 @@ def check_dependencies() -> list[str]:
             capture_output=True,
         )
         # Re-check after install
-        still_missing = [cmd for cmd in (required + ["ss"]) if not shutil.which(cmd)]
-        return still_missing
+        return [cmd for cmd in [*required, "ss"] if not shutil.which(cmd)]
     except subprocess.CalledProcessError:
         return missing
 
 
 def get_arch() -> str:
-    """Return the architecture string used in telemt binary filenames.
+    """
+    Return the architecture string used in telemt binary filenames.
 
     Returns 'x86_64' or 'aarch64'; raises RuntimeError for unsupported arches.
     """
-    import platform
-
     machine = platform.machine().lower()
     mapping = {
         "x86_64": "x86_64",

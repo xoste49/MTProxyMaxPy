@@ -6,23 +6,33 @@ Python port of `mtproxymax.sh` (bash, ~9300 lines). Manages a telemt-based MTPro
 
 ```
 src/mtproxymaxpy/
-  constants.py          — all paths, URLs, version pins
-  process_manager.py    — start/stop/restart telemt binary, generate config.toml
-  cli.py                — Typer CLI (30+ commands)
-  tui/menu.py           — Rich numbered-menu TUI (primary user interface)
+  constants.py            — all paths, URLs, version pins
+  process_manager.py      — start/stop/restart telemt binary, generate config.toml
+  cli.py                  — Typer CLI (22 commands)
+  systemd.py              — systemd unit generation & service management
+  tui/
+    menu.py               — Rich numbered-menu TUI (primary user interface)
+    app.py                — re-export run_tui
   config/
-    settings.py         — Pydantic Settings model, TOML persistence
-    secrets.py          — Secret model, JSON persistence
-    upstreams.py        — Upstream model, JSON persistence
-    migration.py        — detect and migrate legacy bash config
-  doctor.py             — diagnostic checks
-  metrics.py            — telemt metrics endpoint reader
-  backup.py             — config backup/restore
-  geoblock.py           — iptables geo-blocking
-  telegram_bot.py       — Telegram bot (14 commands)
-  utils/                — formatting, network, system, proxy_link
-install.sh              — installer: git clone + uv sync; on update: no TUI
-tests/test_imports.py   — 100 smoke tests (imports, CLI --help, CSV round-trip)
+    settings.py           — Pydantic Settings model, TOML persistence
+    secrets.py            — Secret model, JSON persistence
+    upstreams.py          — Upstream model, JSON persistence
+    instances.py          — multi-port instances, Pydantic model + JSON persistence
+    migration.py          — detect and migrate legacy bash config
+  doctor.py               — diagnostic checks
+  metrics.py              — telemt metrics endpoint reader
+  backup.py               — config backup/restore
+  geoblock.py             — iptables geo-blocking
+  telegram_bot_aiogram.py — Telegram bot, aiogram 3 (17 commands)
+  telegram_messages.py    — bot message builders (entity-based, aiogram.utils.formatting)
+  utils/
+    formatting.py         — output formatting helpers
+    network.py            — network utilities
+    system.py             — system utilities
+    proxy_link.py         — proxy link generation
+    validation.py         — input validation (port, domain, human-readable bytes)
+install.sh                — installer: git clone + uv sync; on update: no TUI
+tests/                    — 176 tests across 25 test files
 ```
 
 Install location: `/opt/mtproxymaxpy/`
@@ -35,7 +45,9 @@ Legacy bash dir: `/opt/mtproxymax/` (no `py` suffix)
 - **Typer** for CLI
 - **Pydantic v2** for config models
 - **httpx** for HTTP (not requests)
+- **aiogram 3** for Telegram bot
 - **tomllib** (stdlib) for reading TOML, **tomli-w** for writing
+- **qrcode** for QR code generation
 
 ## telemt Config Format
 

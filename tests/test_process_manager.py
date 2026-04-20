@@ -3,12 +3,15 @@ from __future__ import annotations
 import io
 import sys
 import tarfile
-from pathlib import Path
 from types import SimpleNamespace
+from typing import TYPE_CHECKING
 
 import pytest
 
 from mtproxymaxpy import process_manager as pm
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_to_rfc3339_expiration() -> None:
@@ -23,6 +26,7 @@ def test_to_rfc3339_expiration() -> None:
 def test_build_toml_config_contains_expected_sections() -> None:
     settings = SimpleNamespace(
         ad_tag="TAG",
+        use_middle_proxy=True,
         masking_enabled=True,
         proxy_port=443,
         proxy_protocol=True,
@@ -34,13 +38,9 @@ def test_build_toml_config_contains_expected_sections() -> None:
         masking_host="example.com",
         fake_cert_len=1024,
     )
-    sec1 = SimpleNamespace(
-        label="u1", key="a" * 32, enabled=True, max_conns=10, max_ips=2, quota_bytes=123, expires="2026-12-31"
-    )
+    sec1 = SimpleNamespace(label="u1", key="a" * 32, enabled=True, max_conns=10, max_ips=2, quota_bytes=123, expires="2026-12-31")
     sec2 = SimpleNamespace(label="u2", key="b" * 32, enabled=False, max_conns=0, max_ips=0, quota_bytes=0, expires="")
-    up1 = SimpleNamespace(
-        enabled=True, type="socks5", weight=10, addr="127.0.0.1:1080", user="user", password="pass", iface=""
-    )
+    up1 = SimpleNamespace(enabled=True, type="socks5", weight=10, addr="127.0.0.1:1080", user="user", password="pass", iface="")
     up2 = SimpleNamespace(enabled=True, type="direct", weight=10, addr="", user="", password="", iface="")
 
     text = pm._build_toml_config(settings, [sec1, sec2], [up1, up2], "")
@@ -62,8 +62,8 @@ def test_write_toml_config_and_atomic_failure(monkeypatch: pytest.MonkeyPatch, t
     monkeypatch.setattr(pm, "TOML_CONFIG_FILE", target)
     monkeypatch.setattr(pm, "_build_toml_config", lambda *a, **k: "x=1\n")
     monkeypatch.setattr(pm, "load_settings", lambda: object())
-    monkeypatch.setattr(pm, "load_secrets", lambda: [])
-    monkeypatch.setattr(pm, "load_upstreams", lambda: [])
+    monkeypatch.setattr(pm, "load_secrets", list)
+    monkeypatch.setattr(pm, "load_upstreams", list)
 
     pm.write_toml_config()
     assert target.read_text(encoding="utf-8") == "x=1\n"
@@ -178,7 +178,7 @@ def test_download_binary_cleanup_on_error(monkeypatch: pytest.MonkeyPatch, tmp_p
             yield b"not a tar"
 
     monkeypatch.setattr(pm.httpx, "stream", lambda *a, **k: _Stream())
-    with pytest.raises(Exception):
+    with pytest.raises(tarfile.ReadError):
         pm.download_binary(force=True)
     assert not (bin_dir / "telemt.tmp").exists()
 
@@ -198,7 +198,7 @@ def test_pid_and_running_helpers(monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     assert pm.is_running() is True
 
     def _dead(pid, sig):
-        raise ProcessLookupError()
+        raise ProcessLookupError
 
     monkeypatch.setattr(pm.os, "kill", _dead)
     assert pm.is_running() is False
@@ -263,7 +263,7 @@ def test_start_stop_restart_reload_and_status(monkeypatch: pytest.MonkeyPatch, t
     def _kill(pid, sig):
         calls.append((pid, sig))
         if sig == 0:
-            raise ProcessLookupError()
+            raise ProcessLookupError
 
     monkeypatch.setattr(pm.os, "kill", _kill)
     pm.stop(timeout=0.1)
@@ -285,7 +285,7 @@ def test_start_stop_restart_reload_and_status(monkeypatch: pytest.MonkeyPatch, t
     pm.reload_config()
 
     def _gone(pid, sig):
-        raise ProcessLookupError()
+        raise ProcessLookupError
 
     monkeypatch.setattr(pm.os, "kill", _gone)
     monkeypatch.setattr(pm, "_clear_pid", lambda: None)
@@ -296,9 +296,7 @@ def test_start_stop_restart_reload_and_status(monkeypatch: pytest.MonkeyPatch, t
     monkeypatch.setattr(pm, "is_running", lambda: True)
     monkeypatch.setattr(pm, "is_binary_present", lambda: True)
     monkeypatch.setattr(pm, "TOML_CONFIG_FILE", SimpleNamespace(exists=lambda: True))
-    monkeypatch.setitem(
-        sys.modules, "psutil", SimpleNamespace(Process=lambda pid: SimpleNamespace(create_time=lambda: 0))
-    )
+    monkeypatch.setitem(sys.modules, "psutil", SimpleNamespace(Process=lambda pid: SimpleNamespace(create_time=lambda: 0)))
     st = pm.status()
     assert st["running"] is True
     assert st["pid"] == 1

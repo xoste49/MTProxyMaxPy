@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import sys
 from types import SimpleNamespace
-
-import pytest
+from typing import TYPE_CHECKING
 
 from mtproxymaxpy.tui import menu
+
+if TYPE_CHECKING:
+    import pytest
 
 
 class _Settings:
@@ -30,6 +32,9 @@ class _Settings:
             "telegram_chat_id": "",
             "telegram_interval": 24,
             "telegram_server_label": "srv",
+            "telegram_bot_proxy": "",
+            "manager_update_branch": "main",
+            "use_middle_proxy": True,
         }
         defaults.update(kw)
         self.__dict__.update(defaults)
@@ -68,7 +73,7 @@ def test_secrets_action_dispatches(monkeypatch: pytest.MonkeyPatch) -> None:
             "c",  # ch7 clone
             "alice",
             "memo",  # ch8
-        ]
+        ],
     )
     ints = iter([3, 2, 30])
     monkeypatch.setattr(menu.Prompt, "ask", lambda *a, **k: next(prompts))
@@ -88,9 +93,7 @@ def test_secrets_action_dispatches(monkeypatch: pytest.MonkeyPatch) -> None:
         disable_expired_secrets=lambda: [1, 2],
     )
     monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.secrets", sec_mod)
-    monkeypatch.setitem(
-        sys.modules, "mtproxymaxpy.utils.validation", SimpleNamespace(parse_human_bytes=lambda x: 1024**3)
-    )
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.utils.validation", SimpleNamespace(parse_human_bytes=lambda x: 1024**3))
 
     secs = [SimpleNamespace(label="alice", key="a" * 32, enabled=True)]
     menu._secrets_action(1, secs)
@@ -162,7 +165,7 @@ def test_links_menu_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     assert called["show"] == 1
 
     # ch=1 path with no enabled
-    monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.secrets", SimpleNamespace(load_secrets=lambda: []))
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.secrets", SimpleNamespace(load_secrets=list))
     choices = iter([1, 0])
     monkeypatch.setattr(menu, "_ask_choice", lambda *a, **k: next(choices))
     menu._links_menu()
@@ -260,9 +263,7 @@ def test_settings_menu_save_and_error(monkeypatch: pytest.MonkeyPatch) -> None:
         state["saved"].append(s)
         state["settings"] = s
 
-    monkeypatch.setitem(
-        sys.modules, "mtproxymaxpy.config.settings", SimpleNamespace(load_settings=_load, save_settings=_save)
-    )
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.settings", SimpleNamespace(load_settings=_load, save_settings=_save))
 
     choices = iter([1, 6, 18, 0])
     monkeypatch.setattr(menu, "_ask_choice", lambda *a, **k: next(choices))

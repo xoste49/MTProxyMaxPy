@@ -2,16 +2,20 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
+import logging
 import os
 import re
 import tempfile
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from mtproxymaxpy.constants import UPSTREAMS_FILE
+
+_log = logging.getLogger(__name__)
 
 DEFAULT_UPSTREAM_WEIGHT = 10
 _NAME_RE = re.compile(r"^[a-zA-Z0-9_-]+$")
@@ -19,6 +23,8 @@ _ADDR_RE = re.compile(r"^[a-zA-Z0-9._-]+:[0-9]+$")
 
 
 class Upstream(BaseModel):
+    """Pydantic model for a proxy upstream (direct, SOCKS5, or SOCKS4)."""
+
     name: str
     type: Literal["direct", "socks5", "socks4"] = "direct"
     addr: str = ""  # "host:port" for SOCKS
@@ -58,20 +64,22 @@ def _normalize_and_validate_addr(type_: str, addr: str) -> str:
 
 
 def load_upstreams(path: Path = UPSTREAMS_FILE) -> list[Upstream]:
+    """Load upstreams from *path*; return a default direct upstream if the file is absent or invalid."""
     if not path.exists():
         return [_default_direct_upstream()]
 
     try:
-        with open(path) as fh:
+        with path.open() as fh:
             data = json.load(fh)
-    except Exception:
+    except (OSError, json.JSONDecodeError):
         return [_default_direct_upstream()]
 
     items: list[Upstream] = []
     for item in data:
         try:
             u = Upstream.model_validate(item)
-        except Exception:
+        except ValidationError:
+            _log.debug("Skipping invalid upstream entry: %s", item)
             continue
         if u.type != "direct" and not u.addr.strip():
             continue
@@ -81,26 +89,25 @@ def load_upstreams(path: Path = UPSTREAMS_FILE) -> list[Upstream]:
 
 
 def save_upstreams(items: list[Upstream], path: Path = UPSTREAMS_FILE) -> None:
+    """Persist *items* to *path* atomically; falls back to a single direct upstream if *items* is empty."""
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = [item.model_dump() for item in (items or [_default_direct_upstream()])]
     fd, tmp = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
     try:
         with os.fdopen(fd, "w") as fh:
             json.dump(payload, fh, indent=2)
-        os.chmod(tmp, 0o600)
-        os.replace(tmp, path)
+        Path(tmp).chmod(0o600)
+        Path(tmp).replace(path)
     except Exception:
-        try:
-            os.unlink(tmp)
-        except OSError:
-            pass
+        with contextlib.suppress(OSError):
+            Path(tmp).unlink()
         raise
 
 
 # ── Mutation helpers ───────────────────────────────────────────────────────────
 
 
-def _set_upstream_field(name: str, field: str, value, path: Path = UPSTREAMS_FILE) -> Upstream:
+def _set_upstream_field(name: str, field: str, *, value: bool | str | int | None, path: Path = UPSTREAMS_FILE) -> Upstream:
     items = load_upstreams(path)
     for i, u in enumerate(items):
         if u.name == name:
@@ -121,6 +128,7 @@ def add_upstream(
     iface: str = "",
     path: Path = UPSTREAMS_FILE,
 ) -> Upstream:
+    """Create and persist a new upstream; raises ValueError/KeyError on invalid input or duplicate name."""
     items = load_upstreams(path)
     _assert_valid_name(name)
     if any(u.name == name for u in items):
@@ -143,7 +151,7 @@ def add_upstream(
 
     item = Upstream(
         name=name,
-        type=t,  # type: ignore[arg-type]
+        type=t,
         addr=normalized_addr,
         user=user,
         password=password,
@@ -157,6 +165,7 @@ def add_upstream(
 
 
 def remove_upstream(name: str, path: Path = UPSTREAMS_FILE) -> Upstream:
+    """Remove the named upstream and return it; raises if it is the last (or last enabled) entry."""
     items = load_upstreams(path)
     if len(items) <= 1:
         raise ValueError("Cannot remove the last upstream")
@@ -175,7 +184,8 @@ def remove_upstream(name: str, path: Path = UPSTREAMS_FILE) -> Upstream:
     return removed
 
 
-def set_upstream_enabled(name: str, enabled: bool, path: Path = UPSTREAMS_FILE) -> Upstream:
+def set_upstream_enabled(name: str, *, enabled: bool, path: Path = UPSTREAMS_FILE) -> Upstream:
+    """Set the ``enabled`` flag on the named upstream; prevents disabling the last enabled entry."""
     items = load_upstreams(path)
     idx = next((i for i, u in enumerate(items) if u.name == name), -1)
     if idx < 0:
@@ -192,23 +202,27 @@ def set_upstream_enabled(name: str, enabled: bool, path: Path = UPSTREAMS_FILE) 
 
 
 def enable_upstream(name: str, path: Path = UPSTREAMS_FILE) -> Upstream:
-    return set_upstream_enabled(name, True, path)
+    """Enable the named upstream."""
+    return set_upstream_enabled(name, enabled=True, path=path)
 
 
 def disable_upstream(name: str, path: Path = UPSTREAMS_FILE) -> Upstream:
-    return set_upstream_enabled(name, False, path)
+    """Disable the named upstream."""
+    return set_upstream_enabled(name, enabled=False, path=path)
 
 
 def toggle_upstream(name: str, path: Path = UPSTREAMS_FILE) -> Upstream:
+    """Toggle the enabled state of the named upstream."""
     items = load_upstreams(path)
     current = next((u for u in items if u.name == name), None)
     if current is None:
         raise KeyError(f"Upstream {name!r} not found")
-    return set_upstream_enabled(name, not current.enabled, path)
+    return set_upstream_enabled(name, enabled=not current.enabled, path=path)
 
 
-def test_upstream(name: str, timeout: float = 10.0) -> dict:
-    """Test connectivity through an upstream proxy.
+def test_upstream(name: str, timeout: float = 10.0) -> dict[str, Any]:  # noqa: PT028
+    """
+    Test connectivity through an upstream proxy.
 
     Returns ``{ok: bool, error: str|None, latency_ms: float|None}``.
     """
@@ -233,12 +247,12 @@ def test_upstream(name: str, timeout: float = 10.0) -> dict:
     cmd += ["-o", "/dev/null", "-w", "%{http_code}", "https://api.ipify.org"]
 
     t0 = time.monotonic()
-    try:
-        import subprocess
+    import subprocess
 
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout + 2)
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout + 2, check=False)
         latency_ms = (time.monotonic() - t0) * 1000
         ok = result.returncode == 0
         return {"ok": ok, "error": result.stderr.strip() or None, "latency_ms": round(latency_ms, 1)}
-    except Exception as exc:
+    except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
         return {"ok": False, "error": str(exc), "latency_ms": None}

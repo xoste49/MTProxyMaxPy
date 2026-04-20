@@ -1,17 +1,20 @@
 from __future__ import annotations
 
 import subprocess
-from pathlib import Path
 from types import SimpleNamespace
+from typing import TYPE_CHECKING
 
 import pytest
 
 from mtproxymaxpy import systemd
 from mtproxymaxpy.config import migration
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 
 def test_migration_parse_bool_and_settings_fallback(tmp_path: Path) -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Cannot parse boolean"):
         migration._parse_bool("maybe")
 
     cfg = tmp_path / "settings.conf"
@@ -40,23 +43,15 @@ def test_run_migration_detect_none_and_error_paths(tmp_path: Path, monkeypatch: 
     src = tmp_path / "s.conf"
     src.write_text("PROXY_PORT='443'\n", encoding="utf-8")
 
-    monkeypatch.setattr(
-        migration, "detect_legacy", lambda: {"settings": src, "secrets": src, "upstreams": src, "instances": src}
-    )
+    monkeypatch.setattr(migration, "detect_legacy", lambda: {"settings": src, "secrets": src, "upstreams": src, "instances": src})
 
     monkeypatch.setattr(
         "mtproxymaxpy.config.settings.save_settings",
         lambda *a, **k: (_ for _ in ()).throw(RuntimeError("save settings")),
     )
-    monkeypatch.setattr(
-        "mtproxymaxpy.config.secrets.save_secrets", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("save secrets"))
-    )
-    monkeypatch.setattr(
-        "mtproxymaxpy.config.upstreams.save_upstreams", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("save ups"))
-    )
-    monkeypatch.setattr(
-        "mtproxymaxpy.config.instances.save_instances", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("save inst"))
-    )
+    monkeypatch.setattr("mtproxymaxpy.config.secrets.save_secrets", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("save secrets")))
+    monkeypatch.setattr("mtproxymaxpy.config.upstreams.save_upstreams", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("save ups")))
+    monkeypatch.setattr("mtproxymaxpy.config.instances.save_instances", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("save inst")))
 
     res = migration.run_migration(files=None)
     assert any(e.startswith("settings:") for e in res.errors)

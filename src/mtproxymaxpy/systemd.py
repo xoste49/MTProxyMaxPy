@@ -5,19 +5,15 @@ from __future__ import annotations
 import logging
 import subprocess
 import sys
-from pathlib import Path
-
-logger = logging.getLogger(__name__)
 
 from mtproxymaxpy.constants import (
-    BINARY_PATH,
     INSTALL_DIR,
     SYSTEMD_SERVICE,
     SYSTEMD_TELEGRAM_SERVICE,
     SYSTEMD_UNIT_DIR,
-    TOML_CONFIG_FILE,
 )
 
+logger = logging.getLogger(__name__)
 
 # ── Unit file templates ────────────────────────────────────────────────────────
 
@@ -133,33 +129,38 @@ def uninstall(*, telegram: bool = True) -> None:
 # ── Service control ────────────────────────────────────────────────────────────
 
 
-def _systemctl(*args: str, check: bool = True) -> subprocess.CompletedProcess:
+def _systemctl(*args: str, check: bool = True) -> subprocess.CompletedProcess[bytes]:
     try:
-        return subprocess.run(["systemctl"] + list(args), check=check, capture_output=True)
-    except FileNotFoundError:
-        raise RuntimeError("systemctl not found — systemd is not available on this system")
+        return subprocess.run(["systemctl", *args], check=check, capture_output=True)
+    except FileNotFoundError as exc:
+        raise RuntimeError("systemctl not found — systemd is not available on this system") from exc
     except subprocess.CalledProcessError as exc:
         stderr = (exc.stderr or b"").decode(errors="replace").strip()
         raise RuntimeError(f"systemctl {' '.join(args)} failed (exit {exc.returncode}): {stderr}") from exc
 
 
 def start_service(name: str = SYSTEMD_SERVICE) -> None:
+    """Start the systemd service *name* via systemctl."""
     _systemctl("start", name)
 
 
 def stop_service(name: str = SYSTEMD_SERVICE) -> None:
+    """Stop the systemd service *name* via systemctl."""
     _systemctl("stop", name)
 
 
 def restart_service(name: str = SYSTEMD_SERVICE) -> None:
+    """Restart the systemd service *name* via systemctl."""
     _systemctl("restart", name)
 
 
 def is_active(name: str = SYSTEMD_SERVICE) -> bool:
+    """Return True if the systemd service *name* is currently active."""
     result = _systemctl("is-active", "--quiet", name, check=False)
     return result.returncode == 0
 
 
 def is_enabled(name: str = SYSTEMD_SERVICE) -> bool:
+    """Return True if the systemd service *name* is enabled (starts on boot)."""
     result = _systemctl("is-enabled", "--quiet", name, check=False)
     return result.returncode == 0

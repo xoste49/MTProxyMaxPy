@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 from types import SimpleNamespace
+from typing import TYPE_CHECKING
 
-import pytest
-
+import mtproxymaxpy
 from mtproxymaxpy.tui import menu
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    import pytest
 
 
 def test_logs_and_health_screens(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -25,18 +29,14 @@ def test_logs_and_health_screens(monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     log_file.unlink()
     menu._logs_screen()
 
-    monkeypatch.setitem(
-        sys.modules,
-        "mtproxymaxpy.doctor",
-        SimpleNamespace(run_full_doctor=lambda: [{"name": "A", "ok": True}, {"name": "B", "ok": False, "error": "x"}]),
-    )
+    _mock_doctor_ok = SimpleNamespace(run_full_doctor=lambda: [{"name": "A", "ok": True}, {"name": "B", "ok": False, "error": "x"}])
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.doctor", _mock_doctor_ok)
+    monkeypatch.setattr(mtproxymaxpy, "doctor", _mock_doctor_ok)
     menu._health_screen()
 
-    monkeypatch.setitem(
-        sys.modules,
-        "mtproxymaxpy.doctor",
-        SimpleNamespace(run_full_doctor=lambda: (_ for _ in ()).throw(RuntimeError("bad"))),
-    )
+    _mock_doctor_err = SimpleNamespace(run_full_doctor=lambda: (_ for _ in ()).throw(RuntimeError("bad")))
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.doctor", _mock_doctor_err)
+    monkeypatch.setattr(mtproxymaxpy, "doctor", _mock_doctor_err)
     menu._health_screen()
 
 
@@ -47,32 +47,24 @@ def test_status_screen_success_and_error(monkeypatch: pytest.MonkeyPatch) -> Non
     printed = []
     monkeypatch.setattr(menu.console, "print", lambda *a, **k: printed.append(a))
 
-    monkeypatch.setitem(
-        sys.modules,
-        "mtproxymaxpy.process_manager",
-        SimpleNamespace(status=lambda: {"running": True, "pid": 1, "uptime_sec": 60}),
+    _mock_pm = SimpleNamespace(status=lambda: {"running": True, "pid": 1, "uptime_sec": 60})
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.process_manager", _mock_pm)
+    monkeypatch.setattr(mtproxymaxpy, "process_manager", _mock_pm)
+    _mock_metrics = SimpleNamespace(
+        get_stats=lambda: {
+            "available": True,
+            "bytes_in": 1,
+            "bytes_out": 2,
+            "active_connections": 3,
+            "total_connections": 4,
+        },
     )
-    monkeypatch.setitem(
-        sys.modules,
-        "mtproxymaxpy.metrics",
-        SimpleNamespace(
-            get_stats=lambda: {
-                "available": True,
-                "bytes_in": 1,
-                "bytes_out": 2,
-                "active_connections": 3,
-                "total_connections": 4,
-            }
-        ),
-    )
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.metrics", _mock_metrics)
+    monkeypatch.setattr(mtproxymaxpy, "metrics", _mock_metrics)
     monkeypatch.setitem(
         sys.modules,
         "mtproxymaxpy.config.settings",
-        SimpleNamespace(
-            load_settings=lambda: SimpleNamespace(
-                proxy_port=443, proxy_domain="cf.com", custom_ip="", proxy_concurrency=1000
-            )
-        ),
+        SimpleNamespace(load_settings=lambda: SimpleNamespace(proxy_port=443, proxy_domain="cf.com", custom_ip="", proxy_concurrency=1000)),
     )
     monkeypatch.setitem(
         sys.modules,
@@ -93,11 +85,9 @@ def test_status_screen_success_and_error(monkeypatch: pytest.MonkeyPatch) -> Non
     menu._status_screen()
     assert printed
 
-    monkeypatch.setitem(
-        sys.modules,
-        "mtproxymaxpy.process_manager",
-        SimpleNamespace(status=lambda: (_ for _ in ()).throw(RuntimeError("x"))),
-    )
+    _mock_pm_err = SimpleNamespace(status=lambda: (_ for _ in ()).throw(RuntimeError("x")))
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.process_manager", _mock_pm_err)
+    monkeypatch.setattr(mtproxymaxpy, "process_manager", _mock_pm_err)
     menu._status_screen()
 
 
@@ -151,13 +141,11 @@ def test_run_tui_main_loop_routes(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
     monkeypatch.setitem(
         sys.modules,
         "mtproxymaxpy.config.settings",
-        SimpleNamespace(
-            load_settings=lambda: SimpleNamespace(telegram_enabled=True, proxy_port=443, proxy_domain="cf.com")
-        ),
+        SimpleNamespace(load_settings=lambda: SimpleNamespace(telegram_enabled=True, proxy_port=443, proxy_domain="cf.com")),
     )
     monkeypatch.setitem(sys.modules, "mtproxymaxpy.geoblock", SimpleNamespace(list_countries=lambda: ["RU"]))
 
-    calls = {i: 0 for i in range(1, 11)}
+    calls = dict.fromkeys(range(1, 11), 0)
     monkeypatch.setattr(menu, "_proxy_menu", lambda: calls.__setitem__(1, calls[1] + 1))
     monkeypatch.setattr(menu, "_secrets_menu", lambda: calls.__setitem__(2, calls[2] + 1))
     monkeypatch.setattr(menu, "_links_menu", lambda: calls.__setitem__(3, calls[3] + 1))
@@ -188,26 +176,22 @@ def test_run_tui_setup_and_migration_paths(monkeypatch: pytest.MonkeyPatch, tmp_
         SimpleNamespace(SETTINGS_FILE=settings_file, UPDATE_BADGE_FILE=tmp_path / "badge"),
     )
 
-    monkeypatch.setitem(
-        sys.modules, "mtproxymaxpy.config.migration", SimpleNamespace(detect_legacy=lambda: ["settings.conf"])
-    )
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.migration", SimpleNamespace(detect_legacy=lambda: ["settings.conf"]))
     called = {"mig": 0, "wiz": 0}
     monkeypatch.setattr(menu, "_migration_screen", lambda legacy: called.__setitem__("mig", called["mig"] + 1))
     monkeypatch.setattr(menu, "_setup_wizard", lambda: called.__setitem__("wiz", called["wiz"] + 1))
-    monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.secrets", SimpleNamespace(load_secrets=lambda: []))
-    monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.upstreams", SimpleNamespace(load_upstreams=lambda: []))
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.secrets", SimpleNamespace(load_secrets=list))
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.upstreams", SimpleNamespace(load_upstreams=list))
     monkeypatch.setitem(
         sys.modules,
         "mtproxymaxpy.config.settings",
-        SimpleNamespace(
-            load_settings=lambda: SimpleNamespace(telegram_enabled=False, proxy_port=443, proxy_domain="cf.com")
-        ),
+        SimpleNamespace(load_settings=lambda: SimpleNamespace(telegram_enabled=False, proxy_port=443, proxy_domain="cf.com")),
     )
-    monkeypatch.setitem(sys.modules, "mtproxymaxpy.geoblock", SimpleNamespace(list_countries=lambda: []))
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.geoblock", SimpleNamespace(list_countries=list))
     monkeypatch.setattr(menu, "_ask_choice", lambda *a, **k: 0)
     menu.run_tui()
     assert called["mig"] == 1
 
-    monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.migration", SimpleNamespace(detect_legacy=lambda: []))
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.migration", SimpleNamespace(detect_legacy=list))
     menu.run_tui()
     assert called["wiz"] == 1

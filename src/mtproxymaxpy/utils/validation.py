@@ -24,7 +24,8 @@ def validate_domain(domain: str) -> bool:
 
 
 def parse_human_bytes(value: str) -> int:
-    """Parse a human-readable byte string like '5G', '500M', '2048' into bytes.
+    """
+    Parse a human-readable byte string like '5G', '500M', '2048' into bytes.
 
     Supported suffixes: B, K/KB, M/MB, G/GB, T/TB (case-insensitive).
     Raises ValueError for unrecognised input.
@@ -41,12 +42,13 @@ def parse_human_bytes(value: str) -> int:
     return int(number * multipliers[suffix])
 
 
-def is_port_available(port: int, host: str = "0.0.0.0") -> bool:
+def is_port_available(port: int, host: str = "127.0.0.1") -> bool:
     """Return True if the given port is not currently bound."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
             s.bind((host, port))
-            return True
         except OSError:
             return False
+        else:
+            return True

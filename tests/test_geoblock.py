@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import subprocess
 import sys
-from pathlib import Path
 from types import SimpleNamespace
+from typing import TYPE_CHECKING
 
 import pytest
 
 from mtproxymaxpy import geoblock
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_run_and_require_tools(monkeypatch: pytest.MonkeyPatch) -> None:

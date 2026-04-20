@@ -3,11 +3,14 @@ name = "mtproxymaxpy"
 version = "1.0.0"
 description = "MTProto proxy management platform"
 requires-python = ">=3.13"
+license = "MIT"
+readme = "README.md"
 dependencies = [
     "rich>=13.0",
     "psutil>=5.9",
     "pydantic>=2.7",
     "aiogram>=3.26,<4",
+    "aiohttp-socks>=0.8",
     "httpx>=0.27",
     "typer>=0.12",
     "tomli-w>=1.0",
@@ -26,11 +29,13 @@ packages = ["src/mtproxymaxpy"]
 
 [dependency-groups]
 dev = [
+    "mypy>=1.20.1",
     "pre-commit>=3.8",
     "pytest>=8",
     "pytest-cov>=5",
     "pytest-mock>=3.14",
-    "ruff>=0.15",
+    "ruff>=0.15.10",
+    "types-qrcode>=8.2.0.20260408",
 ]
 
 [tool.pytest.ini_options]
@@ -55,9 +60,31 @@ show_missing = true
 skip_covered = false
 precision = 2
 
+[tool.mypy]
+plugins = ["pydantic.mypy"]
+python_version = "3.13"
+strict = true                   # Включает все строгие проверки (disallow_untyped_*, warn_*, strict_equality, extra_checks и др.)
+
+enable_error_code = [
+    "ignore-without-code",  # Требует `# type: ignore[code]` вместо голого `# type: ignore`
+    "possibly-undefined",  # Ловит переменные, которые могут быть не определены в ветке
+    "redundant-expr",  # Предупреждает об избыточных выражениях в условиях
+    "truthy-bool",  # Предупреждает, когда non-bool используется в boolean-контексте
+    "truthy-iterable",  # Ловит `if queryset:` на итераторах, которые всегда truthy
+    "mutable-override",  # Ловит ковариантное переопределение мутабельного атрибута в подклассе
+    "explicit-override",  # Требует @override для всех переопределений методов (Python 3.12+)
+]
+
+# Опции, не входящие в strict:
+disallow_any_unimported = true  # Типы из непроимпортированных модулей не становятся тихо `Any`
+local_partial_types = true      # Запрещает вывод типа None из двух присваиваний в разных scope
+implicit_reexport = true        # Переопределяет strict (strict ставит no_implicit_reexport) — намеренно
+strict_bytes = true             # Запрещает bytearray/memoryview как подтипы bytes (default в mypy 2.0)
+strict_equality_for_none = true # Расширяет strict_equality на проверки с None
+
 [tool.ruff]
 target-version = "py313"
-line-length = 120
+line-length = 150
 indent-width = 4
 exclude = [
     ".git",
@@ -68,9 +95,82 @@ exclude = [
 ]
 
 [tool.ruff.lint]
-select = ["E4", "E7", "E9", "F"]
-ignore = ["E402", "E741", "F401", "F541", "F841"]
+select = [
+    "ERA", # Включить проверку наличия закоментированного кода https://docs.astral.sh/ruff/rules/#eradicate-era
+    "YTT", # flake8-2020 (YTT) https://docs.astral.sh/ruff/rules/#flake8-2020-ytt
+    "ANN", # flake8-annotations (ANN) https://docs.astral.sh/ruff/rules/#flake8-annotations-ann
+    "ASYNC", # flake8-async (ASYNC) https://docs.astral.sh/ruff/rules/#flake8-async-async
+    "S", # flake8-bandit (S) https://docs.astral.sh/ruff/rules/#flake8-bandit-s
+    "BLE", # flake8-blind-except (BLE) https://docs.astral.sh/ruff/rules/#flake8-blind-except-ble
+    "FBT", # flake8-boolean-trap (FBT) https://docs.astral.sh/ruff/rules/#flake8-boolean-trap-fbt
+    "B", # flake8-bugbear (B) https://docs.astral.sh/ruff/rules/#flake8-bugbear-b
+    "A", # flake8-builtins (A) https://docs.astral.sh/ruff/rules/#flake8-builtins-a
+    "COM", # flake8-commas (COM) https://docs.astral.sh/ruff/rules/#flake8-commas-com
+    "C4", # flake8-comprehensions (C4) https://docs.astral.sh/ruff/rules/#flake8-comprehensions-c4
+    "DTZ", # flake8-datetimez (DTZ) https://docs.astral.sh/ruff/rules/#flake8-datetimez-dtz
+    # "T10", "DJ", "EM", "EXE" - не нужны
+    "FIX", # flake8-fixme (FIX) https://docs.astral.sh/ruff/rules/#flake8-fixme-fix
+    # "FA" для старых версий python
+    "INT", # flake8-gettext (INT) https://docs.astral.sh/ruff/rules/#flake8-gettext-int
+    "ISC", # flake8-implicit-str-concat (ISC) https://docs.astral.sh/ruff/rules/#flake8-implicit-str-concat-isc
+    "ICN", # flake8-import-conventions (ICN) https://docs.astral.sh/ruff/rules/#flake8-import-conventions-icn
+    "LOG", # flake8-logging (LOG) https://docs.astral.sh/ruff/rules/#flake8-logging-log
+    "G", # flake8-logging-format (G) https://docs.astral.sh/ruff/rules/#flake8-logging-format-g
+    "INP", # flake8-no-pep420 (INP) https://docs.astral.sh/ruff/rules/#flake8-no-pep420-inp
+    "PIE", # flake8-pie (PIE) https://docs.astral.sh/ruff/rules/#flake8-pie-pie
+    "T20", # flake8-print (T20) https://docs.astral.sh/ruff/rules/#flake8-print-t20
+    "PYI", # flake8-pyi (PYI) https://docs.astral.sh/ruff/rules/#flake8-print-t20
+    "PT", # flake8-pytest-style (PT) https://docs.astral.sh/ruff/rules/#flake8-pytest-style-pt
+    "Q", # flake8-quotes (Q) https://docs.astral.sh/ruff/rules/#flake8-quotes-q
+    "RSE", # flake8-raise (RSE) https://docs.astral.sh/ruff/rules/#flake8-raise-rse
+    "RET", # flake8-return (RET) https://docs.astral.sh/ruff/rules/#flake8-return-ret
+    "SLF", # flake8-self (SLF) https://docs.astral.sh/ruff/rules/#flake8-self-slf
+    "SIM", # flake8-simplify (SIM) https://docs.astral.sh/ruff/rules/#flake8-simplify-sim
+    #"SLOT", # flake8-slots (SLOT) https://docs.astral.sh/ruff/rules/#flake8-slots-slot - не совсем понятно, как применять к некоторым классам
+    "TID", # flake8-tidy-imports (TID) https://docs.astral.sh/ruff/rules/#flake8-tidy-imports-tid
+    "TD", # flake8-todos (TD) https://docs.astral.sh/ruff/rules/#flake8-todos-td
+    "TC", # flake8-type-checking (TC) https://docs.astral.sh/ruff/rules/#flake8-type-checking-tc
+    "ARG", # flake8-unused-arguments (ARG) https://docs.astral.sh/ruff/rules/#flake8-unused-arguments-arg
+    "PTH", # flake8-use-pathlib (PTH) https://docs.astral.sh/ruff/rules/#flake8-use-pathlib-pth
+    "FLY", # flynt (FLY) https://docs.astral.sh/ruff/rules/#flynt-fly
+    "I", # isort (I) https://docs.astral.sh/ruff/rules/#isort-i
+    "C90", # mccabe (C90) https://docs.astral.sh/ruff/rules/#mccabe-c90
+    "N", # pep8-naming (N) https://docs.astral.sh/ruff/rules/#pep8-naming-n
+    "PERF", # Perflint (PERF) https://docs.astral.sh/ruff/rules/#perflint-perf
+    "E", "W", # pycodestyle (E, W) https://docs.astral.sh/ruff/rules/#pycodestyle-e-w
+    #"DOC", # pydoclint (DOC) — в состоянии preview https://docs.astral.sh/ruff/rules/#pydoclint-doc поэтому используется само приложение pydoclint
+    "D", # pydocstyle (D) https://docs.astral.sh/ruff/rules/#pydocstyle-d
+    "F", # Pyflakes (F) https://docs.astral.sh/ruff/rules/#pyflakes-f
+    "PGH", # pygrep-hooks (PGH) https://docs.astral.sh/ruff/rules/#pygrep-hooks-pgh
+    "PLC", "PLE", "PLR", "PLW", # Pylint (PL) https://docs.astral.sh/ruff/rules/#pylint-pl
+    "UP", # pyupgrade (UP) https://docs.astral.sh/ruff/rules/#pyupgrade-up
+    "FURB", # refurb (FURB) https://docs.astral.sh/ruff/rules/#refurb-furb
+    "RUF", # Ruff-specific rules (RUF) https://docs.astral.sh/ruff/rules/#ruff-specific-rules-ruf
+    "TRY", # tryceratops (TRY) https://docs.astral.sh/ruff/rules/#tryceratops-try
+]
+ignore = [
+    "COM812", # Конфликтующие с форматером
+    "E741", "S103", "S603", "S607",
+    "D104",   # Докстринги для пакетов (__init__.py) не требуются
+    "D105",   # Докстринги для магических методов не требуются
+    "D203",   # Конфликтует с D211 (Google convention требует D211 — без пустой строки перед докстрингом класса)
+    "D212",   # Конфликтует с D213 (Google convention требует D213 — summary на следующей строке после """)
+    "PLC0415", # Lazy imports — намеренный паттерн для избежания циклических импортов и опциональных зависимостей
+    "PLR0913", # Слишком много аргументов в функции — иногда неизбежно, например, при работе с конфигурацией
+    "PLR2004", # magic-value-comparison
+    "PLR0915", # too-many-statements
+    "PLR0912", # too-many-branches
+    "TRY003", # inline exception messages — acceptable for this project
+    "TRY301", # abstract raise to inner function — over-engineering
+    "RUF001", "RUF002", "RUF003",
+    ]
 fixable = ["ALL"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["ANN", "ARG", "FBT", "S101", "S608", "S105", "S106", "INP", "SLF001", "D100", "D101", "D102", "D103", "D107", "PLW0108"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.ruff.format]
 quote-style = "double"

@@ -1,4 +1,5 @@
-"""Detection and import of legacy bash-based MTProxyMaxPy configuration files.
+"""
+Detection and import of legacy bash-based MTProxyMaxPy configuration files.
 
 Legacy formats
 --------------
@@ -13,31 +14,38 @@ instances.conf  pipe-delimited, format varies but at minimum:
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass, field
-from datetime import datetime
-from pathlib import Path
-from typing import Any
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 
+from pydantic import ValidationError
+
+from mtproxymaxpy.config.instances import Instance
+from mtproxymaxpy.config.secrets import Secret
+from mtproxymaxpy.config.settings import Settings
+from mtproxymaxpy.config.upstreams import Upstream
 from mtproxymaxpy.constants import (
     INSTALL_DIR,
+    INSTANCES_FILE,
+    LEGACY_BASH_INSTANCES_FILE,
+    LEGACY_BASH_SECRETS_FILE,
+    LEGACY_BASH_SETTINGS_FILE,
+    LEGACY_BASH_UPSTREAMS_FILE,
     LEGACY_INSTANCES_FILE,
     LEGACY_SECRETS_FILE,
     LEGACY_SETTINGS_FILE,
     LEGACY_UPSTREAMS_FILE,
-    LEGACY_BASH_SETTINGS_FILE,
-    LEGACY_BASH_SECRETS_FILE,
-    LEGACY_BASH_UPSTREAMS_FILE,
-    LEGACY_BASH_INSTANCES_FILE,
-    SETTINGS_FILE,
     SECRETS_FILE,
+    SETTINGS_FILE,
     UPSTREAMS_FILE,
-    INSTANCES_FILE,
 )
-from mtproxymaxpy.config.settings import Settings
-from mtproxymaxpy.config.secrets import Secret
-from mtproxymaxpy.config.upstreams import Upstream
-from mtproxymaxpy.config.instances import Instance
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+_log = logging.getLogger(__name__)
 
 # ── Known settings.conf key → Settings field mapping ────────────────────────
 
@@ -87,8 +95,8 @@ def _parse_bool(v: str) -> bool:
 def _parse_settings_conf(path: Path) -> dict[str, Any]:
     """Parse KEY='VALUE' shell-format settings.conf into a plain dict."""
     result: dict[str, Any] = {}
-    for line in path.read_text(errors="replace").splitlines():
-        line = line.strip()
+    for raw in path.read_text(errors="replace").splitlines():
+        line = raw.strip()
         if not line or line.startswith("#"):
             continue
         m = _KV_RE.match(line)
@@ -103,18 +111,17 @@ def _parse_settings_conf(path: Path) -> dict[str, Any]:
         try:
             field_info = Settings.model_fields[py_key]
             annotation = field_info.annotation
-            # unwrap Optional
-            origin = getattr(annotation, "__origin__", None)
-            args = getattr(annotation, "__args__", ())
-            inner = args[0] if origin is type(None).__class__ and args else annotation
+            # unwrap Optional (Union[X, None] or X | None) — runtime introspection
+            args: tuple[type, ...] = getattr(annotation, "__args__", ())
+            inner = args[0] if type(None) in args and args[0] is not type(None) else annotation
 
             if inner is bool or annotation is bool:
                 result[py_key] = _parse_bool(raw_value)
-            elif inner is int or annotation is int:
+            elif inner is int or annotation is int:  # type: ignore[comparison-overlap]
                 result[py_key] = int(raw_value)
             else:
                 result[py_key] = raw_value
-        except Exception:
+        except (ValueError, TypeError):
             result[py_key] = raw_value  # store as string, let Pydantic validate later
 
     return result
@@ -123,16 +130,16 @@ def _parse_settings_conf(path: Path) -> dict[str, Any]:
 def _ts_to_date(ts: str) -> str:
     """Convert a Unix timestamp string to YYYY-MM-DD, or return '' on failure."""
     try:
-        return datetime.fromtimestamp(int(ts)).date().isoformat()
-    except Exception:
+        return datetime.fromtimestamp(int(ts), tz=UTC).date().isoformat()
+    except (ValueError, OverflowError, OSError):
         return ""
 
 
 def _parse_secrets_conf(path: Path) -> list[Secret]:
     """Parse pipe-delimited secrets.conf (9 columns)."""
     items: list[Secret] = []
-    for line in path.read_text(errors="replace").splitlines():
-        line = line.strip()
+    for raw in path.read_text(errors="replace").splitlines():
+        line = raw.strip()
         if not line or line.startswith("#"):
             continue
         cols = line.split("|")
@@ -153,9 +160,10 @@ def _parse_secrets_conf(path: Path) -> list[Secret]:
                     quota_bytes=int(quota.strip() or 0),
                     expires=expires.strip() if expires.strip() not in ("", "0") else "",
                     notes=notes.strip(),
-                )
+                ),
             )
-        except Exception:
+        except (ValueError, ValidationError):
+            _log.debug("Skipping malformed secret line: %s", line)
             continue
     return items
 
@@ -163,8 +171,8 @@ def _parse_secrets_conf(path: Path) -> list[Secret]:
 def _parse_upstreams_conf(path: Path) -> list[Upstream]:
     """Parse pipe-delimited upstreams.conf (8 columns)."""
     items: list[Upstream] = []
-    for line in path.read_text(errors="replace").splitlines():
-        line = line.strip()
+    for raw in path.read_text(errors="replace").splitlines():
+        line = raw.strip()
         if not line or line.startswith("#"):
             continue
         cols = line.split("|")
@@ -176,16 +184,17 @@ def _parse_upstreams_conf(path: Path) -> list[Upstream]:
             items.append(
                 Upstream(
                     name=name.strip(),
-                    type=utype.strip() or "direct",  # type: ignore[arg-type]
+                    type=utype.strip() or "direct",
                     addr=addr.strip(),
                     user=user.strip(),
                     password=password.strip(),
                     weight=int(weight.strip() or 100),
                     iface=iface.strip(),
                     enabled=_parse_bool(enabled.strip()) if enabled.strip() else True,
-                )
+                ),
             )
-        except Exception:
+        except (ValueError, ValidationError):
+            _log.debug("Skipping malformed upstream line: %s", line)
             continue
     return items
 
@@ -193,8 +202,8 @@ def _parse_upstreams_conf(path: Path) -> list[Upstream]:
 def _parse_instances_conf(path: Path) -> list[Instance]:
     """Parse pipe-delimited instances.conf (4 columns)."""
     items: list[Instance] = []
-    for line in path.read_text(errors="replace").splitlines():
-        line = line.strip()
+    for raw in path.read_text(errors="replace").splitlines():
+        line = raw.strip()
         if not line or line.startswith("#"):
             continue
         cols = line.split("|")
@@ -209,9 +218,10 @@ def _parse_instances_conf(path: Path) -> list[Instance]:
                     port=int(port.strip()),
                     enabled=_parse_bool(enabled.strip()) if enabled.strip() else True,
                     notes=notes.strip(),
-                )
+                ),
             )
-        except Exception:
+        except (ValueError, ValidationError):
+            _log.debug("Skipping malformed instance line: %s", line)
             continue
     return items
 
@@ -221,6 +231,8 @@ def _parse_instances_conf(path: Path) -> list[Instance]:
 
 @dataclass
 class MigrationResult:
+    """Result summary returned by a legacy-config migration run."""
+
     settings_imported: bool = False
     secrets_count: int = 0
     upstreams_count: int = 0
@@ -229,8 +241,9 @@ class MigrationResult:
     errors: list[str] = field(default_factory=list)
 
 
-def detect_legacy(install_dir: Path = INSTALL_DIR) -> dict[str, Path]:
-    """Return a dict of legacy config files that exist.
+def detect_legacy(_install_dir: Path = INSTALL_DIR) -> dict[str, Path]:
+    """
+    Return a dict of legacy config files that exist.
 
     Keys are one of: 'settings', 'secrets', 'upstreams', 'instances'.
     Values are the resolved Path objects.
@@ -260,15 +273,16 @@ def run_migration(
     upstreams_out: Path = UPSTREAMS_FILE,
     instances_out: Path = INSTANCES_FILE,
 ) -> MigrationResult:
-    """Import legacy config files into the new TOML/JSON format.
+    """
+    Import legacy config files into the new TOML/JSON format.
 
     *files* should be the return value of :func:`detect_legacy`.
     If None, :func:`detect_legacy` is called automatically.
     """
-    from mtproxymaxpy.config.settings import save_settings
-    from mtproxymaxpy.config.secrets import save_secrets
-    from mtproxymaxpy.config.upstreams import save_upstreams
     from mtproxymaxpy.config.instances import save_instances
+    from mtproxymaxpy.config.secrets import save_secrets
+    from mtproxymaxpy.config.settings import save_settings
+    from mtproxymaxpy.config.upstreams import save_upstreams
 
     if files is None:
         files = detect_legacy()
@@ -281,7 +295,7 @@ def run_migration(
             settings = Settings.model_validate(raw)
             save_settings(settings, settings_out)
             result.settings_imported = True
-        except Exception as exc:
+        except (ValueError, OSError, RuntimeError, ValidationError) as exc:
             result.errors.append(f"settings: {exc}")
 
     if "secrets" in files:
@@ -289,23 +303,23 @@ def run_migration(
             items = _parse_secrets_conf(files["secrets"])
             save_secrets(items, secrets_out)
             result.secrets_count = len(items)
-        except Exception as exc:
+        except (ValueError, OSError, RuntimeError, ValidationError) as exc:
             result.errors.append(f"secrets: {exc}")
 
     if "upstreams" in files:
         try:
-            items = _parse_upstreams_conf(files["upstreams"])
-            save_upstreams(items, upstreams_out)
-            result.upstreams_count = len(items)
-        except Exception as exc:
+            upstream_items = _parse_upstreams_conf(files["upstreams"])
+            save_upstreams(upstream_items, upstreams_out)
+            result.upstreams_count = len(upstream_items)
+        except (ValueError, OSError, RuntimeError, ValidationError) as exc:
             result.errors.append(f"upstreams: {exc}")
 
     if "instances" in files:
         try:
-            items = _parse_instances_conf(files["instances"])
-            save_instances(items, instances_out)
-            result.instances_count = len(items)
-        except Exception as exc:
+            instance_items = _parse_instances_conf(files["instances"])
+            save_instances(instance_items, instances_out)
+            result.instances_count = len(instance_items)
+        except (ValueError, OSError, RuntimeError, ValidationError) as exc:
             result.errors.append(f"instances: {exc}")
 
     return result

@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import sys
-from datetime import datetime
-from pathlib import Path
+from datetime import UTC, datetime
 from types import SimpleNamespace
-
-import pytest
+from typing import TYPE_CHECKING
 
 from mtproxymaxpy.tui import menu
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    import pytest
 
 
 class _Settings:
@@ -19,6 +22,7 @@ class _Settings:
             "telegram_interval": 24,
             "telegram_alerts_enabled": True,
             "telegram_server_label": "srv",
+            "telegram_bot_proxy": "",
             "proxy_port": 443,
             "proxy_domain": "cloudflare.com",
             "custom_ip": "",
@@ -71,7 +75,7 @@ def test_backup_menu_and_migration_screen(monkeypatch: pytest.MonkeyPatch, tmp_p
     import mtproxymaxpy as pkg
 
     bkp = SimpleNamespace(
-        list_backups=lambda: [{"name": "b.tar.gz", "size": 1024, "mtime": datetime(2026, 1, 1)}],
+        list_backups=lambda: [{"name": "b.tar.gz", "size": 1024, "mtime": datetime(2026, 1, 1, tzinfo=UTC)}],
         create_backup=lambda label="": tmp_path / "b.tar.gz",
         restore_backup=lambda path: {"version": "1.0"},
     )
@@ -87,9 +91,7 @@ def test_backup_menu_and_migration_screen(monkeypatch: pytest.MonkeyPatch, tmp_p
     monkeypatch.setattr(menu.Confirm, "ask", lambda *a, **k: True)
     menu._backup_menu()
 
-    monkeypatch.setitem(
-        sys.modules, "mtproxymaxpy.config.migration", SimpleNamespace(run_migration=lambda legacy: {"ok": True})
-    )
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.migration", SimpleNamespace(run_migration=lambda legacy: {"ok": True}))
     monkeypatch.setattr(menu.Confirm, "ask", lambda *a, **k: True)
     menu._migration_screen({"settings": tmp_path / "settings.conf"})
 
@@ -122,12 +124,14 @@ def test_telegram_menu_and_helpers(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
         SimpleNamespace(load_settings=_load_settings, save_settings=_save_settings),
     )
 
-    calls = {"start": 0, "stop": 0, "install": 0, "wizard": 0, "test": 0, "tg_logs": 0}
+    calls = {"start": 0, "stop": 0, "restart": 0, "install": 0, "uninstall": 0, "wizard": 0, "test": 0, "tg_logs": 0}
     sd = SimpleNamespace(
         is_active=lambda name: False,
         install_telegram_service=lambda: calls.__setitem__("install", calls["install"] + 1),
         start_service=lambda name: calls.__setitem__("start", calls["start"] + 1),
         stop_service=lambda name: calls.__setitem__("stop", calls["stop"] + 1),
+        restart_service=lambda name: calls.__setitem__("restart", calls["restart"] + 1),
+        uninstall=lambda **k: calls.__setitem__("uninstall", calls["uninstall"] + 1),
     )
     monkeypatch.setitem(sys.modules, "mtproxymaxpy.systemd", sd)
     monkeypatch.setattr(pkg, "systemd", sd, raising=False)
@@ -135,12 +139,10 @@ def test_telegram_menu_and_helpers(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     real_test = menu._telegram_test
     monkeypatch.setattr(menu, "_telegram_setup_wizard", lambda: calls.__setitem__("wizard", calls["wizard"] + 1))
     monkeypatch.setattr(menu, "_telegram_test", lambda: calls.__setitem__("test", calls["test"] + 1))
-    monkeypatch.setattr(
-        menu, "_stream_telegram_logs_screen", lambda: calls.__setitem__("tg_logs", calls["tg_logs"] + 1)
-    )
+    monkeypatch.setattr(menu, "_stream_telegram_logs_screen", lambda: calls.__setitem__("tg_logs", calls["tg_logs"] + 1))
     monkeypatch.setattr(menu.IntPrompt, "ask", lambda *a, **k: 12)
 
-    choices = iter([1, 2, 3, 4, 5, 6, 7, 0])
+    choices = iter([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0])
     monkeypatch.setattr(menu, "_ask_choice", lambda *a, **k: next(choices))
     menu._telegram_menu()
 
@@ -148,9 +150,13 @@ def test_telegram_menu_and_helpers(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     assert calls["test"] == 1
     assert calls["install"] >= 1
     assert calls["tg_logs"] == 1
+    assert calls["start"] >= 1
+    assert calls["stop"] >= 1
+    assert calls["restart"] >= 1
+    assert calls["uninstall"] >= 1
 
     # _telegram_setup_wizard real path
-    prompts = iter(["token", "chat", "node-1"])
+    prompts = iter(["token", "chat", "node-1", ""])
     monkeypatch.setattr(menu.Prompt, "ask", lambda *a, **k: next(prompts))
     real_wizard()
     assert state["settings"].telegram_enabled is True
@@ -280,9 +286,7 @@ def test_update_and_setup_wizard(monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 
     prompts = iter(["1.2.3.4", "my.domain", "TAG", "user1"])
     confirms = iter([True, True, False])  # masking yes, ad-tag yes, telegram setup no
-    monkeypatch.setattr(
-        menu.IntPrompt, "ask", lambda *a, **k: 443 if "port" in a[0].lower() else len(menu.FAKETLS_DOMAINS)
-    )
+    monkeypatch.setattr(menu.IntPrompt, "ask", lambda *a, **k: 443 if "port" in a[0].lower() else len(menu.FAKETLS_DOMAINS))
     monkeypatch.setattr(menu.Prompt, "ask", lambda *a, **k: next(prompts))
     monkeypatch.setattr(menu.Confirm, "ask", lambda *a, **k: next(confirms))
     menu._setup_wizard()

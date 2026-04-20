@@ -1,4 +1,5 @@
-"""Backup and restore of MTProxyMaxPy configuration files.
+"""
+Backup and restore of MTProxyMaxPy configuration files.
 
 Creates/extracts .tar.gz archives containing settings, secrets, upstreams,
 instances, and stats snapshots.  A metadata.json is always included.
@@ -6,6 +7,7 @@ instances, and stats snapshots.  A metadata.json is always included.
 
 from __future__ import annotations
 
+import contextlib
 import io
 import json
 import os
@@ -13,9 +15,9 @@ import platform
 import socket
 import tarfile
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
+from typing import Any
 
 from mtproxymaxpy.constants import (
     BACKUP_DIR,
@@ -27,12 +29,11 @@ from mtproxymaxpy.constants import (
     VERSION,
 )
 
-
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 
-def _metadata() -> dict:
-    now_utc = datetime.now(timezone.utc)
+def _metadata() -> dict[str, Any]:
+    now_utc = datetime.now(UTC)
     return {
         "version": VERSION,
         "date": now_utc.isoformat().replace("+00:00", "Z"),
@@ -47,7 +48,7 @@ def _metadata() -> dict:
 def create_backup(label: str = "") -> Path:
     """Create a backup archive. Returns the path to the .tar.gz file."""
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
     slug = f"-{label}" if label else ""
     archive_path = BACKUP_DIR / f"backup-{timestamp}{slug}.tar.gz"
 
@@ -68,15 +69,15 @@ def create_backup(label: str = "") -> Path:
         info.size = len(meta_bytes)
         tf.addfile(info, io.BytesIO(meta_bytes))
 
-    os.chmod(archive_path, 0o600)
+    archive_path.chmod(0o600)
     return archive_path
 
 
-def list_backups() -> list[dict]:
+def list_backups() -> list[dict[str, Any]]:
     """Return a list of backup info dicts, sorted newest first."""
     if not BACKUP_DIR.exists():
         return []
-    backups: list[dict] = []
+    backups: list[dict[str, Any]] = []
     for f in BACKUP_DIR.glob("backup-*.tar.gz"):
         stat = f.stat()
         backups.append(
@@ -84,14 +85,36 @@ def list_backups() -> list[dict]:
                 "path": f,
                 "name": f.name,
                 "size": stat.st_size,
-                "mtime": datetime.fromtimestamp(stat.st_mtime),
-            }
+                "mtime": datetime.fromtimestamp(stat.st_mtime, tz=UTC),
+            },
         )
     return sorted(backups, key=lambda x: x["mtime"], reverse=True)
 
 
-def restore_backup(archive: Path) -> dict:
-    """Extract and restore a backup archive.
+_CONFIG_EXTS = (".toml", ".json", ".conf")
+
+
+def _extract_config_member(tf: tarfile.TarFile, member: tarfile.TarInfo, install_dir: Path) -> None:
+    """Atomically extract a single config file member from a backup archive."""
+    src = tf.extractfile(member)
+    if src is None:
+        return
+    dest = install_dir / Path(member.name).name
+    fd, tmp = tempfile.mkstemp(dir=install_dir, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(src.read())
+        Path(tmp).chmod(0o600)
+        Path(tmp).replace(dest)
+    except Exception:
+        with contextlib.suppress(OSError):
+            Path(tmp).unlink()
+        raise
+
+
+def restore_backup(archive: Path) -> dict[str, Any]:
+    """
+    Extract and restore a backup archive.
 
     Returns the metadata dict from the archive.
     Automatically creates a safety backup of the current state before restoring.
@@ -100,11 +123,11 @@ def restore_backup(archive: Path) -> dict:
         raise FileNotFoundError(f"Backup not found: {archive}")
 
     # Safety backup before overwriting anything
-    pre_restore: Optional[Path] = None
+    pre_restore: Path | None = None
     if SETTINGS_FILE.exists() or SECRETS_FILE.exists():
         pre_restore = create_backup("pre-restore")
 
-    meta: dict = {}
+    meta: dict[str, Any] = {}
     INSTALL_DIR.mkdir(parents=True, exist_ok=True)
 
     with tarfile.open(archive, "r:gz") as tf:
@@ -117,28 +140,11 @@ def restore_backup(archive: Path) -> dict:
         except KeyError:
             pass
 
-        # Extract config files atomically
-        _CONFIG_EXTS = (".toml", ".json", ".conf")
         for member in tf.getmembers():
             if member.name == "metadata.json":
                 continue
             if any(member.name.endswith(ext) for ext in _CONFIG_EXTS):
-                src = tf.extractfile(member)
-                if src is None:
-                    continue
-                dest = INSTALL_DIR / Path(member.name).name
-                fd, tmp = tempfile.mkstemp(dir=INSTALL_DIR, suffix=".tmp")
-                try:
-                    with os.fdopen(fd, "wb") as fh:
-                        fh.write(src.read())
-                    os.chmod(tmp, 0o600)
-                    os.replace(tmp, dest)
-                except Exception:
-                    try:
-                        os.unlink(tmp)
-                    except OSError:
-                        pass
-                    raise
+                _extract_config_member(tf, member, INSTALL_DIR)
             elif member.isdir() and member.name == "relay_stats":
                 (INSTALL_DIR / "relay_stats").mkdir(exist_ok=True)
 

@@ -16,6 +16,32 @@ def _mute_ui(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(menu.console, "print", lambda *a, **k: None)
 
 
+def _subprocess_pull_fail(cmd: list[str], **kwargs: object) -> SimpleNamespace:
+    if "rev-parse" in cmd:
+        return SimpleNamespace(returncode=0, stdout="a" * 40, stderr="")
+    if "pull" in cmd:
+        return SimpleNamespace(returncode=1, stdout="", stderr="pull failed")
+    return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+
+def _subprocess_sync_fail(cmd: list[str], **kwargs: object) -> SimpleNamespace:
+    if "rev-parse" in cmd:
+        return SimpleNamespace(returncode=0, stdout="a" * 40, stderr="")
+    if "pull" in cmd:
+        return SimpleNamespace(returncode=0, stdout="ok", stderr="")
+    if cmd and str(cmd[0]).endswith("uv"):
+        return SimpleNamespace(returncode=1, stdout="", stderr="sync fail")
+    return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+
+def _subprocess_all_ok(cmd: list[str], **kwargs: object) -> SimpleNamespace:
+    if "rev-parse" in cmd:
+        return SimpleNamespace(returncode=0, stdout="a" * 40, stderr="")
+    if cmd and str(cmd[0]).endswith("uv"):
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+    return SimpleNamespace(returncode=0, stdout="ok", stderr="")
+
+
 def test_update_screen_deep_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _mute_ui(monkeypatch)
     import mtproxymaxpy as pkg
@@ -49,62 +75,43 @@ def test_update_screen_deep_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
     )
     monkeypatch.setitem(sys.modules, "mtproxymaxpy.process_manager", _pm)
     monkeypatch.setattr(pkg, "process_manager", _pm, raising=False)
-    monkeypatch.setitem(sys.modules, "httpx", SimpleNamespace(get=lambda *a, **k: SimpleNamespace(text="b" * 40)))
+    monkeypatch.setattr(menu, "httpx", SimpleNamespace(get=lambda *a, **k: SimpleNamespace(text="b" * 40), HTTPError=Exception))
+    monkeypatch.setitem(
+        sys.modules,
+        "mtproxymaxpy.config.settings",
+        SimpleNamespace(load_settings=lambda: SimpleNamespace(manager_update_branch="main")),
+    )
 
     # In Debian test containers, uv exists at ~/.local/bin/uv. Disable this
     # fallback so branch expectations (git/uv missing cases) stay deterministic.
     monkeypatch.setattr("pathlib.Path.home", lambda: Path("/__nohome__"))
 
-    # case 1: update accepted but git missing
+    # Case 1: update accepted but git missing
     monkeypatch.setattr(menu.Confirm, "ask", lambda *a, **k: True)
 
     monkeypatch.setattr("shutil.which", lambda name: None)
     monkeypatch.setattr("subprocess.run", lambda *a, **k: SimpleNamespace(returncode=0, stdout="", stderr=""))
     menu._update_screen()
 
-    # case 2: git exists, uv missing
+    # Case 2: git exists, uv missing
     monkeypatch.setattr("shutil.which", lambda name: "git" if name == "git" else None)
     menu._update_screen()
 
-    # case 3: git+uv exists, pull fails
+    # Case 3: git+uv exists, pull fails
     monkeypatch.setattr("shutil.which", lambda name: "C:/bin/git" if name == "git" else "C:/bin/uv")
-
-    def _pull_fail(cmd, **kwargs):
-        if "rev-parse" in cmd:
-            return SimpleNamespace(returncode=0, stdout="a" * 40, stderr="")
-        if "pull" in cmd:
-            return SimpleNamespace(returncode=1, stdout="", stderr="pull failed")
-        return SimpleNamespace(returncode=0, stdout="", stderr="")
-
-    monkeypatch.setattr("subprocess.run", _pull_fail)
+    monkeypatch.setattr("subprocess.run", _subprocess_pull_fail)
     menu._update_screen()
 
-    # case 4: pull ok, uv sync fails
-    def _sync_fail(cmd, **kwargs):
-        if "rev-parse" in cmd:
-            return SimpleNamespace(returncode=0, stdout="a" * 40, stderr="")
-        if "pull" in cmd:
-            return SimpleNamespace(returncode=0, stdout="ok", stderr="")
-        if cmd and str(cmd[0]).endswith("uv"):
-            return SimpleNamespace(returncode=1, stdout="", stderr="sync fail")
-        return SimpleNamespace(returncode=0, stdout="", stderr="")
-
-    monkeypatch.setattr("subprocess.run", _sync_fail)
+    # Case 4: pull ok, uv sync fails
+    monkeypatch.setattr("subprocess.run", _subprocess_sync_fail)
     menu._update_screen()
 
-    # case 5: successful self-update triggers SystemExit
+    # Case 5: successful self-update triggers SystemExit
     _svc = SimpleNamespace(is_active=lambda name: True, restart_service=lambda name: None)
     monkeypatch.setitem(sys.modules, "mtproxymaxpy.systemd", _svc)
     monkeypatch.setattr(pkg, "systemd", _svc, raising=False)
 
-    def _all_ok(cmd, **kwargs):
-        if "rev-parse" in cmd:
-            return SimpleNamespace(returncode=0, stdout="a" * 40, stderr="")
-        if cmd and str(cmd[0]).endswith("uv"):
-            return SimpleNamespace(returncode=0, stdout="", stderr="")
-        return SimpleNamespace(returncode=0, stdout="ok", stderr="")
-
-    monkeypatch.setattr("subprocess.run", _all_ok)
+    monkeypatch.setattr("subprocess.run", _subprocess_all_ok)
     with pytest.raises(SystemExit):
         menu._update_screen()
 
@@ -152,9 +159,7 @@ def test_setup_wizard_error_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
         "mtproxymaxpy.config.secrets",
         SimpleNamespace(add_secret=lambda label: SimpleNamespace(label=label, key="a" * 32)),
     )
-    pm = SimpleNamespace(
-        download_binary=lambda **k: (_ for _ in ()).throw(RuntimeError("dl bad")), start=lambda public_ip="": 1
-    )
+    pm = SimpleNamespace(download_binary=lambda **k: (_ for _ in ()).throw(RuntimeError("dl bad")), start=lambda public_ip="": 1)
     monkeypatch.setitem(sys.modules, "mtproxymaxpy.process_manager", pm)
     monkeypatch.setattr(pkg, "process_manager", pm, raising=False)
 
@@ -168,9 +173,7 @@ def test_setup_wizard_error_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
 
     # 3) start fails and link generation fails, telegram setup branch true
     binary_path.write_text("ok", encoding="utf-8")
-    pm2 = SimpleNamespace(
-        download_binary=lambda **k: None, start=lambda public_ip="": (_ for _ in ()).throw(RuntimeError("start bad"))
-    )
+    pm2 = SimpleNamespace(download_binary=lambda **k: None, start=lambda public_ip="": (_ for _ in ()).throw(RuntimeError("start bad")))
     monkeypatch.setitem(sys.modules, "mtproxymaxpy.process_manager", pm2)
     monkeypatch.setattr(pkg, "process_manager", pm2, raising=False)
     monkeypatch.setitem(sys.modules, "mtproxymaxpy.systemd", SimpleNamespace(install=lambda: None))
@@ -203,11 +206,7 @@ def test_menu_secrets_and_upstreams_render_loops(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setitem(
         sys.modules,
         "mtproxymaxpy.config.secrets",
-        SimpleNamespace(
-            load_secrets=lambda: [
-                SimpleNamespace(label="u1", key="a" * 32, enabled=True, expires="", max_conns=0, notes="")
-            ]
-        ),
+        SimpleNamespace(load_secrets=lambda: [SimpleNamespace(label="u1", key="a" * 32, enabled=True, expires="", max_conns=0, notes="")]),
     )
     choices = iter([1, 0])
     monkeypatch.setattr(menu, "_ask_choice", lambda *a, **k: next(choices))
@@ -225,11 +224,7 @@ def test_menu_secrets_and_upstreams_render_loops(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setitem(
         sys.modules,
         "mtproxymaxpy.config.upstreams",
-        SimpleNamespace(
-            load_upstreams=lambda: [
-                SimpleNamespace(name="u1", type="socks5", addr="1.1.1.1:1080", enabled=True, weight=10)
-            ]
-        ),
+        SimpleNamespace(load_upstreams=lambda: [SimpleNamespace(name="u1", type="socks5", addr="1.1.1.1:1080", enabled=True, weight=10)]),
     )
     choices = iter([1, 0])
     monkeypatch.setattr(menu, "_ask_choice", lambda *a, **k: next(choices))
@@ -282,9 +277,7 @@ def test_update_screen_engine_upgrade_path(monkeypatch: pytest.MonkeyPatch, tmp_
     assert calls == {"stop": 1, "dl": 1, "start": 1}
 
 
-def test_update_screen_engine_upgrade_is_not_reoffered_after_success(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_update_screen_engine_upgrade_is_not_reoffered_after_success(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _mute_ui(monkeypatch)
     import mtproxymaxpy as pkg
 
@@ -346,11 +339,7 @@ def test_menu_loop_exception_handlers(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setitem(
         sys.modules,
         "mtproxymaxpy.config.secrets",
-        SimpleNamespace(
-            load_secrets=lambda: [
-                SimpleNamespace(label="u1", key="a" * 32, enabled=True, expires="", max_conns=0, notes="")
-            ]
-        ),
+        SimpleNamespace(load_secrets=lambda: [SimpleNamespace(label="u1", key="a" * 32, enabled=True, expires="", max_conns=0, notes="")]),
     )
     monkeypatch.setattr(menu, "_ask_choice", lambda *a, **k: 1)
     monkeypatch.setattr(menu, "_secrets_action", lambda *a, **k: (_ for _ in ()).throw(KeyboardInterrupt()))
@@ -369,11 +358,7 @@ def test_menu_loop_exception_handlers(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setitem(
         sys.modules,
         "mtproxymaxpy.config.upstreams",
-        SimpleNamespace(
-            load_upstreams=lambda: [
-                SimpleNamespace(name="u1", type="socks5", addr="1.1.1.1:1080", enabled=True, weight=10)
-            ]
-        ),
+        SimpleNamespace(load_upstreams=lambda: [SimpleNamespace(name="u1", type="socks5", addr="1.1.1.1:1080", enabled=True, weight=10)]),
     )
     paused2 = {"n": 0}
     monkeypatch.setattr(menu, "_pause", lambda: paused2.__setitem__("n", paused2["n"] + 1))

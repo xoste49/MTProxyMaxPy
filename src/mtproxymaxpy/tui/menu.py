@@ -1,4 +1,5 @@
-"""Rich-based interactive terminal menu for MTProxyMaxPy.
+"""
+Rich-based interactive terminal menu for MTProxyMaxPy.
 
 Replaces the Textual GUI-style app with a numbered-menu TUI similar to the
 original bash script: box-drawing headers, coloured status, numbered choices.
@@ -6,13 +7,13 @@ original bash script: box-drawing headers, coloured status, numbered choices.
 
 from __future__ import annotations
 
+import logging
 import os
-import sys
+import subprocess
 import time
-from pathlib import Path
-from typing import Callable, Optional
+from typing import TYPE_CHECKING, Any
 
-from rich.columns import Columns
+import httpx
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Confirm, IntPrompt, Prompt
@@ -20,7 +21,16 @@ from rich.rule import Rule
 from rich.table import Table
 from rich.text import Text
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from mtproxymaxpy.config.secrets import Secret
+    from mtproxymaxpy.config.settings import Settings
+    from mtproxymaxpy.config.upstreams import Upstream
+
 from mtproxymaxpy.constants import APP_TITLE, VERSION
+
+logger = logging.getLogger(__name__)
 
 console = Console(highlight=False)
 
@@ -37,7 +47,8 @@ def _pause() -> None:
 
 
 def _read_last_lines(path: Path, limit: int, max_bytes: int = 262_144) -> list[str]:
-    """Read only tail lines from a potentially large log file.
+    """
+    Read only tail lines from a potentially large log file.
 
     Limits bytes read from the end of file to avoid high memory usage in live screens.
     """
@@ -53,74 +64,121 @@ def _read_last_lines(path: Path, limit: int, max_bytes: int = 262_144) -> list[s
             # First line may be cut if we started in the middle of the file.
             lines = lines[1:]
         return lines[-limit:]
-    except Exception:
+    except (OSError, ValueError):
         return []
+
+
+def _get_binary_ver() -> str:
+    """Return the current telemt binary version string, or '?' on failure."""
+    try:
+        from mtproxymaxpy import process_manager
+
+        get_ver = getattr(process_manager, "get_binary_version", None)
+        if callable(get_ver):
+            return str(get_ver())
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return "?"
+
+
+def _get_tg_status_text(settings: Settings, service_unit: Path) -> Text:
+    """Return a Rich Text badge for the Telegram bot service status."""
+    from mtproxymaxpy.constants import SYSTEMD_TELEGRAM_SERVICE
+
+    if not getattr(settings, "telegram_enabled", False):
+        return Text("○ TG DISABLED", style="bold red")
+    if not service_unit.exists():
+        return Text("◐ TG NOT INSTALLED", style="bold yellow")
+    try:
+        from mtproxymaxpy import systemd as _systemd
+
+        if _systemd.is_active(SYSTEMD_TELEGRAM_SERVICE):
+            return Text("● TG RUNNING", style="bold green")
+        return Text("○ TG STOPPED", style="bold red")
+    except (OSError, RuntimeError, subprocess.SubprocessError):
+        return Text("○ TG UNKNOWN", style="dim")
 
 
 def _header_panel() -> Panel:
     """Build the status header shown at the top of every screen."""
+    lines: list[Text] = []
     tg_line = Text("○ TG UNKNOWN", style="dim")
     try:
-        from mtproxymaxpy import process_manager
-
-        st = process_manager.status()
+        from mtproxymaxpy import metrics, process_manager
+        from mtproxymaxpy.config.secrets import load_secrets
         from mtproxymaxpy.config.settings import load_settings
         from mtproxymaxpy.constants import SYSTEMD_TELEGRAM_SERVICE, SYSTEMD_UNIT_DIR
+        from mtproxymaxpy.utils.formatting import format_bytes, format_duration
 
+        st = process_manager.status()
         settings = load_settings()
+        secrets = load_secrets()
 
-        if st["running"]:
-            status_txt = Text("● RUNNING", style="bold green")
+        ver = _get_binary_ver()
+        status_line = Text()
+        if st.get("running"):
+            status_line.append("● RUNNING", style="bold green")
         else:
-            status_txt = Text("○ STOPPED", style="bold red")
+            status_line.append("○ STOPPED", style="bold red")
+        status_line.append(f"  Engine: telemt v{ver}", style="cyan")
+        lines.append(status_line)
 
-        parts: list[Text] = [
-            status_txt,
-            Text(f"  Port: {settings.proxy_port}", style="cyan"),
-        ]
+        port = getattr(settings, "proxy_port", "?")
+        domain = getattr(settings, "proxy_domain", "?")
+        uptime = "-"
         if st.get("uptime_sec") is not None:
-            from mtproxymaxpy.utils.formatting import format_duration
+            uptime = format_duration(st["uptime_sec"])
 
-            parts.append(Text(f"  Uptime: {format_duration(st['uptime_sec'])}", style="yellow"))
-        if st["pid"]:
-            parts.append(Text(f"  PID: {st['pid']}", style="dim"))
+        core_line = Text()
+        core_line.append(f"Port: {port}", style="cyan")
+        core_line.append(f"  Uptime: {uptime}", style="yellow")
+        core_line.append(f"  Domain: {domain}", style="magenta")
+        lines.append(core_line)
 
-        tg_line = Text()
-        if not settings.telegram_enabled:
-            tg_line.append("○ TG DISABLED", style="bold red")
+        traffic_line = Text()
+        mst = metrics.get_stats(max_age=2.0)
+        if mst.get("available"):
+            traffic_line.append(
+                f"Traffic: ↓ {format_bytes(int(mst.get('bytes_in', 0)))}  ↑ {format_bytes(int(mst.get('bytes_out', 0)))}",
+                style="green",
+            )
+            traffic_line.append(f"  Conns: {int(mst.get('active_connections', 0))}", style="yellow")
         else:
-            service_unit = SYSTEMD_UNIT_DIR / f"{SYSTEMD_TELEGRAM_SERVICE}.service"
-            if not service_unit.exists():
-                tg_line.append("◐ TG NOT INSTALLED", style="bold yellow")
-            else:
-                try:
-                    from mtproxymaxpy import systemd as _systemd
+            traffic_line.append("Traffic: ↓ 0 B  ↑ 0 B", style="dim")
+            traffic_line.append("  Conns: 0", style="dim")
+        lines.append(traffic_line)
 
-                    if _systemd.is_active(SYSTEMD_TELEGRAM_SERVICE):
-                        tg_line.append("● TG RUNNING", style="bold green")
-                    else:
-                        tg_line.append("○ TG STOPPED", style="bold red")
-                except Exception:
-                    tg_line.append("○ TG UNKNOWN", style="dim")
-    except Exception:
-        status_txt = Text("○ UNKNOWN", style="dim")
-        parts = [status_txt]
+        active = sum(1 for s in secrets if getattr(s, "enabled", False))
+        disabled = max(0, len(secrets) - active)
+        secrets_line = Text()
+        secrets_line.append(f"Secrets: {active} active / {disabled} disabled", style="cyan")
+        if st.get("pid"):
+            secrets_line.append(f"  PID: {st['pid']}", style="dim")
+        lines.append(secrets_line)
+
+        service_unit = SYSTEMD_UNIT_DIR / f"{SYSTEMD_TELEGRAM_SERVICE}.service"
+        tg_line = _get_tg_status_text(settings, service_unit)
+    except (OSError, ValueError, RuntimeError):
+        lines = [Text("○ UNKNOWN", style="dim")]
 
     combined = Text()
-    for p in parts:
-        combined.append_text(p)
+    for i, line in enumerate(lines):
+        if i:
+            combined.append("\n")
+        combined.append_text(line)
+
+    combined.append("\n")
+    combined.append_text(tg_line)
 
     # Update badge
     try:
         from mtproxymaxpy.constants import UPDATE_BADGE_FILE
 
         if UPDATE_BADGE_FILE.exists():
-            combined.append("  ⬆ Update available — select [10]", style="bold yellow")
-    except Exception:
-        pass
-
-    combined.append("\n")
-    combined.append_text(tg_line)
+            combined.append("\n")
+            combined.append("⬆ Update available - select [10]", style="bold yellow")
+    except (OSError, ValueError):
+        logger.debug("Failed to read update badge", exc_info=True)
 
     title = f"[bold cyan]{APP_TITLE} v{VERSION}[/bold cyan]  [dim]Telegram MTProto Proxy Manager[/dim]"
     return Panel(combined, title=title, border_style="cyan", padding=(0, 2))
@@ -131,7 +189,7 @@ def _choice(n: int, label: str, hint: str = "") -> str:
     return f"  [bold cyan]{n}[/bold cyan]  {label}{hint_part}"
 
 
-def _ask_choice(max_n: int, allow_zero: bool = True) -> int:
+def _ask_choice(max_n: int, *, allow_zero: bool = True) -> int:
     """Prompt for a menu choice. Returns the integer selected."""
     zero_hint = "/0=back" if allow_zero else ""
     while True:
@@ -157,13 +215,14 @@ def _manager_update_branch() -> str:
         branch = str(getattr(settings, "manager_update_branch", "main") or "main").strip()
         if branch and not any(ch.isspace() for ch in branch):
             return branch
-    except Exception:
-        pass
+    except (OSError, ValueError):
+        logger.debug("Failed to read update branch from settings", exc_info=True)
     return "main"
 
 
 def _manager_commits_url(branch: str) -> str:
     from urllib.parse import quote
+
     from mtproxymaxpy.constants import GITHUB_API_COMMITS
 
     base = GITHUB_API_COMMITS.strip().rstrip("/")
@@ -175,72 +234,77 @@ def _manager_commits_url(branch: str) -> str:
 # ── Background update checker ─────────────────────────────────────────────────
 
 
+def _read_local_manager_sha() -> str:
+    """Return the local git HEAD SHA for the manager install, or empty string."""
+    try:
+        from mtproxymaxpy.constants import INSTALL_DIR, UPDATE_SHA_FILE
+
+        res = subprocess.run(
+            ["git", "-C", str(INSTALL_DIR), "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        sha = (res.stdout or "").strip().lower()
+        if res.returncode == 0 and len(sha) == 40 and all(c in "0123456789abcdef" for c in sha):
+            return sha
+        return UPDATE_SHA_FILE.read_text().strip().lower() if UPDATE_SHA_FILE.exists() else ""
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def _update_check_worker() -> None:
+    """Background worker: compare remote HEAD SHA with local and set badge file."""
+    try:
+        from mtproxymaxpy.constants import UPDATE_BADGE_FILE, UPDATE_SHA_FILE
+
+        branch = _manager_update_branch()
+        commits_url = _manager_commits_url(branch)
+
+        resp = httpx.get(
+            commits_url,
+            headers={"Accept": "application/vnd.github.sha"},
+            timeout=10,
+            follow_redirects=True,
+        )
+        remote_sha = resp.text.strip()[:40].lower()
+        if len(remote_sha) != 40 or not all(c in "0123456789abcdef" for c in remote_sha):
+            return
+
+        local_sha = _read_local_manager_sha()
+        if not local_sha:
+            # Fallback for non-git installs: keep baseline behavior from .update_sha.
+            stored = UPDATE_SHA_FILE.read_text().strip().lower() if UPDATE_SHA_FILE.exists() else ""
+            if not stored:
+                UPDATE_SHA_FILE.write_text(remote_sha)
+                UPDATE_BADGE_FILE.unlink(missing_ok=True)
+            elif remote_sha != stored:
+                UPDATE_BADGE_FILE.write_text("new")
+            else:
+                UPDATE_BADGE_FILE.unlink(missing_ok=True)
+            return
+
+        if remote_sha != local_sha:
+            UPDATE_BADGE_FILE.write_text("new")
+        else:
+            UPDATE_BADGE_FILE.unlink(missing_ok=True)
+    except (OSError, httpx.HTTPError, ValueError):
+        logger.debug("Background update check failed", exc_info=True)
+
+
 def _check_update_bg(wait_timeout: float = 3.0) -> None:
-    """Fire a background thread to compare GitHub HEAD SHA with stored baseline.
+    """
+    Fire a background thread to compare GitHub HEAD SHA with stored baseline.
 
     Args:
         wait_timeout: Maximum seconds to wait for the check to complete before returning (default: 3.0).
                       Prevents blocking the TUI startup while still ensuring the badge is set on first run.
+
     """
     import threading
 
-    def _read_local_manager_sha() -> str:
-        try:
-            import subprocess
-            from mtproxymaxpy.constants import INSTALL_DIR, UPDATE_SHA_FILE
-
-            res = subprocess.run(
-                ["git", "-C", str(INSTALL_DIR), "rev-parse", "HEAD"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            sha = (res.stdout or "").strip().lower()
-            if res.returncode == 0 and len(sha) == 40 and all(c in "0123456789abcdef" for c in sha):
-                return sha
-            return UPDATE_SHA_FILE.read_text().strip().lower() if UPDATE_SHA_FILE.exists() else ""
-        except Exception:
-            return ""
-
-    def _worker() -> None:
-        try:
-            import httpx
-            from mtproxymaxpy.constants import UPDATE_BADGE_FILE, UPDATE_SHA_FILE
-
-            branch = _manager_update_branch()
-            commits_url = _manager_commits_url(branch)
-
-            resp = httpx.get(
-                commits_url,
-                headers={"Accept": "application/vnd.github.sha"},
-                timeout=10,
-                follow_redirects=True,
-            )
-            remote_sha = resp.text.strip()[:40].lower()
-            if len(remote_sha) != 40 or not all(c in "0123456789abcdef" for c in remote_sha):
-                return
-
-            local_sha = _read_local_manager_sha()
-            if not local_sha:
-                # Fallback for non-git installs: keep baseline behavior from .update_sha.
-                stored = UPDATE_SHA_FILE.read_text().strip().lower() if UPDATE_SHA_FILE.exists() else ""
-                if not stored:
-                    UPDATE_SHA_FILE.write_text(remote_sha)
-                    UPDATE_BADGE_FILE.unlink(missing_ok=True)
-                elif remote_sha != stored:
-                    UPDATE_BADGE_FILE.write_text("new")
-                else:
-                    UPDATE_BADGE_FILE.unlink(missing_ok=True)
-                return
-
-            if remote_sha != local_sha:
-                UPDATE_BADGE_FILE.write_text("new")
-            else:
-                UPDATE_BADGE_FILE.unlink(missing_ok=True)
-        except Exception:
-            pass
-
-    thread = threading.Thread(target=_worker, daemon=True)
+    thread = threading.Thread(target=_update_check_worker, daemon=True)
     thread.start()
     # Wait up to wait_timeout seconds for the check to complete to ensure
     # the badge file is set on first menu render, avoiding the race condition
@@ -267,8 +331,8 @@ def run_tui() -> None:
             if legacy:
                 _migration_screen(legacy)
                 migrated = True
-        except Exception:
-            pass
+        except (OSError, ImportError, ValueError):
+            logger.debug("Legacy config migration failed", exc_info=True)
         # Fresh install — run setup wizard
         if not migrated:
             _setup_wizard()
@@ -279,10 +343,10 @@ def run_tui() -> None:
         console.print()
 
         try:
-            from mtproxymaxpy.config.secrets import load_secrets
-            from mtproxymaxpy.config.upstreams import load_upstreams
-            from mtproxymaxpy.config.settings import load_settings
             from mtproxymaxpy import geoblock
+            from mtproxymaxpy.config.secrets import load_secrets
+            from mtproxymaxpy.config.settings import load_settings
+            from mtproxymaxpy.config.upstreams import load_upstreams
 
             n_secrets = len(load_secrets())
             n_upstreams = len(load_upstreams())
@@ -290,7 +354,7 @@ def run_tui() -> None:
             settings = load_settings()
             tg_hint = "enabled" if settings.telegram_enabled else "disabled"
             cfg_hint = f"port {settings.proxy_port} · {settings.proxy_domain}"
-        except Exception:
+        except (OSError, ValueError, RuntimeError):
             n_secrets = n_upstreams = n_geo = 0
             tg_hint = cfg_hint = ""
 
@@ -298,7 +362,7 @@ def run_tui() -> None:
             from mtproxymaxpy.constants import UPDATE_BADGE_FILE
 
             update_hint = "[yellow]⬆ available![/yellow]" if UPDATE_BADGE_FILE.exists() else ""
-        except Exception:
+        except (OSError, ValueError):
             update_hint = ""
 
         console.print(
@@ -350,7 +414,7 @@ def _logs_screen() -> None:
                 console.print(f"  {line}")
         else:
             console.print("  [dim]Log file not found.[/dim]")
-    except Exception as exc:
+    except (OSError, ValueError) as exc:
         console.print(f"[red]Error: {exc}[/red]")
     _pause()
 
@@ -382,8 +446,32 @@ def _health_screen() -> None:
             details = "  ".join(f"{k}={v}" for k, v in extra.items()) if extra else ""
             tbl.add_row(r["name"], status, details)
         console.print(tbl)
-    except Exception as exc:
+    except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
         console.print(f"[red]Error: {exc}[/red]")
+    _pause()
+
+
+def _proxy_action(choice: int, *, running: bool) -> None:
+    """Execute start/stop/restart for the given choice and running state."""
+    try:
+        from mtproxymaxpy import process_manager as _pm2
+        from mtproxymaxpy.utils.network import get_public_ip as _gip
+
+        ip = _gip() or ""
+        if running:
+            if choice == 1:
+                _pm2.stop()
+                console.print("[green][+] Proxy stopped.[/green]")
+            else:
+                pid = _pm2.restart(public_ip=ip)
+                console.print(f"[green][+] Proxy restarted (PID {pid})[/green]")
+        elif choice == 1:
+            pid = _pm2.start(public_ip=ip)
+            console.print(f"[green][+] Proxy started (PID {pid})[/green]")
+        else:
+            console.print("[yellow][!] Proxy is not running.[/yellow]")
+    except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
+        console.print(f"[red][!] {exc}[/red]")
     _pause()
 
 
@@ -401,8 +489,8 @@ def _proxy_menu() -> None:
             from mtproxymaxpy import process_manager as _pm
 
             running = _pm.is_running()
-        except Exception:
-            pass
+        except (OSError, RuntimeError):
+            logger.debug("Failed to check proxy running state", exc_info=True)
 
         if running:
             console.print(_choice(1, "[red]Stop proxy[/red]"))
@@ -424,34 +512,11 @@ def _proxy_menu() -> None:
             return
 
         if choice in (1, 2):
-            try:
-                from mtproxymaxpy import process_manager as _pm2
-                from mtproxymaxpy.utils.network import get_public_ip as _gip
-
-                ip = _gip() or ""
-                if running:
-                    if choice == 1:
-                        _pm2.stop()
-                        console.print("[green][+] Proxy stopped.[/green]")
-                    else:
-                        pid = _pm2.restart(public_ip=ip)
-                        console.print(f"[green][+] Proxy restarted (PID {pid})[/green]")
-                else:
-                    if choice == 1:
-                        pid = _pm2.start(public_ip=ip)
-                        console.print(f"[green][+] Proxy started (PID {pid})[/green]")
-                    else:
-                        console.print("[yellow][!] Proxy is not running.[/yellow]")
-            except Exception as exc:
-                console.print(f"[red][!] {exc}[/red]")
-            _pause()
-
+            _proxy_action(choice, running=running)
         elif choice == 3:
             _logs_screen()
-
         elif choice == 4:
             _health_screen()
-
         elif choice == 5:
             _status_screen()
 
@@ -463,11 +528,12 @@ def _status_screen() -> None:
     _clear()
     console.print(_header_panel())
     try:
-        from mtproxymaxpy import process_manager, metrics as _metrics
-        from mtproxymaxpy.config.settings import load_settings
+        from mtproxymaxpy import metrics as _metrics
+        from mtproxymaxpy import process_manager
         from mtproxymaxpy.config.secrets import load_secrets
-        from mtproxymaxpy.utils.network import get_public_ip
+        from mtproxymaxpy.config.settings import load_settings
         from mtproxymaxpy.utils.formatting import format_bytes, format_duration
+        from mtproxymaxpy.utils.network import get_public_ip
         from mtproxymaxpy.utils.proxy_link import build_proxy_links
 
         st = process_manager.status()
@@ -513,7 +579,7 @@ def _status_screen() -> None:
             console.print(f"  [dim]tg://[/dim]   {tg_link}")
             console.print(f"  [dim]https[/dim]   {web_link}")
 
-    except Exception as exc:
+    except (OSError, ValueError, KeyError, RuntimeError) as exc:
         console.print(f"[red]Error: {exc}[/red]")
 
     _pause()
@@ -530,7 +596,7 @@ def _secrets_menu() -> None:
             from mtproxymaxpy.config.secrets import load_secrets
 
             secs = load_secrets()
-        except Exception:
+        except (OSError, ValueError, RuntimeError):
             secs = []
 
         tbl = Table(show_header=True, box=None, padding=(0, 1))
@@ -572,52 +638,24 @@ def _secrets_menu() -> None:
             _secrets_action(ch, secs)
         except (KeyboardInterrupt, EOFError):
             return
-        except Exception as exc:
+        except (ValueError, KeyError, OSError, RuntimeError) as exc:
             console.print(f"[red]Error:[/red] {exc}")
             _pause()
 
 
-def _secrets_action(ch: int, secs) -> None:
-    from mtproxymaxpy import config
-
-    if ch == 1:
-        _secret_add()
-    elif ch == 2:
-        label = Prompt.ask("  Label to remove", console=console)
-        from mtproxymaxpy.config.secrets import remove_secret
-
-        if remove_secret(label):
-            console.print(f"[green][+] Removed '{label}'[/green]")
-        else:
-            console.print(f"[red][!] Not found: '{label}'[/red]")
-        _pause()
-    elif ch == 3:
-        label = Prompt.ask("  Label to rotate", console=console)
-        from mtproxymaxpy.config.secrets import rotate_secret
-
-        s = rotate_secret(label)
-        console.print(f"[green][+] New key: {s.key}[/green]")
-        _pause()
-    elif ch == 4:
-        label = Prompt.ask("  Label", console=console)
-        action = Prompt.ask("  Action", choices=["enable", "disable"], default="enable", console=console)
-        from mtproxymaxpy.config.secrets import enable_secret, disable_secret
-
-        fn = enable_secret if action == "enable" else disable_secret
-        fn(label)
-        console.print(f"[green][+] {action.capitalize()}d '{label}'[/green]")
-        _pause()
-    elif ch == 5:
+def _secrets_advanced_action(ch: int, secs: list[Secret]) -> None:
+    """Handle secrets menu choices 5–11 (limits, expiry, rename/clone, notes, link, export)."""
+    if ch == 5:
         label = Prompt.ask("  Label", console=console)
         mc = IntPrompt.ask("  Max connections (0=unlimited)", default=0, console=console)
         mi = IntPrompt.ask("  Max unique IPs (0=unlimited)", default=0, console=console)
         qb_str = Prompt.ask("  Quota (e.g. 5G, 0=unlimited)", default="0", console=console)
-        from mtproxymaxpy.utils.validation import parse_human_bytes
         from mtproxymaxpy.config.secrets import set_secret_limits
+        from mtproxymaxpy.utils.validation import parse_human_bytes
 
         qb = parse_human_bytes(qb_str) if qb_str != "0" else 0
         exp = Prompt.ask("  Expires (YYYY-MM-DD or blank)", default="", console=console)
-        set_secret_limits(label, max_conns=mc, max_ips=mi, quota_bytes=qb, expires=exp if exp else None)
+        set_secret_limits(label, max_conns=mc, max_ips=mi, quota_bytes=qb, expires=exp or None)
         console.print("[green][+] Limits updated[/green]")
         _pause()
     elif ch == 6:
@@ -640,7 +678,7 @@ def _secrets_action(ch: int, secs) -> None:
             from mtproxymaxpy.config.secrets import clone_secret
 
             clone_secret(old, new)
-        console.print(f"[green][+] Done[/green]")
+        console.print("[green][+] Done[/green]")
         _pause()
     elif ch == 8:
         label = Prompt.ask("  Label", console=console)
@@ -666,6 +704,39 @@ def _secrets_action(ch: int, secs) -> None:
         _pause()
 
 
+def _secrets_action(ch: int, secs: list[Secret]) -> None:
+
+    if ch == 1:
+        _secret_add()
+    elif ch == 2:
+        label = Prompt.ask("  Label to remove", console=console)
+        from mtproxymaxpy.config.secrets import remove_secret
+
+        if remove_secret(label):
+            console.print(f"[green][+] Removed '{label}'[/green]")
+        else:
+            console.print(f"[red][!] Not found: '{label}'[/red]")
+        _pause()
+    elif ch == 3:
+        label = Prompt.ask("  Label to rotate", console=console)
+        from mtproxymaxpy.config.secrets import rotate_secret
+
+        s = rotate_secret(label)
+        console.print(f"[green][+] New key: {s.key}[/green]")
+        _pause()
+    elif ch == 4:
+        label = Prompt.ask("  Label", console=console)
+        action = Prompt.ask("  Action", choices=["enable", "disable"], default="enable", console=console)
+        from mtproxymaxpy.config.secrets import disable_secret, enable_secret
+
+        fn = enable_secret if action == "enable" else disable_secret
+        fn(label)
+        console.print(f"[green][+] {action.capitalize()}d '{label}'[/green]")
+        _pause()
+    elif ch >= 5:
+        _secrets_advanced_action(ch, secs)
+
+
 def _secret_add() -> None:
     from mtproxymaxpy.config.secrets import add_secret
 
@@ -677,17 +748,14 @@ def _secret_add() -> None:
     _pause()
 
 
-def _secret_show_link(secs) -> None:
+def _secret_show_link(secs: list[Secret]) -> None:
     from mtproxymaxpy.config.settings import load_settings
     from mtproxymaxpy.utils.network import get_public_ip
     from mtproxymaxpy.utils.proxy_link import build_proxy_links, render_qr_terminal
 
     label = Prompt.ask("  Label (blank = first enabled)", default="", console=console)
     target = None
-    if label:
-        target = next((s for s in secs if s.label == label), None)
-    else:
-        target = next((s for s in secs if s.enabled), None)
+    target = next((s for s in secs if s.label == label), None) if label else next((s for s in secs if s.enabled), None)
     if target is None:
         console.print("[red][!] Secret not found[/red]")
         _pause()
@@ -702,7 +770,7 @@ def _secret_show_link(secs) -> None:
         Panel(
             f"[bold]{target.label}[/bold]\n\n[dim]tg://[/dim]\n{tg_link}\n\n[dim]https[/dim]\n{web_link}",
             border_style="cyan",
-        )
+        ),
     )
     qr = render_qr_terminal(web_link)
     if qr:
@@ -721,7 +789,7 @@ def _links_menu() -> None:
             from mtproxymaxpy.config.secrets import load_secrets
 
             secs = load_secrets()
-        except Exception:
+        except (OSError, ValueError):
             secs = []
 
         enabled = [s for s in secs if s.enabled]
@@ -770,7 +838,7 @@ def _links_menu() -> None:
                 qr = render_qr_terminal(web_link)
                 if qr:
                     console.print(qr)
-        except Exception as exc:
+        except (OSError, ValueError, RuntimeError) as exc:
             console.print(f"[red]Error:[/red] {exc}")
         _pause()
 
@@ -813,7 +881,7 @@ def _upstreams_menu() -> None:
             return
         try:
             _upstreams_action(ch, ups)
-        except Exception as exc:
+        except (ValueError, KeyError, OSError, RuntimeError) as exc:
             console.print(f"[red]Error:[/red] {exc}")
             _pause()
 
@@ -829,7 +897,7 @@ def _restart_proxy_if_running() -> None:
         console.print(f"[green][+] Proxy restarted (PID {pid})[/green]")
 
 
-def _upstreams_action(ch: int, ups) -> None:
+def _upstreams_action(ch: int, _ups: list[Upstream]) -> None:
     if ch == 1:
         from mtproxymaxpy.config.upstreams import add_upstream
 
@@ -877,6 +945,48 @@ def _upstreams_action(ch: int, ups) -> None:
 # ── Settings menu ──────────────────────────────────────────────────────────────
 
 
+def _restart_telegram_bot(*, enabled: bool) -> None:
+    """Stop and conditionally restart the Telegram bot after a settings change."""
+    try:
+        from mtproxymaxpy import telegram_bot_aiogram as _tg
+
+        _tg.stop()
+        if enabled:
+            _tg.start()
+            console.print("[green][+] Telegram bot restarted[/green]")
+        else:
+            console.print("[yellow][*] Telegram bot stopped[/yellow]")
+    except (OSError, RuntimeError, ImportError) as tg_exc:
+        console.print(f"[yellow][!] Could not restart Telegram bot: {tg_exc}[/yellow]")
+
+
+_TELEGRAM_SETTING_FIELDS: frozenset[str] = frozenset(
+    {
+        "telegram_enabled",
+        "telegram_bot_token",
+        "telegram_chat_id",
+        "telegram_interval",
+        "telegram_alerts_enabled",
+        "telegram_server_label",
+        "telegram_bot_proxy",
+    }
+)
+
+
+def _apply_settings_field(settings: Any, field: str, new_val: Any, save_settings: Any) -> None:  # noqa: ANN401
+    """Validate, persist and apply side-effects for a single settings field change."""
+    if field == "manager_update_branch":
+        if not new_val:
+            raise ValueError("manager_update_branch must not be empty")
+        if any(ch.isspace() for ch in new_val):
+            raise ValueError("manager_update_branch must not contain spaces")
+    updated = settings.model_copy(update={field: new_val})
+    save_settings(updated)
+    console.print(f"[green][+] Saved {field} = {new_val}[/green]")
+    if field in _TELEGRAM_SETTING_FIELDS:
+        _restart_telegram_bot(enabled=updated.telegram_enabled)
+
+
 def _settings_menu() -> None:
     while True:
         _clear()
@@ -885,85 +995,115 @@ def _settings_menu() -> None:
 
         settings = load_settings()
 
-        tbl = Table(show_header=False, box=None, padding=(0, 2))
-        tbl.add_column("Key", style="dim", width=30)
+        tbl = Table(show_header=True, box=None, padding=(0, 2))
+        tbl.add_column("#", style="bold cyan", width=3, justify="right")
+        tbl.add_column("Setting", style="dim", width=34)
         tbl.add_column("Value")
-        fields = [
-            ("1  proxy_port", str(settings.proxy_port)),
-            ("2  proxy_domain", settings.proxy_domain),
-            ("3  proxy_concurrency", str(settings.proxy_concurrency)),
-            ("4  custom_ip", settings.custom_ip or "(auto)"),
-            ("5  ad_tag", settings.ad_tag or "(none)"),
-            ("6  masking_enabled", str(settings.masking_enabled)),
-            ("7  masking_host", settings.masking_host),
-            ("8  unknown_sni_action", settings.unknown_sni_action),
-            ("9  proxy_protocol", str(settings.proxy_protocol)),
-            ("10 proxy_protocol_trusted_cidrs", settings.proxy_protocol_trusted_cidrs or "(none)"),
-            ("11 proxy_cpus", settings.proxy_cpus or "(unlimited)"),
-            ("12 proxy_memory", settings.proxy_memory or "(unlimited)"),
-            ("13 auto_update_enabled", str(settings.auto_update_enabled)),
-            ("14 geoblock_mode", settings.geoblock_mode),
-            ("15 telegram_enabled", str(settings.telegram_enabled)),
+
+        def _yes_no(*, value: bool) -> str:
+            return "yes" if value else "no"
+
+        menu_fields = [
+            (1, "proxy_port", "Proxy port", str(settings.proxy_port), int),
+            (2, "proxy_domain", "Proxy domain", settings.proxy_domain, str),
+            (3, "proxy_concurrency", "Proxy concurrency", str(settings.proxy_concurrency), int),
+            (4, "custom_ip", "Public IP override", settings.custom_ip or "(auto)", str),
+            (5, "ad_tag", "Ad tag", settings.ad_tag or "(none)", str),
             (
-                "16 telegram_bot_token",
-                ("*" * 8 + settings.telegram_bot_token[-4:])
-                if len(settings.telegram_bot_token) > 4
-                else settings.telegram_bot_token or "(not set)",
+                6,
+                "masking_enabled",
+                "Masking enabled",
+                _yes_no(value=settings.masking_enabled),
+                lambda v: v.lower() in ("true", "1", "yes", "on"),
             ),
-            ("17 telegram_chat_id", settings.telegram_chat_id or "(not set)"),
-            ("18 telegram_interval (h)", str(settings.telegram_interval)),
-            ("19 telegram_server_label", settings.telegram_server_label),
-            ("20 manager_update_branch", getattr(settings, "manager_update_branch", "main")),
+            (7, "masking_host", "Masking host", settings.masking_host or "(none)", str),
+            (8, "unknown_sni_action", "Unknown SNI action", settings.unknown_sni_action, str),
+            (
+                9,
+                "proxy_protocol",
+                "Proxy protocol enabled",
+                _yes_no(value=settings.proxy_protocol),
+                lambda v: v.lower() in ("true", "1", "yes", "on"),
+            ),
+            (
+                10,
+                "proxy_protocol_trusted_cidrs",
+                "Trusted CIDRs (proxy protocol)",
+                settings.proxy_protocol_trusted_cidrs or "(none)",
+                str,
+            ),
+            (11, "proxy_cpus", "CPU limit", settings.proxy_cpus or "(unlimited)", str),
+            (12, "proxy_memory", "Memory limit", settings.proxy_memory or "(unlimited)", str),
+            (
+                13,
+                "auto_update_enabled",
+                "Auto update enabled",
+                _yes_no(value=settings.auto_update_enabled),
+                lambda v: v.lower() in ("true", "1", "yes", "on"),
+            ),
+            (14, "geoblock_mode", "Geoblock mode", settings.geoblock_mode, str),
+            (
+                15,
+                "telegram_enabled",
+                "Telegram reports enabled",
+                _yes_no(value=settings.telegram_enabled),
+                lambda v: v.lower() in ("true", "1", "yes", "on"),
+            ),
+            (
+                16,
+                "telegram_bot_token",
+                "Telegram bot token",
+                ("*" * 8 + settings.telegram_bot_token[-4:]) if len(settings.telegram_bot_token) > 4 else settings.telegram_bot_token or "(not set)",
+                str,
+            ),
+            (17, "telegram_chat_id", "Telegram chat ID", settings.telegram_chat_id or "(not set)", str),
+            (18, "telegram_interval", "Telegram interval (h)", str(settings.telegram_interval), int),
+            (19, "telegram_server_label", "Telegram server label", settings.telegram_server_label, str),
+            (20, "telegram_bot_proxy", "Telegram bot proxy URL", settings.telegram_bot_proxy or "(none)", str),
+            (
+                21,
+                "manager_update_branch",
+                "Manager update branch",
+                getattr(settings, "manager_update_branch", "main"),
+                lambda v: v.strip(),
+            ),
+            (
+                22,
+                "use_middle_proxy",
+                "Middle proxy (ME pool)",
+                _yes_no(value=settings.use_middle_proxy),
+                lambda v: v.lower() in ("true", "1", "yes", "on"),
+            ),
         ]
-        for k, v in fields:
-            tbl.add_row(k, v)
+        for n, _field, label, value, _converter in menu_fields:
+            tbl.add_row(str(n), label, value)
 
         console.print(Rule("[cyan]Configuration[/cyan]"))
         console.print(tbl)
         console.print()
+        console.print("  [dim]Tips:[/dim]")
+        console.print("  [dim]- true/false: true, false, yes, no, 1, 0[/dim]")
+        console.print("  [dim]- Unknown SNI action: mask | drop[/dim]")
+        console.print("  [dim]- Trusted CIDRs: comma-separated, e.g. 10.0.0.0/8,192.168.0.0/16[/dim]")
+        console.print("  [dim]- Leave empty to reset optional fields (where allowed)[/dim]")
+        console.print("  [dim]- Proxy URL: e.g. http://host:port or socks5://user:pass@host:port[/dim]")
+        console.print("  [dim]- Middle proxy: enables ad_tag/sponsor channel; disable if using xray-core/v2ray SOCKS5[/dim]")
+        console.print()
         console.print("  Enter field number to edit, [bold cyan]0[/bold cyan] to go back")
 
-        ch = _ask_choice(20)
+        ch = _ask_choice(22)
         if ch == 0:
             return
 
-        field_map = {
-            1: ("proxy_port", int),
-            2: ("proxy_domain", str),
-            3: ("proxy_concurrency", int),
-            4: ("custom_ip", str),
-            5: ("ad_tag", str),
-            6: ("masking_enabled", lambda v: v.lower() in ("true", "1", "yes", "on")),
-            7: ("masking_host", str),
-            8: ("unknown_sni_action", str),
-            9: ("proxy_protocol", lambda v: v.lower() in ("true", "1", "yes", "on")),
-            10: ("proxy_protocol_trusted_cidrs", str),
-            11: ("proxy_cpus", str),
-            12: ("proxy_memory", str),
-            13: ("auto_update_enabled", lambda v: v.lower() in ("true", "1", "yes", "on")),
-            14: ("geoblock_mode", str),
-            15: ("telegram_enabled", lambda v: v.lower() in ("true", "1", "yes", "on")),
-            16: ("telegram_bot_token", str),
-            17: ("telegram_chat_id", str),
-            18: ("telegram_interval", int),
-            19: ("telegram_server_label", str),
-            20: ("manager_update_branch", lambda v: v.strip()),
-        }
+        field_map = {n: (field, label, converter) for n, field, label, _value, converter in menu_fields}
         if ch in field_map:
-            field, converter = field_map[ch]
+            field, label, converter = field_map[ch]
             current = getattr(settings, field, "")
-            new_val_str = Prompt.ask(f"  {field}", default=str(current), console=console)
+            new_val_str = Prompt.ask(f"  {label}", default=str(current), console=console)
             try:
-                new_val = converter(new_val_str)
-                if field == "manager_update_branch":
-                    if not new_val:
-                        raise ValueError("manager_update_branch must not be empty")
-                    if any(ch.isspace() for ch in new_val):
-                        raise ValueError("manager_update_branch must not contain spaces")
-                updated = settings.model_copy(update={field: new_val})
-                save_settings(updated)
-                console.print(f"[green][+] Saved {field} = {new_val}[/green]")
-            except Exception as exc:
+                new_val = converter(new_val_str)  # type: ignore[operator]
+                _apply_settings_field(settings, field, new_val, save_settings)
+            except (ValueError, OSError) as exc:
                 console.print(f"[red][!] {exc}[/red]")
             _pause()
 
@@ -993,7 +1133,7 @@ def _metrics_screen() -> None:
             tbl.add_row("Total connections", str(stats["total_connections"]))
             console.print(tbl)
 
-            user_stats: dict = stats.get("user_stats", {})
+            user_stats: dict[str, Any] = stats.get("user_stats", {})
             if user_stats:
                 console.print()
                 console.print(Rule("[cyan]Per-User Stats[/cyan]"))
@@ -1010,7 +1150,7 @@ def _metrics_screen() -> None:
                         str(int(us.get("active", 0))),
                     )
                 console.print(utbl)
-    except Exception as exc:
+    except (OSError, ValueError, KeyError, RuntimeError) as exc:
         console.print(f"[red]Error: {exc}[/red]")
     _pause()
 
@@ -1074,7 +1214,7 @@ def _connection_log_screen() -> None:
                 console.print(f"  {line}")
         else:
             console.print("  [dim]Connection log is empty.[/dim]")
-    except Exception as exc:
+    except (OSError, ValueError) as exc:
         console.print(f"[red]Error: {exc}[/red]")
     _pause()
 
@@ -1094,10 +1234,8 @@ def _active_connections_screen() -> None:
             return
 
         console.print(f"  Global active connections: [bold]{stats['active_connections']}[/bold]\n")
-        user_stats: dict = stats.get("user_stats", {})
-        active_rows = [
-            (key, int(us.get("active", 0))) for key, us in user_stats.items() if int(us.get("active", 0)) > 0
-        ]
+        user_stats: dict[str, Any] = stats.get("user_stats", {})
+        active_rows = [(key, int(us.get("active", 0))) for key, us in user_stats.items() if int(us.get("active", 0)) > 0]
         if not active_rows:
             console.print("  [dim]No active per-user connections right now.[/dim]")
         else:
@@ -1107,7 +1245,7 @@ def _active_connections_screen() -> None:
             for key, active in active_rows:
                 tbl.add_row(key[:12] + "…", str(active))
             console.print(tbl)
-    except Exception as exc:
+    except (OSError, ValueError, KeyError) as exc:
         console.print(f"[red]Error: {exc}[/red]")
     _pause()
 
@@ -1140,6 +1278,22 @@ def _metrics_live_screen() -> None:
         pass
 
 
+def _print_user_traffic_breakdown(user_stats: dict[str, Any], enabled: list[Any]) -> None:
+    """Print per-user traffic breakdown to the console."""
+    from mtproxymaxpy.utils.formatting import format_bytes
+
+    if not enabled:
+        console.print("  [dim]No enabled users.[/dim]")
+        return
+    for s in enabled:
+        us = user_stats.get(s.label, {})
+        u_in = int(us.get("bytes_in", 0))
+        u_out = int(us.get("bytes_out", 0))
+        u_active = int(us.get("active", 0))
+        console.print(f"  [green]✓[/green] [bold]{s.label}[/bold]")
+        console.print(f"    ↓ {format_bytes(u_in)}  ↑ {format_bytes(u_out)}  conns: {u_active}")
+
+
 def _logs_traffic_screen() -> None:
     """Bash-parity Logs & Traffic screen with summary and actions."""
     _clear()
@@ -1147,7 +1301,8 @@ def _logs_traffic_screen() -> None:
     console.print(Rule("[cyan]Logs & Traffic[/cyan]"))
 
     try:
-        from mtproxymaxpy import process_manager, metrics as _metrics
+        from mtproxymaxpy import metrics as _metrics
+        from mtproxymaxpy import process_manager
         from mtproxymaxpy.config.secrets import load_secrets
         from mtproxymaxpy.utils.formatting import format_bytes
 
@@ -1160,7 +1315,7 @@ def _logs_traffic_screen() -> None:
         if not stats.get("available"):
             console.print(f"  [yellow][!] Metrics endpoint unavailable: {stats.get('error', 'unknown')}[/yellow]")
             t_in = t_out = conns = 0
-            user_stats = {}
+            user_stats: dict[str, Any] = {}
         else:
             t_in = int(stats.get("bytes_in", 0))
             t_out = int(stats.get("bytes_out", 0))
@@ -1174,16 +1329,7 @@ def _logs_traffic_screen() -> None:
 
         console.print("\n  [bold]Per-User Breakdown[/bold]")
         enabled = [s for s in load_secrets() if s.enabled]
-        if not enabled:
-            console.print("  [dim]No enabled users.[/dim]")
-        else:
-            for s in enabled:
-                us = user_stats.get(s.label, {})
-                u_in = int(us.get("bytes_in", 0))
-                u_out = int(us.get("bytes_out", 0))
-                u_active = int(us.get("active", 0))
-                console.print(f"  [green]✓[/green] [bold]{s.label}[/bold]")
-                console.print(f"    ↓ {format_bytes(u_in)}  ↑ {format_bytes(u_out)}  conns: {u_active}")
+        _print_user_traffic_breakdown(user_stats, enabled)
 
         console.print()
         console.print(
@@ -1206,7 +1352,7 @@ def _logs_traffic_screen() -> None:
             _metrics_live_screen()
         elif choice == 5:
             _active_connections_screen()
-    except Exception as exc:
+    except (OSError, ValueError, KeyError, RuntimeError) as exc:
         console.print(f"[red]Error: {exc}[/red]")
         _pause()
 
@@ -1261,7 +1407,7 @@ def _geoblock_menu() -> None:
                     geoblock.clear_all()
                     console.print("[green][+] All rules cleared[/green]")
                     _pause()
-        except Exception as exc:
+        except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
             console.print(f"[red]Error:[/red] {exc}")
             _pause()
 
@@ -1314,7 +1460,7 @@ def _backup_menu() -> None:
                     meta = backup.restore_backup(path)
                     console.print(f"[green][+] Restored. Original version: {meta.get('version', '?')}[/green]")
                     _pause()
-        except Exception as exc:
+        except (OSError, ValueError, RuntimeError) as exc:
             console.print(f"[red]Error:[/red] {exc}")
             _pause()
 
@@ -1322,27 +1468,112 @@ def _backup_menu() -> None:
 # ── Telegram menu ──────────────────────────────────────────────────────────────
 
 
+def _get_service_status_text(service_unit: Path) -> str:
+    """Return a Rich markup string for the Telegram service status."""
+    from mtproxymaxpy.constants import SYSTEMD_TELEGRAM_SERVICE
+
+    if not service_unit.exists():
+        return "[yellow]not installed[/yellow]"
+    try:
+        from mtproxymaxpy import systemd as _systemd
+
+        return "[green]running[/green]" if _systemd.is_active(SYSTEMD_TELEGRAM_SERVICE) else "[red]stopped[/red]"
+    except (OSError, RuntimeError, subprocess.SubprocessError):
+        return "[dim]unknown[/dim]"
+
+
+def _telegram_toggle(settings: Settings, service_unit: Path) -> None:
+    """Toggle Telegram bot enabled state and sync systemd service."""
+    from mtproxymaxpy.config.settings import save_settings
+    from mtproxymaxpy.constants import SYSTEMD_TELEGRAM_SERVICE
+
+    settings = settings.model_copy(update={"telegram_enabled": not settings.telegram_enabled})
+    save_settings(settings)
+    state = "enabled" if settings.telegram_enabled else "disabled"
+    console.print(f"[green][+] Telegram bot {state}[/green]")
+    try:
+        from mtproxymaxpy import systemd as _systemd
+
+        if settings.telegram_enabled:
+            if not service_unit.exists():
+                _systemd.install_telegram_service()
+                console.print("[green][+] Telegram service installed[/green]")
+            else:
+                _systemd.start_service(SYSTEMD_TELEGRAM_SERVICE)
+                console.print("[green][+] Telegram service started[/green]")
+        elif service_unit.exists():
+            _systemd.stop_service(SYSTEMD_TELEGRAM_SERVICE)
+            console.print("[yellow][*] Telegram service stopped[/yellow]")
+    except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
+        console.print(f"[yellow][!] Could not change service state: {exc}[/yellow]")
+    _pause()
+
+
+def _telegram_systemd_action(ch: int) -> None:
+    """Handle systemd service actions for the Telegram bot (choices 6–11)."""
+    from mtproxymaxpy import systemd as _systemd
+    from mtproxymaxpy.constants import SYSTEMD_TELEGRAM_SERVICE
+
+    if ch == 6:
+        _systemd.install_telegram_service()
+        console.print("[green][+] Telegram service installed and started[/green]")
+    elif ch == 8:
+        _systemd.start_service(SYSTEMD_TELEGRAM_SERVICE)
+        console.print("[green][+] Service started[/green]")
+    elif ch == 9:
+        _systemd.stop_service(SYSTEMD_TELEGRAM_SERVICE)
+        console.print("[yellow][*] Service stopped[/yellow]")
+    elif ch == 10:
+        _systemd.restart_service(SYSTEMD_TELEGRAM_SERVICE)
+        console.print("[green][+] Service restarted[/green]")
+    elif ch == 11:
+        _systemd.uninstall(telegram=True)
+        console.print("[yellow][*] Telegram service uninstalled[/yellow]")
+    _pause()
+
+
+def _telegram_menu_action(ch: int, settings: Settings, service_unit: Path) -> None:
+    """Dispatch a single Telegram menu action."""
+    from mtproxymaxpy.config.settings import load_settings, save_settings
+
+    try:
+        settings = load_settings()
+        if ch == 1:
+            _telegram_setup_wizard()
+        elif ch == 2:
+            _telegram_test()
+        elif ch == 3:
+            _telegram_toggle(settings, service_unit)
+        elif ch == 4:
+            hours = IntPrompt.ask("  Report interval (hours)", default=settings.telegram_interval, console=console)
+            save_settings(settings.model_copy(update={"telegram_interval": hours}))
+            console.print("[green][+] Saved[/green]")
+            _pause()
+        elif ch == 5:
+            settings = settings.model_copy(update={"telegram_alerts_enabled": not settings.telegram_alerts_enabled})
+            save_settings(settings)
+            state = "enabled" if settings.telegram_alerts_enabled else "disabled"
+            console.print(f"[green][+] Alerts {state}[/green]")
+            _pause()
+        elif ch == 7:
+            _stream_telegram_logs_screen()
+        elif ch in {6, 8, 9, 10, 11}:
+            _telegram_systemd_action(ch)
+    except (OSError, ValueError, RuntimeError) as exc:
+        console.print(f"[red]Error:[/red] {exc}")
+        _pause()
+
+
 def _telegram_menu() -> None:
     while True:
         _clear()
         console.print(_header_panel())
-        from mtproxymaxpy.config.settings import load_settings, save_settings
+        from mtproxymaxpy.config.settings import load_settings
         from mtproxymaxpy.constants import SYSTEMD_TELEGRAM_SERVICE, SYSTEMD_UNIT_DIR
 
         settings = load_settings()
         service_unit = SYSTEMD_UNIT_DIR / f"{SYSTEMD_TELEGRAM_SERVICE}.service"
-        service_status = "[dim]unknown[/dim]"
-        if not service_unit.exists():
-            service_status = "[yellow]not installed[/yellow]"
-        else:
-            try:
-                from mtproxymaxpy import systemd as _systemd
-
-                service_status = (
-                    "[green]running[/green]" if _systemd.is_active(SYSTEMD_TELEGRAM_SERVICE) else "[red]stopped[/red]"
-                )
-            except Exception:
-                service_status = "[dim]unknown[/dim]"
+        service_status = _get_service_status_text(service_unit)
 
         console.print(Rule("[cyan]Telegram Bot[/cyan]"))
         tbl = Table(show_header=False, box=None, padding=(0, 2))
@@ -1352,14 +1583,13 @@ def _telegram_menu() -> None:
         tbl.add_row("Service status", service_status)
         tbl.add_row(
             "Bot token",
-            ("*" * 8 + settings.telegram_bot_token[-4:])
-            if len(settings.telegram_bot_token) > 4
-            else settings.telegram_bot_token or "(not set)",
+            ("*" * 8 + settings.telegram_bot_token[-4:]) if len(settings.telegram_bot_token) > 4 else settings.telegram_bot_token or "(not set)",
         )
         tbl.add_row("Chat ID", settings.telegram_chat_id or "(not set)")
         tbl.add_row("Report interval (h)", str(settings.telegram_interval))
         tbl.add_row("Alerts enabled", str(settings.telegram_alerts_enabled))
         tbl.add_row("Server label", settings.telegram_server_label)
+        tbl.add_row("Proxy URL", settings.telegram_bot_proxy or "(none)")
         console.print(tbl)
         console.print()
         console.print(
@@ -1368,64 +1598,19 @@ def _telegram_menu() -> None:
             _choice(3, "Enable / Disable"),
             _choice(4, "Set report interval"),
             _choice(5, "Toggle alerts"),
-            _choice(6, "Install / Repair Telegram service"),
-            _choice(7, "Stream telegram bot logs"),
+            _choice(6, "Install / Repair service"),
+            _choice(7, "Stream logs"),
+            _choice(8, "Start service"),
+            _choice(9, "Stop service"),
+            _choice(10, "Restart service"),
+            _choice(11, "Uninstall service"),
             _choice(0, "Back"),
             sep="\n",
         )
-        ch = _ask_choice(7)
+        ch = _ask_choice(11)
         if ch == 0:
             return
-        try:
-            settings = load_settings()
-            if ch == 1:
-                _telegram_setup_wizard()
-            elif ch == 2:
-                _telegram_test()
-            elif ch == 3:
-                settings = settings.model_copy(update={"telegram_enabled": not settings.telegram_enabled})
-                save_settings(settings)
-                state = "enabled" if settings.telegram_enabled else "disabled"
-                console.print(f"[green][+] Telegram bot {state}[/green]")
-
-                try:
-                    from mtproxymaxpy import systemd as _systemd
-
-                    if settings.telegram_enabled:
-                        if not service_unit.exists():
-                            _systemd.install_telegram_service()
-                            console.print("[green][+] Telegram service installed[/green]")
-                        else:
-                            _systemd.start_service(SYSTEMD_TELEGRAM_SERVICE)
-                            console.print("[green][+] Telegram service started[/green]")
-                    elif service_unit.exists():
-                        _systemd.stop_service(SYSTEMD_TELEGRAM_SERVICE)
-                        console.print("[yellow][*] Telegram service stopped[/yellow]")
-                except Exception as exc:
-                    console.print(f"[yellow][!] Could not change service state: {exc}[/yellow]")
-                _pause()
-            elif ch == 4:
-                hours = IntPrompt.ask("  Report interval (hours)", default=settings.telegram_interval, console=console)
-                save_settings(settings.model_copy(update={"telegram_interval": hours}))
-                console.print("[green][+] Saved[/green]")
-                _pause()
-            elif ch == 5:
-                settings = settings.model_copy(update={"telegram_alerts_enabled": not settings.telegram_alerts_enabled})
-                save_settings(settings)
-                state = "enabled" if settings.telegram_alerts_enabled else "disabled"
-                console.print(f"[green][+] Alerts {state}[/green]")
-                _pause()
-            elif ch == 6:
-                from mtproxymaxpy import systemd as _systemd
-
-                _systemd.install_telegram_service()
-                console.print("[green][+] Telegram service installed and started[/green]")
-                _pause()
-            elif ch == 7:
-                _stream_telegram_logs_screen()
-        except Exception as exc:
-            console.print(f"[red]Error:[/red] {exc}")
-            _pause()
+        _telegram_menu_action(ch, settings, service_unit)
 
 
 def _telegram_setup_wizard() -> None:
@@ -1441,13 +1626,16 @@ def _telegram_setup_wizard() -> None:
     token = Prompt.ask("  Bot token", default=settings.telegram_bot_token, console=console)
     chat_id = Prompt.ask("  Chat ID", default=settings.telegram_chat_id, console=console)
     label = Prompt.ask("  Server label", default=settings.telegram_server_label, console=console)
+    console.print("  [dim]Proxy URL (e.g. http://host:port, socks5://user:pass@host:port) — leave empty to disable[/dim]")
+    proxy = Prompt.ask("  Proxy URL", default=settings.telegram_bot_proxy, console=console)
     updated = settings.model_copy(
         update={
             "telegram_enabled": True,
             "telegram_bot_token": token,
             "telegram_chat_id": chat_id,
             "telegram_server_label": label,
-        }
+            "telegram_bot_proxy": proxy,
+        },
     )
     save_settings(updated)
     console.print("[green][+] Telegram bot configured and enabled[/green]")
@@ -1457,7 +1645,6 @@ def _telegram_setup_wizard() -> None:
 def _telegram_test() -> None:
     import asyncio
 
-    from aiogram import Bot
     from mtproxymaxpy.config.settings import load_settings
 
     settings = load_settings()
@@ -1468,7 +1655,14 @@ def _telegram_test() -> None:
     try:
 
         async def _send_test() -> None:
-            bot = Bot(token=settings.telegram_bot_token)
+            from aiogram import Bot
+
+            bot_kwargs: dict[str, Any] = {"token": settings.telegram_bot_token}
+            if settings.telegram_bot_proxy:
+                from aiogram.client.session.aiohttp import AiohttpSession
+
+                bot_kwargs["session"] = AiohttpSession(proxy=settings.telegram_bot_proxy)
+            bot = Bot(**bot_kwargs)
             try:
                 await bot.send_message(settings.telegram_chat_id, "✅ MTProxyMaxPy test message — bot is working!")
             finally:
@@ -1476,7 +1670,7 @@ def _telegram_test() -> None:
 
         asyncio.run(_send_test())
         console.print("[green][+] Test message sent[/green]")
-    except Exception as exc:
+    except (OSError, RuntimeError) as exc:
         console.print(f"[red][!] Failed: {exc}[/red]")
     _pause()
 
@@ -1493,14 +1687,10 @@ def _update_screen() -> None:  # noqa: C901
     console.print("\n  [bold]1. MTProxyMaxPy manager[/bold]")
     self_updated = False
     try:
-        import subprocess
-        import httpx
         from mtproxymaxpy.constants import (
-            GITHUB_REPO,
             INSTALL_DIR,
-            UPDATE_SHA_FILE,
             UPDATE_BADGE_FILE,
-            VERSION,
+            UPDATE_SHA_FILE,
         )
 
         branch = _manager_update_branch()
@@ -1513,12 +1703,13 @@ def _update_screen() -> None:  # noqa: C901
                 capture_output=True,
                 text=True,
                 timeout=5,
+                check=False,
             )
             candidate = (r_local.stdout or "").strip().lower()
             if r_local.returncode == 0 and len(candidate) == 40 and all(c in "0123456789abcdef" for c in candidate):
                 local_sha = candidate
-        except Exception:
-            pass
+        except (OSError, subprocess.SubprocessError):
+            logger.debug("Failed to get local git SHA", exc_info=True)
 
         if not local_sha:
             local_sha = UPDATE_SHA_FILE.read_text().strip().lower() if UPDATE_SHA_FILE.exists() else ""
@@ -1549,11 +1740,7 @@ def _update_screen() -> None:  # noqa: C901
                 # uv is a system tool — check common locations
                 uv = (
                     _shutil.which("uv")
-                    or (
-                        _Path.home() / ".local" / "bin" / "uv"
-                        if (_Path.home() / ".local" / "bin" / "uv").exists()
-                        else None
-                    )
+                    or (_Path.home() / ".local" / "bin" / "uv" if (_Path.home() / ".local" / "bin" / "uv").exists() else None)
                     or (_Path("/usr/local/bin/uv") if _Path("/usr/local/bin/uv").exists() else None)
                 )
                 if not git:
@@ -1569,20 +1756,49 @@ def _update_screen() -> None:  # noqa: C901
                         [git, "-C", str(INSTALL_DIR), "stash", "--quiet"],
                         capture_output=True,
                         text=True,
+                        check=False,
+                    )
+                    r_fetch = _sp.run(
+                        [git, "-C", str(INSTALL_DIR), "fetch", "origin", branch],
+                        capture_output=True,
+                        text=True,
+                        check=False,
                     )
                     r0 = _sp.run(
                         [git, "-C", str(INSTALL_DIR), "checkout", branch],
                         capture_output=True,
                         text=True,
+                        check=False,
                     )
                     if r0.returncode != 0:
-                        r0 = _sp.run(
-                            [git, "-C", str(INSTALL_DIR), "checkout", "-b", branch, f"origin/{branch}"],
-                            capture_output=True,
-                            text=True,
-                        )
+                        # Use FETCH_HEAD because origin/<branch> may be absent locally
+                        # even when fetch succeeded (e.g. minimal/non-standard refspecs).
+                        if r_fetch.returncode == 0:
+                            r0 = _sp.run(
+                                [git, "-C", str(INSTALL_DIR), "checkout", "-B", branch, "FETCH_HEAD"],
+                                capture_output=True,
+                                text=True,
+                                check=False,
+                            )
+                        else:
+                            r0 = _sp.run(
+                                [git, "-C", str(INSTALL_DIR), "checkout", "-b", branch, f"origin/{branch}"],
+                                capture_output=True,
+                                text=True,
+                                check=False,
+                            )
                     if r0.returncode != 0:
-                        out0 = "\n".join(filter(None, [r0.stdout.strip(), r0.stderr.strip()]))
+                        out0 = "\n".join(
+                            filter(
+                                None,
+                                [
+                                    (r_fetch.stdout or "").strip(),
+                                    (r_fetch.stderr or "").strip(),
+                                    (r0.stdout or "").strip(),
+                                    (r0.stderr or "").strip(),
+                                ],
+                            ),
+                        )
                         if out0:
                             console.print(f"  {out0}")
                         console.print(f"[red][!] failed to switch to branch '{branch}'[/red]")
@@ -1592,6 +1808,7 @@ def _update_screen() -> None:  # noqa: C901
                             [git, "-C", str(INSTALL_DIR), "pull", "--ff-only", "origin", branch],
                             capture_output=True,
                             text=True,
+                            check=False,
                         )
                     # Always drop any stash created above — generated files
                     # (uv.lock etc.) will be recreated by uv sync anyway.
@@ -1599,6 +1816,7 @@ def _update_screen() -> None:  # noqa: C901
                         [git, "-C", str(INSTALL_DIR), "stash", "drop", "--quiet"],
                         capture_output=True,
                         text=True,
+                        check=False,
                     )
                     if r1 is None:
                         pass
@@ -1607,7 +1825,7 @@ def _update_screen() -> None:  # noqa: C901
                         if out:
                             console.print(f"  {out}")
                     if r1 is None or r1.returncode != 0:
-                        console.print(f"[red][!] git pull failed[/red]")
+                        console.print("[red][!] git pull failed[/red]")
                     else:
                         console.print("  Syncing dependencies…")
                         r2 = _sp.run(
@@ -1615,6 +1833,7 @@ def _update_screen() -> None:  # noqa: C901
                             capture_output=True,
                             text=True,
                             cwd=str(INSTALL_DIR),
+                            check=False,
                         )
                         if r2.returncode == 0:
                             UPDATE_SHA_FILE.write_text(remote_sha)
@@ -1630,16 +1849,14 @@ def _update_screen() -> None:  # noqa: C901
                                 if _svc.is_active(SYSTEMD_TELEGRAM_SERVICE):
                                     _svc.restart_service(SYSTEMD_TELEGRAM_SERVICE)
                                     console.print("[green][+] Telegram bot service restarted.[/green]")
-                            except Exception as exc:
+                            except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
                                 console.print(f"[yellow][!] Telegram bot service restart skipped: {exc}[/yellow]")
 
-                            console.print(
-                                "[bold yellow]  App will now close. Start 'mtproxymaxpy' again.[/bold yellow]"
-                            )
+                            console.print("[bold yellow]  App will now close. Start 'mtproxymaxpy' again.[/bold yellow]")
                             self_updated = True
                         else:
                             console.print(f"[red][!] uv sync failed:\n{r2.stderr.strip()}[/red]")
-    except Exception as exc:
+    except (OSError, httpx.HTTPError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
         console.print(f"  [red]Error checking manager update: {exc}[/red]")
 
     # ── 2. Engine update (telemt binary) ─────────────────────────────────
@@ -1648,9 +1865,7 @@ def _update_screen() -> None:  # noqa: C901
         from mtproxymaxpy import process_manager
         from mtproxymaxpy.constants import TELEMT_VERSION
 
-        current = (
-            process_manager.get_binary_version() if hasattr(process_manager, "get_binary_version") else TELEMT_VERSION
-        )
+        current = process_manager.get_binary_version() if hasattr(process_manager, "get_binary_version") else TELEMT_VERSION
         console.print(f"  Current: [bold]{current}[/bold]  Checking latest…")
         latest = process_manager.get_latest_version()
         console.print(f"  Latest:  [bold]{latest}[/bold]")
@@ -1672,7 +1887,7 @@ def _update_screen() -> None:  # noqa: C901
                     ip = get_public_ip() or ""
                     pid = process_manager.start(public_ip=ip)
                     console.print(f"[green][+] Proxy restarted (PID {pid})[/green]")
-    except Exception as exc:
+    except (OSError, httpx.HTTPError, RuntimeError, subprocess.SubprocessError) as exc:
         console.print(f"  [red]Error checking engine update: {exc}[/red]")
 
     if self_updated:
@@ -1700,7 +1915,7 @@ def _setup_wizard() -> None:  # noqa: C901
             title="[bold]First-Run Setup[/bold]",
             border_style="cyan",
             padding=(1, 4),
-        )
+        ),
     )
     console.print()
 
@@ -1721,8 +1936,8 @@ def _setup_wizard() -> None:  # noqa: C901
 
         with console.status("  Detecting public IP…"):
             detected_ip = get_public_ip() or ""
-    except Exception:
-        pass
+    except (OSError, httpx.HTTPError, ValueError):
+        logger.debug("Failed to detect public IP", exc_info=True)
     if detected_ip:
         console.print(f"  Detected: [green]{detected_ip}[/green]")
     raw_ip = Prompt.ask(
@@ -1778,8 +1993,8 @@ def _setup_wizard() -> None:  # noqa: C901
     console.print(Rule())
     console.print("  [bold]Saving configuration…[/bold]")
     try:
-        from mtproxymaxpy.config.settings import Settings, save_settings
         from mtproxymaxpy.config.secrets import add_secret
+        from mtproxymaxpy.config.settings import Settings, save_settings
 
         s = Settings(
             proxy_port=port,
@@ -1791,9 +2006,9 @@ def _setup_wizard() -> None:  # noqa: C901
         )
         save_settings(s)
         secret = add_secret(secret_label)
-        console.print(f"  [green][+] Settings saved[/green]")
+        console.print("  [green][+] Settings saved[/green]")
         console.print(f"  [green][+] Secret '{secret.label}' created: {secret.key}[/green]")
-    except Exception as exc:
+    except (OSError, ValueError, RuntimeError) as exc:
         console.print(f"  [red][!] Failed to save config: {exc}[/red]")
         _pause()
         return
@@ -1809,7 +2024,7 @@ def _setup_wizard() -> None:  # noqa: C901
             with console.status("  Downloading…"):
                 process_manager.download_binary()
             console.print("  [green][+] Binary downloaded[/green]")
-        except Exception as exc:
+        except (OSError, httpx.HTTPError, RuntimeError) as exc:
             console.print(f"  [red][!] Download failed: {exc}[/red]")
             console.print("  [dim]Run 'mtproxymaxpy install' to retry.[/dim]")
             _pause()
@@ -1823,7 +2038,7 @@ def _setup_wizard() -> None:  # noqa: C901
         srv_ip = custom_ip or detected_ip or ""
         pid = process_manager.start(public_ip=srv_ip)
         console.print(f"  [green][+] Proxy started (PID {pid})[/green]")
-    except Exception as exc:
+    except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
         console.print(f"  [red][!] Start failed: {exc}[/red]")
 
     # ── Install systemd ────────────────────────────────────────────────────────
@@ -1832,8 +2047,8 @@ def _setup_wizard() -> None:  # noqa: C901
 
         systemd.install()
         console.print("  [green][+] systemd service installed[/green]")
-    except Exception:
-        pass
+    except (OSError, RuntimeError, subprocess.SubprocessError):
+        logger.debug("systemd install failed", exc_info=True)
 
     # ── Show proxy links ───────────────────────────────────────────────────────
     console.print()
@@ -1848,9 +2063,9 @@ def _setup_wizard() -> None:  # noqa: C901
                 title="[green]Installation Complete[/green]",
                 border_style="green",
                 padding=(1, 4),
-            )
+            ),
         )
-    except Exception:
+    except (OSError, ValueError, RuntimeError):
         console.print("  [green][+] Installation complete![/green]")
 
     # ── Telegram bot setup (optional) ─────────────────────────────────────────
@@ -1864,7 +2079,7 @@ def _setup_wizard() -> None:  # noqa: C901
 # ── Migration screen ───────────────────────────────────────────────────────────
 
 
-def _migration_screen(legacy: dict) -> None:
+def _migration_screen(legacy: dict[str, Any]) -> None:
     _clear()
     console.print(
         Panel(
@@ -1873,7 +2088,7 @@ def _migration_screen(legacy: dict) -> None:
             "Original files will NOT be modified.",
             title="[bold]Migration from MTProxyMax (bash)[/bold]",
             border_style="yellow",
-        )
+        ),
     )
     files = "\n".join(f"  • {p}" for p in legacy.values() if p)
     console.print(f"\nDetected files:\n{files}\n")
@@ -1883,6 +2098,6 @@ def _migration_screen(legacy: dict) -> None:
 
             result = run_migration(legacy)
             console.print(f"[green][+] Migration complete: {result}[/green]")
-        except Exception as exc:
+        except (OSError, ValueError, RuntimeError) as exc:
             console.print(f"[red][!] Migration failed: {exc}[/red]")
         _pause()

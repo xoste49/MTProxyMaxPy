@@ -1,11 +1,9 @@
 """Tests for Secret persistence and CRUD operations."""
 
-import json
-import stat
 import sys
-import pytest
 from pathlib import Path
-from datetime import date
+
+import pytest
 
 from mtproxymaxpy.config.secrets import (
     Secret,
@@ -15,8 +13,8 @@ from mtproxymaxpy.config.secrets import (
     rotate_secret,
     save_secrets,
 )
-from mtproxymaxpy.process_manager import _build_toml_config
 from mtproxymaxpy.config.settings import Settings
+from mtproxymaxpy.process_manager import _build_toml_config
 
 
 def test_save_and_load_round_trip(tmp_path: Path) -> None:

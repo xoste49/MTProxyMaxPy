@@ -11,13 +11,25 @@ repos:
     hooks:
       - id: ruff-check
         name: ruff check (uv)
-        entry: uv run ruff check --fix --exit-non-zero-on-fix
+        entry: uv run ruff check --fix --exit-non-zero-on-fix --no-cache
         language: system
-        pass_filenames: true
+        pass_filenames: false
         types_or: [python, pyi]
       - id: ruff-format
         name: ruff format (uv)
-        entry: uv run ruff format
+        entry: uv run ruff format --no-cache
         language: system
-        pass_filenames: true
+        pass_filenames: false
         types_or: [python, pyi]
+      - id: mypy
+        name: mypy (uv)
+        entry: uv run mypy src
+        language: system
+        pass_filenames: false
+        types_or: [python, pyi]
+      - id: pytest
+        name: pytest (uv)
+        entry: uv run pytest --cov=src/mtproxymaxpy
+        language: system
+        pass_filenames: false
+        always_run: true

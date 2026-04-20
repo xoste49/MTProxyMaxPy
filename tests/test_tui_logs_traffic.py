@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 from types import SimpleNamespace
-
-import pytest
+from typing import TYPE_CHECKING
 
 from mtproxymaxpy.tui import menu
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    import pytest
 
 
 def test_metrics_screen_branches(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -15,9 +18,7 @@ def test_metrics_screen_branches(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(menu, "_header_panel", lambda: "H")
     monkeypatch.setattr(menu.console, "print", lambda *a, **k: None)
 
-    monkeypatch.setitem(
-        sys.modules, "mtproxymaxpy.metrics", SimpleNamespace(get_stats=lambda: {"available": False, "error": "x"})
-    )
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.metrics", SimpleNamespace(get_stats=lambda: {"available": False, "error": "x"}))
     monkeypatch.setitem(sys.modules, "mtproxymaxpy.utils.formatting", SimpleNamespace(format_bytes=lambda n: f"{n}B"))
     menu._metrics_screen()
 
@@ -32,7 +33,7 @@ def test_metrics_screen_branches(monkeypatch: pytest.MonkeyPatch) -> None:
                 "active_connections": 3,
                 "total_connections": 4,
                 "user_stats": {"a" * 32: {"bytes_in": 10, "bytes_out": 20, "active": 1}},
-            }
+            },
         ),
     )
     menu._metrics_screen()
@@ -76,9 +77,7 @@ def test_connection_and_active_screens(monkeypatch: pytest.MonkeyPatch, tmp_path
     conn.write_text("line1\nline2\n", encoding="utf-8")
     menu._connection_log_screen()
 
-    monkeypatch.setitem(
-        sys.modules, "mtproxymaxpy.metrics", SimpleNamespace(get_stats=lambda: {"available": False, "error": "x"})
-    )
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.metrics", SimpleNamespace(get_stats=lambda: {"available": False, "error": "x"}))
     menu._active_connections_screen()
 
     monkeypatch.setitem(
@@ -91,9 +90,7 @@ def test_connection_and_active_screens(monkeypatch: pytest.MonkeyPatch, tmp_path
     monkeypatch.setitem(
         sys.modules,
         "mtproxymaxpy.metrics",
-        SimpleNamespace(
-            get_stats=lambda: {"available": True, "active_connections": 3, "user_stats": {"a" * 32: {"active": 2}}}
-        ),
+        SimpleNamespace(get_stats=lambda: {"available": True, "active_connections": 3, "user_stats": {"a" * 32: {"active": 2}}}),
     )
     menu._active_connections_screen()
 
@@ -103,9 +100,7 @@ def test_metrics_live_screen_branches(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(menu, "_header_panel", lambda: "H")
     monkeypatch.setattr(menu.console, "print", lambda *a, **k: None)
 
-    monkeypatch.setitem(
-        sys.modules, "mtproxymaxpy.metrics", SimpleNamespace(get_stats=lambda: {"available": False, "error": "x"})
-    )
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.metrics", SimpleNamespace(get_stats=lambda: {"available": False, "error": "x"}))
     monkeypatch.setitem(sys.modules, "mtproxymaxpy.utils.formatting", SimpleNamespace(format_bytes=lambda n: f"{n}B"))
     monkeypatch.setattr(menu.time, "sleep", lambda s: (_ for _ in ()).throw(KeyboardInterrupt()))
     menu._metrics_live_screen()
@@ -120,7 +115,7 @@ def test_metrics_live_screen_branches(monkeypatch: pytest.MonkeyPatch) -> None:
                 "bytes_out": 2,
                 "active_connections": 3,
                 "total_connections": 4,
-            }
+            },
         ),
     )
     monkeypatch.setattr(menu.time, "sleep", lambda s: (_ for _ in ()).throw(KeyboardInterrupt()))
@@ -142,7 +137,7 @@ def test_logs_traffic_screen_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(pkg, "process_manager", pm, raising=False)
     monkeypatch.setitem(sys.modules, "mtproxymaxpy.metrics", met)
     monkeypatch.setattr(pkg, "metrics", met, raising=False)
-    monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.secrets", SimpleNamespace(load_secrets=lambda: []))
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.secrets", SimpleNamespace(load_secrets=list))
     monkeypatch.setitem(sys.modules, "mtproxymaxpy.utils.formatting", SimpleNamespace(format_bytes=lambda n: f"{n}B"))
     menu._logs_traffic_screen()
 
@@ -153,7 +148,7 @@ def test_logs_traffic_screen_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(pkg, "process_manager", pm2, raising=False)
     monkeypatch.setitem(sys.modules, "mtproxymaxpy.metrics", met2)
     monkeypatch.setattr(pkg, "metrics", met2, raising=False)
-    monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.secrets", SimpleNamespace(load_secrets=lambda: []))
+    monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.secrets", SimpleNamespace(load_secrets=list))
     monkeypatch.setattr(menu, "_ask_choice", lambda *a, **k: 0)
     menu._logs_traffic_screen()
 
@@ -165,7 +160,7 @@ def test_logs_traffic_screen_paths(monkeypatch: pytest.MonkeyPatch) -> None:
             "bytes_out": 2,
             "active_connections": 3,
             "user_stats": {"a" * 32: {"bytes_in": 1, "bytes_out": 2, "active": 1}},
-        }
+        },
     )
     monkeypatch.setitem(sys.modules, "mtproxymaxpy.metrics", met3)
     monkeypatch.setattr(pkg, "metrics", met3, raising=False)
@@ -213,7 +208,7 @@ def test_logs_traffic_screen_uses_label_keyed_user_stats(monkeypatch: pytest.Mon
             "user_stats": {
                 "me": {"bytes_in": 1, "bytes_out": 2, "active": 3},
             },
-        }
+        },
     )
 
     monkeypatch.setitem(sys.modules, "mtproxymaxpy.process_manager", pm)

@@ -1,4 +1,5 @@
-"""Geo-blocking via iptables + ipset.
+"""
+Geo-blocking via iptables + ipset.
 
 Downloads country CIDR lists from ipdeny.com, creates an ipset hash:net per
 country, and applies DROP rules in the iptables INPUT chain.  State is
@@ -7,6 +8,7 @@ persisted to geoblock.json so rules can be re-applied after a reboot.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os
@@ -14,6 +16,7 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
+from typing import Any, cast
 
 import httpx
 
@@ -31,11 +34,11 @@ GEO_STATE_FILE = INSTALL_DIR / "geoblock.json"
 # ── Internal helpers ───────────────────────────────────────────────────────────
 
 
-def _run(*cmd: str, check: bool = True) -> subprocess.CompletedProcess:
+def _run(*cmd: str, check: bool = True) -> subprocess.CompletedProcess[str]:
     try:
         return subprocess.run(list(cmd), check=check, capture_output=True, text=True)
-    except FileNotFoundError:
-        raise RuntimeError(f"Command not found: {cmd[0]}")
+    except FileNotFoundError as exc:
+        raise RuntimeError(f"Command not found: {cmd[0]}") from exc
     except subprocess.CalledProcessError as exc:
         raise RuntimeError(f"{' '.join(cmd)} failed (exit {exc.returncode}): {exc.stderr.strip()}") from exc
 
@@ -69,34 +72,33 @@ def _download_cidrs(cc: str) -> list[str]:
         resp.raise_for_status()
         cidrs = [l.strip() for l in resp.text.splitlines() if l.strip()]
         cache_file.write_text("\n".join(cidrs))
-        return cidrs
-    except Exception as exc:
+    except (httpx.HTTPError, OSError, ValueError, RuntimeError) as exc:
         raise RuntimeError(f"Failed to download CIDRs for {cc}: {exc}") from exc
+    else:
+        return cidrs
 
 
-def _load_state() -> dict:
+def _load_state() -> dict[str, Any]:
     if GEO_STATE_FILE.exists():
         try:
-            return json.loads(GEO_STATE_FILE.read_text())
-        except Exception:
-            pass
+            return json.loads(GEO_STATE_FILE.read_text())  # type: ignore[no-any-return]
+        except (json.JSONDecodeError, OSError):
+            logger.debug("Failed to load geo state file", exc_info=True)
     return {"countries": [], "mode": "blacklist"}
 
 
-def _save_state(state: dict) -> None:
+def _save_state(state: dict[str, Any]) -> None:
     INSTALL_DIR.mkdir(parents=True, exist_ok=True)
     raw = json.dumps(state, indent=2).encode()
     fd, tmp = tempfile.mkstemp(dir=INSTALL_DIR, suffix=".tmp")
     try:
         with os.fdopen(fd, "wb") as fh:
             fh.write(raw)
-        os.chmod(tmp, 0o600)
-        os.replace(tmp, GEO_STATE_FILE)
+        Path(tmp).chmod(0o600)
+        Path(tmp).replace(GEO_STATE_FILE)
     except Exception:
-        try:
-            os.unlink(tmp)
-        except OSError:
-            pass
+        with contextlib.suppress(OSError):
+            Path(tmp).unlink()
         raise
 
 
@@ -104,7 +106,8 @@ def _save_state(state: dict) -> None:
 
 
 def add_country(cc: str) -> int:
-    """Add a country to the geo-block list and apply iptables rules.
+    """
+    Add a country to the geo-block list and apply iptables rules.
 
     Returns the number of CIDRs loaded.
     """
@@ -126,6 +129,7 @@ def add_country(cc: str) -> int:
     probe = subprocess.run(
         ["iptables", "-C", "INPUT", "-m", "set", "--match-set", setname, "src", "-j", "DROP"],
         capture_output=True,
+        check=False,
     )
     if probe.returncode != 0:
         _run(
@@ -179,7 +183,9 @@ def remove_country(cc: str) -> None:
 
 
 def list_countries() -> list[str]:
-    return _load_state().get("countries", [])
+    """Return the list of currently geo-blocked country codes."""
+    result = _load_state().get("countries", [])
+    return cast("list[str]", result)
 
 
 def clear_all() -> None:
@@ -187,7 +193,7 @@ def clear_all() -> None:
     for cc in list(list_countries()):
         try:
             remove_country(cc)
-        except Exception as exc:
+        except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
             logger.warning("Failed to clear geoblock for %s: %s", cc, exc)
 
 
@@ -196,5 +202,5 @@ def reapply_all() -> None:
     for cc in list_countries():
         try:
             add_country(cc)
-        except Exception as exc:
+        except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
             logger.warning("Failed to reapply geoblock for %s: %s", cc, exc)

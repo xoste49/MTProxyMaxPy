@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import sys
 from types import SimpleNamespace
-
-import pytest
+from typing import TYPE_CHECKING
 
 from mtproxymaxpy.utils import proxy_link, validation
+
+if TYPE_CHECKING:
+    import pytest
 
 
 def test_proxy_link_builders_and_qr_url() -> None:

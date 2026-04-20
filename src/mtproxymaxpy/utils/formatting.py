@@ -3,7 +3,7 @@
 import re
 
 
-def format_bytes(n: int | float) -> str:
+def format_bytes(n: float) -> str:
     """Return a human-readable byte size string."""
     n = float(n)
     for unit in ("B", "KB", "MB", "GB", "TB"):
@@ -35,10 +35,10 @@ def format_duration(seconds: int) -> str:
     return " ".join(parts)
 
 
-def format_number(n: int | float) -> str:
+def format_number(n: float) -> str:
     """Return a compact number string: 1K, 5M, etc."""
     n = float(n)
-    for suffix in ("K", "M", "G", "T"):
+    for suffix in ("K", "M", "G", "T"):  # noqa: B007
         if abs(n) < 1000.0:
             break
         n /= 1000.0

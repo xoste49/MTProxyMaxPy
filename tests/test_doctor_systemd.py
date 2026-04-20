@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -133,7 +134,7 @@ def test_check_secrets_and_disk_and_metrics(monkeypatch: pytest.MonkeyPatch) -> 
         load_secrets=lambda: [
             SimpleNamespace(label="a", expires="1900-01-01", enabled=True),
             SimpleNamespace(label="b", expires=None, enabled=False),
-        ]
+        ],
     )
     monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.secrets", sec_mod)
     out = doctor.check_secrets()
@@ -143,7 +144,7 @@ def test_check_secrets_and_disk_and_metrics(monkeypatch: pytest.MonkeyPatch) -> 
 
     import mtproxymaxpy.constants as c
 
-    monkeypatch.setattr(c, "INSTALL_DIR", Path("/tmp/not-real"))
+    monkeypatch.setattr(c, "INSTALL_DIR", Path(tempfile.gettempdir()) / "not-real")
     monkeypatch.setattr(
         doctor.shutil,
         "disk_usage",
@@ -201,6 +202,7 @@ def test_check_telegram_service_and_full_doctor(monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setattr(doctor, "check_disk_space", lambda: {"ok": True})
     monkeypatch.setattr(doctor, "check_metrics_endpoint", lambda: {"ok": True})
     monkeypatch.setattr(doctor, "check_telegram_service", lambda: {"ok": True})
+    monkeypatch.setattr(doctor, "check_middle_proxy_compat", lambda: {"ok": True})
     res = doctor.run_full_doctor()
     assert [r["name"] for r in res] == [
         "Binary present",
@@ -211,6 +213,7 @@ def test_check_telegram_service_and_full_doctor(monkeypatch: pytest.MonkeyPatch)
         "Disk space",
         "Metrics endpoint",
         "Telegram service",
+        "Middle proxy compat",
     ]
 
 
