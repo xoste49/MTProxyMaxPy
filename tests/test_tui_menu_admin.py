@@ -22,6 +22,7 @@ class _Settings:
             "telegram_interval": 24,
             "telegram_alerts_enabled": True,
             "telegram_server_label": "srv",
+            "telegram_bot_proxy": "",
             "proxy_port": 443,
             "proxy_domain": "cloudflare.com",
             "custom_ip": "",
@@ -149,7 +150,7 @@ def test_telegram_menu_and_helpers(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     assert calls["tg_logs"] == 1
 
     # _telegram_setup_wizard real path
-    prompts = iter(["token", "chat", "node-1"])
+    prompts = iter(["token", "chat", "node-1", ""])
     monkeypatch.setattr(menu.Prompt, "ask", lambda *a, **k: next(prompts))
     real_wizard()
     assert state["settings"].telegram_enabled is True

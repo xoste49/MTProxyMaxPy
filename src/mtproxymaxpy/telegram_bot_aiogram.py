@@ -531,7 +531,14 @@ async def _bot_main(token: str, chat_id: str, interval_hours: int) -> None:
     from aiogram import Bot, Dispatcher, Router
     from aiogram.types import BotCommand
 
-    bot = Bot(token=token)
+    settings = load_settings()
+    bot_kwargs: dict[str, Any] = {"token": token}
+    if settings.telegram_bot_proxy:
+        from aiogram.client.session.aiohttp import AiohttpSession
+
+        bot_kwargs["session"] = AiohttpSession(proxy=settings.telegram_bot_proxy)
+
+    bot = Bot(**bot_kwargs)
     dp = Dispatcher()
     router = Router(name="mtproxymaxpy-aiogram")
 

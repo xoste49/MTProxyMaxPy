@@ -1017,8 +1017,9 @@ def _settings_menu() -> None:
             (17, "telegram_chat_id", "Telegram chat ID", settings.telegram_chat_id or "(not set)", str),
             (18, "telegram_interval", "Telegram interval (h)", str(settings.telegram_interval), int),
             (19, "telegram_server_label", "Telegram server label", settings.telegram_server_label, str),
+            (20, "telegram_bot_proxy", "Telegram bot proxy URL", settings.telegram_bot_proxy or "(none)", str),
             (
-                20,
+                21,
                 "manager_update_branch",
                 "Manager update branch",
                 getattr(settings, "manager_update_branch", "main"),
@@ -1036,10 +1037,11 @@ def _settings_menu() -> None:
         console.print("  [dim]- Unknown SNI action: mask | drop[/dim]")
         console.print("  [dim]- Trusted CIDRs: comma-separated, e.g. 10.0.0.0/8,192.168.0.0/16[/dim]")
         console.print("  [dim]- Leave empty to reset optional fields (where allowed)[/dim]")
+        console.print("  [dim]- Proxy URL: e.g. http://host:port or socks5://user:pass@host:port[/dim]")
         console.print()
         console.print("  Enter field number to edit, [bold cyan]0[/bold cyan] to go back")
 
-        ch = _ask_choice(20)
+        ch = _ask_choice(21)
         if ch == 0:
             return
 
@@ -1525,6 +1527,7 @@ def _telegram_menu() -> None:
         tbl.add_row("Report interval (h)", str(settings.telegram_interval))
         tbl.add_row("Alerts enabled", str(settings.telegram_alerts_enabled))
         tbl.add_row("Server label", settings.telegram_server_label)
+        tbl.add_row("Proxy URL", settings.telegram_bot_proxy or "(none)")
         console.print(tbl)
         console.print()
         console.print(
@@ -1557,12 +1560,15 @@ def _telegram_setup_wizard() -> None:
     token = Prompt.ask("  Bot token", default=settings.telegram_bot_token, console=console)
     chat_id = Prompt.ask("  Chat ID", default=settings.telegram_chat_id, console=console)
     label = Prompt.ask("  Server label", default=settings.telegram_server_label, console=console)
+    console.print("  [dim]Proxy URL (e.g. http://host:port, socks5://user:pass@host:port) — leave empty to disable[/dim]")
+    proxy = Prompt.ask("  Proxy URL", default=settings.telegram_bot_proxy, console=console)
     updated = settings.model_copy(
         update={
             "telegram_enabled": True,
             "telegram_bot_token": token,
             "telegram_chat_id": chat_id,
             "telegram_server_label": label,
+            "telegram_bot_proxy": proxy,
         },
     )
     save_settings(updated)
@@ -1572,8 +1578,6 @@ def _telegram_setup_wizard() -> None:
 
 def _telegram_test() -> None:
     import asyncio
-
-    from aiogram import Bot
 
     from mtproxymaxpy.config.settings import load_settings
 
@@ -1585,7 +1589,14 @@ def _telegram_test() -> None:
     try:
 
         async def _send_test() -> None:
-            bot = Bot(token=settings.telegram_bot_token)
+            from aiogram import Bot
+
+            bot_kwargs: dict[str, Any] = {"token": settings.telegram_bot_token}
+            if settings.telegram_bot_proxy:
+                from aiogram.client.session.aiohttp import AiohttpSession
+
+                bot_kwargs["session"] = AiohttpSession(proxy=settings.telegram_bot_proxy)
+            bot = Bot(**bot_kwargs)
             try:
                 await bot.send_message(settings.telegram_chat_id, "✅ MTProxyMaxPy test message — bot is working!")
             finally:

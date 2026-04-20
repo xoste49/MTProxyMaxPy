@@ -60,6 +60,7 @@ class Settings(BaseModel):
     telegram_interval: int = Field(DEFAULT_TELEGRAM_INTERVAL_HOURS, ge=1)
     telegram_alerts_enabled: bool = True
     telegram_server_label: str = "mtproxymaxpy"
+    telegram_bot_proxy: str = ""
 
     # ── Auto-update ───────────────────────────────────────────────────────────
     auto_update_enabled: bool = True
