@@ -161,6 +161,38 @@ def check_telegram_service() -> dict[str, Any]:
     return {"ok": None, "note": "systemctl not available"}
 
 
+def check_middle_proxy_compat() -> dict[str, Any]:
+    """
+    Warn when use_middle_proxy=true and SOCKS5/SOCKS4 upstreams are active.
+
+    xray-core / v2ray based SOCKS5 servers return BND.ADDR=0.0.0.0 / BND.PORT=0,
+    but telemt ME pool initialization requires a real BND.ADDR/BND.PORT in the
+    SOCKS5 CONNECT response.  Result: ME pool never initialises, all DCs fail.
+
+    Fix: set use_middle_proxy=false, or replace xray-core SOCKS5 with dante.
+    """
+    from mtproxymaxpy.config.settings import load_settings
+    from mtproxymaxpy.config.upstreams import load_upstreams
+
+    settings = load_settings()
+    if not settings.use_middle_proxy:
+        return {"ok": True, "note": "use_middle_proxy=false — ME pool disabled, no conflict"}
+    upstreams = load_upstreams()
+    socks_active = [u for u in upstreams if u.enabled and u.type in ("socks5", "socks4")]
+    if not socks_active:
+        return {"ok": True, "note": "no SOCKS upstreams active"}
+    names = ", ".join(u.name for u in socks_active)
+    return {
+        "ok": False,
+        "note": (
+            f"SOCKS upstream(s) [{names}] active with use_middle_proxy=true. "
+            "xray-core/v2ray SOCKS5 does not return BND.ADDR/BND.PORT — ME pool will never initialise. "
+            "Fix: set use_middle_proxy=false (loses ad_tag support), or replace with dante."
+        ),
+        "upstreams": [u.name for u in socks_active],
+    }
+
+
 # ── Full doctor run ────────────────────────────────────────────────────────────
 
 
@@ -190,4 +222,5 @@ def run_full_doctor() -> list[dict[str, Any]]:
     add("Disk space", check_disk_space())
     add("Metrics endpoint", check_metrics_endpoint())
     add("Telegram service", check_telegram_service())
+    add("Middle proxy compat", check_middle_proxy_compat())
     return results

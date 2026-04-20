@@ -26,6 +26,7 @@ def test_to_rfc3339_expiration() -> None:
 def test_build_toml_config_contains_expected_sections() -> None:
     settings = SimpleNamespace(
         ad_tag="TAG",
+        use_middle_proxy=True,
         masking_enabled=True,
         proxy_port=443,
         proxy_protocol=True,

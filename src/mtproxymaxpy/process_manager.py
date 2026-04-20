@@ -80,7 +80,7 @@ def _toml_general_section(settings: Settings, active: list[Secret]) -> list[str]
         "[general]",
         "prefer_ipv6 = false",
         "fast_mode = true",
-        "use_middle_proxy = true",
+        f"use_middle_proxy = {'true' if settings.use_middle_proxy else 'false'}",
         'log_level = "normal"',
     ]
     if settings.ad_tag:

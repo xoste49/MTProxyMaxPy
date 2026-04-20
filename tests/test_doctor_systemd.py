@@ -202,6 +202,7 @@ def test_check_telegram_service_and_full_doctor(monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setattr(doctor, "check_disk_space", lambda: {"ok": True})
     monkeypatch.setattr(doctor, "check_metrics_endpoint", lambda: {"ok": True})
     monkeypatch.setattr(doctor, "check_telegram_service", lambda: {"ok": True})
+    monkeypatch.setattr(doctor, "check_middle_proxy_compat", lambda: {"ok": True})
     res = doctor.run_full_doctor()
     assert [r["name"] for r in res] == [
         "Binary present",
@@ -212,6 +213,7 @@ def test_check_telegram_service_and_full_doctor(monkeypatch: pytest.MonkeyPatch)
         "Disk space",
         "Metrics endpoint",
         "Telegram service",
+        "Middle proxy compat",
     ]
 
 

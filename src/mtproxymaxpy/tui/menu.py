@@ -1067,6 +1067,13 @@ def _settings_menu() -> None:
                 getattr(settings, "manager_update_branch", "main"),
                 lambda v: v.strip(),
             ),
+            (
+                22,
+                "use_middle_proxy",
+                "Middle proxy (ME pool)",
+                _yes_no(value=settings.use_middle_proxy),
+                lambda v: v.lower() in ("true", "1", "yes", "on"),
+            ),
         ]
         for n, _field, label, value, _converter in menu_fields:
             tbl.add_row(str(n), label, value)
@@ -1080,10 +1087,11 @@ def _settings_menu() -> None:
         console.print("  [dim]- Trusted CIDRs: comma-separated, e.g. 10.0.0.0/8,192.168.0.0/16[/dim]")
         console.print("  [dim]- Leave empty to reset optional fields (where allowed)[/dim]")
         console.print("  [dim]- Proxy URL: e.g. http://host:port or socks5://user:pass@host:port[/dim]")
+        console.print("  [dim]- Middle proxy: enables ad_tag/sponsor channel; disable if using xray-core/v2ray SOCKS5[/dim]")
         console.print()
         console.print("  Enter field number to edit, [bold cyan]0[/bold cyan] to go back")
 
-        ch = _ask_choice(21)
+        ch = _ask_choice(22)
         if ch == 0:
             return
 

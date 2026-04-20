@@ -33,6 +33,8 @@ class _Settings:
             "telegram_interval": 24,
             "telegram_server_label": "srv",
             "telegram_bot_proxy": "",
+            "manager_update_branch": "main",
+            "use_middle_proxy": True,
         }
         defaults.update(kw)
         self.__dict__.update(defaults)

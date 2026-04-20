@@ -40,8 +40,9 @@ class Settings(BaseModel):
     proxy_protocol: bool = False
     proxy_protocol_trusted_cidrs: str = ""
 
-    # ── Ad-tag ────────────────────────────────────────────────────────────────
+    # ── Ad-tag / Middle proxy ─────────────────────────────────────────────────
     ad_tag: str = ""
+    use_middle_proxy: bool = True
 
     # ── Geo-blocking ─────────────────────────────────────────────────────────
     geoblock_mode: str = "blacklist"
