@@ -3,6 +3,8 @@ name = "mtproxymaxpy"
 version = "1.0.0"
 description = "MTProto proxy management platform"
 requires-python = ">=3.13"
+license = "MIT"
+readme = "README.md"
 dependencies = [
     "rich>=13.0",
     "psutil>=5.9",
@@ -60,6 +62,7 @@ precision = 2
 [tool.mypy]
 plugins = ["pydantic.mypy"]
 python_version = "3.13"
+strict = true                   # Включает все строгие проверки (disallow_untyped_*, warn_*, strict_equality, extra_checks и др.)
 
 enable_error_code = [
     "ignore-without-code",  # Требует `# type: ignore[code]` вместо голого `# type: ignore`
@@ -68,29 +71,15 @@ enable_error_code = [
     "truthy-bool",  # Предупреждает, когда non-bool используется в boolean-контексте
     "truthy-iterable",  # Ловит `if queryset:` на итераторах, которые всегда truthy
     "mutable-override",  # Ловит ковариантное переопределение мутабельного атрибута в подклассе
-    "explicit-override",  # Требует @override для всех переопределений методов (Python 3.12+
+    "explicit-override",  # Требует @override для всех переопределений методов (Python 3.12+)
 ]
 
-disallow_untyped_calls = true
-disallow_untyped_defs = true  # Требует типов для всех функций
-disallow_incomplete_defs = true  # Требует полных аннотаций
-check_untyped_defs = true
-disallow_untyped_decorators = true
-disallow_any_generics = true  # Запрещает голые list, dict — требует list[int], dict[str, Any]
+# Опции, не входящие в strict:
 disallow_any_unimported = true  # Типы из непроимпортированных модулей не становятся тихо `Any`
-disallow_subclassing_any = true  # Запрещает наследование от `Any`-типизированных базовых классов
-
-warn_redundant_casts = true   # Предупреждает об избыточных cast(), которые ничего не меняют
-warn_unused_ignores = true    # Предупреждает о комментариях # type: ignore, которые уже не нужны
-warn_no_return = true         # Предупреждает, если функция может завершиться без return
-warn_return_any = true        # Предупреждает, если функция возвращает Any в типизированном контексте
-warn_unreachable = true       # Предупреждает о недостижимом коде
-
-local_partial_types = true
-implicit_reexport = true
-strict_equality = true          # Ловит бессмысленные сравнения вроде str == int
-extra_checks = true             # Дополнительные проверки (strict concatenate, unneeded type params и др.)
-strict = true                   # Включает все строгие проверки
+local_partial_types = true      # Запрещает вывод типа None из двух присваиваний в разных scope
+implicit_reexport = true        # Переопределяет strict (strict ставит no_implicit_reexport) — намеренно
+strict_bytes = true             # Запрещает bytearray/memoryview как подтипы bytes (default в mypy 2.0)
+strict_equality_for_none = true # Расширяет strict_equality на проверки с None
 
 [tool.ruff]
 target-version = "py313"
@@ -145,8 +134,6 @@ select = [
     "FLY", # flynt (FLY) https://docs.astral.sh/ruff/rules/#flynt-fly
     "I", # isort (I) https://docs.astral.sh/ruff/rules/#isort-i
     "C90", # mccabe (C90) https://docs.astral.sh/ruff/rules/#mccabe-c90
-    "NPY", # NumPy-specific rules (NPY) https://docs.astral.sh/ruff/rules/#numpy-specific-rules-npy
-    "PD", # pandas-vet (PD) https://docs.astral.sh/ruff/rules/#pandas-vet-pd
     "N", # pep8-naming (N) https://docs.astral.sh/ruff/rules/#pep8-naming-n
     "PERF", # Perflint (PERF) https://docs.astral.sh/ruff/rules/#perflint-perf
     "E", "W", # pycodestyle (E, W) https://docs.astral.sh/ruff/rules/#pycodestyle-e-w
@@ -177,7 +164,12 @@ ignore = [
     "RUF001", "RUF002", "RUF003",
     ]
 fixable = ["ALL"]
-per-file-ignores = {"tests/**" = ["ANN", "ARG", "FBT", "S101", "S608", "S105", "S106", "INP", "SLF001", "D100", "D101", "D102", "D103", "D107", "PLW0108",]}
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["ANN", "ARG", "FBT", "S101", "S608", "S105", "S106", "INP", "SLF001", "D100", "D101", "D102", "D103", "D107", "PLW0108"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.ruff.format]
 quote-style = "double"

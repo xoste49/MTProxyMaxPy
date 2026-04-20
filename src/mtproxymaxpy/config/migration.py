@@ -111,14 +111,13 @@ def _parse_settings_conf(path: Path) -> dict[str, Any]:
         try:
             field_info = Settings.model_fields[py_key]
             annotation = field_info.annotation
-            # unwrap Optional
-            origin = getattr(annotation, "__origin__", None)
-            args = getattr(annotation, "__args__", ())
-            inner = args[0] if origin is type(None).__class__ and args else annotation
+            # unwrap Optional (Union[X, None] or X | None) — runtime introspection
+            args: tuple[type, ...] = getattr(annotation, "__args__", ())
+            inner = args[0] if type(None) in args and args[0] is not type(None) else annotation
 
             if inner is bool or annotation is bool:
                 result[py_key] = _parse_bool(raw_value)
-            elif inner is int or annotation is int:
+            elif inner is int or annotation is int:  # type: ignore[comparison-overlap]
                 result[py_key] = int(raw_value)
             else:
                 result[py_key] = raw_value
