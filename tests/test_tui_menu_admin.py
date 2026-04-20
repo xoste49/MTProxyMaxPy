@@ -124,12 +124,14 @@ def test_telegram_menu_and_helpers(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
         SimpleNamespace(load_settings=_load_settings, save_settings=_save_settings),
     )
 
-    calls = {"start": 0, "stop": 0, "install": 0, "wizard": 0, "test": 0, "tg_logs": 0}
+    calls = {"start": 0, "stop": 0, "restart": 0, "install": 0, "uninstall": 0, "wizard": 0, "test": 0, "tg_logs": 0}
     sd = SimpleNamespace(
         is_active=lambda name: False,
         install_telegram_service=lambda: calls.__setitem__("install", calls["install"] + 1),
         start_service=lambda name: calls.__setitem__("start", calls["start"] + 1),
         stop_service=lambda name: calls.__setitem__("stop", calls["stop"] + 1),
+        restart_service=lambda name: calls.__setitem__("restart", calls["restart"] + 1),
+        uninstall=lambda **k: calls.__setitem__("uninstall", calls["uninstall"] + 1),
     )
     monkeypatch.setitem(sys.modules, "mtproxymaxpy.systemd", sd)
     monkeypatch.setattr(pkg, "systemd", sd, raising=False)
@@ -140,7 +142,7 @@ def test_telegram_menu_and_helpers(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     monkeypatch.setattr(menu, "_stream_telegram_logs_screen", lambda: calls.__setitem__("tg_logs", calls["tg_logs"] + 1))
     monkeypatch.setattr(menu.IntPrompt, "ask", lambda *a, **k: 12)
 
-    choices = iter([1, 2, 3, 4, 5, 6, 7, 0])
+    choices = iter([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0])
     monkeypatch.setattr(menu, "_ask_choice", lambda *a, **k: next(choices))
     menu._telegram_menu()
 
@@ -148,6 +150,10 @@ def test_telegram_menu_and_helpers(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     assert calls["test"] == 1
     assert calls["install"] >= 1
     assert calls["tg_logs"] == 1
+    assert calls["start"] >= 1
+    assert calls["stop"] >= 1
+    assert calls["restart"] >= 1
+    assert calls["uninstall"] >= 1
 
     # _telegram_setup_wizard real path
     prompts = iter(["token", "chat", "node-1", ""])

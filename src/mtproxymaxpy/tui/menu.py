@@ -945,6 +945,48 @@ def _upstreams_action(ch: int, _ups: list[Upstream]) -> None:
 # ── Settings menu ──────────────────────────────────────────────────────────────
 
 
+def _restart_telegram_bot(*, enabled: bool) -> None:
+    """Stop and conditionally restart the Telegram bot after a settings change."""
+    try:
+        from mtproxymaxpy import telegram_bot_aiogram as _tg
+
+        _tg.stop()
+        if enabled:
+            _tg.start()
+            console.print("[green][+] Telegram bot restarted[/green]")
+        else:
+            console.print("[yellow][*] Telegram bot stopped[/yellow]")
+    except (OSError, RuntimeError, ImportError) as tg_exc:
+        console.print(f"[yellow][!] Could not restart Telegram bot: {tg_exc}[/yellow]")
+
+
+_TELEGRAM_SETTING_FIELDS: frozenset[str] = frozenset(
+    {
+        "telegram_enabled",
+        "telegram_bot_token",
+        "telegram_chat_id",
+        "telegram_interval",
+        "telegram_alerts_enabled",
+        "telegram_server_label",
+        "telegram_bot_proxy",
+    }
+)
+
+
+def _apply_settings_field(settings: Any, field: str, new_val: Any, save_settings: Any) -> None:  # noqa: ANN401
+    """Validate, persist and apply side-effects for a single settings field change."""
+    if field == "manager_update_branch":
+        if not new_val:
+            raise ValueError("manager_update_branch must not be empty")
+        if any(ch.isspace() for ch in new_val):
+            raise ValueError("manager_update_branch must not contain spaces")
+    updated = settings.model_copy(update={field: new_val})
+    save_settings(updated)
+    console.print(f"[green][+] Saved {field} = {new_val}[/green]")
+    if field in _TELEGRAM_SETTING_FIELDS:
+        _restart_telegram_bot(enabled=updated.telegram_enabled)
+
+
 def _settings_menu() -> None:
     while True:
         _clear()
@@ -1052,14 +1094,7 @@ def _settings_menu() -> None:
             new_val_str = Prompt.ask(f"  {label}", default=str(current), console=console)
             try:
                 new_val = converter(new_val_str)  # type: ignore[operator]
-                if field == "manager_update_branch":
-                    if not new_val:
-                        raise ValueError("manager_update_branch must not be empty")
-                    if any(ch.isspace() for ch in new_val):
-                        raise ValueError("manager_update_branch must not contain spaces")
-                updated = settings.model_copy(update={field: new_val})
-                save_settings(updated)
-                console.print(f"[green][+] Saved {field} = {new_val}[/green]")
+                _apply_settings_field(settings, field, new_val, save_settings)
             except (ValueError, OSError) as exc:
                 console.print(f"[red][!] {exc}[/red]")
             _pause()
@@ -1466,6 +1501,29 @@ def _telegram_toggle(settings: Settings, service_unit: Path) -> None:
     _pause()
 
 
+def _telegram_systemd_action(ch: int) -> None:
+    """Handle systemd service actions for the Telegram bot (choices 6–11)."""
+    from mtproxymaxpy import systemd as _systemd
+    from mtproxymaxpy.constants import SYSTEMD_TELEGRAM_SERVICE
+
+    if ch == 6:
+        _systemd.install_telegram_service()
+        console.print("[green][+] Telegram service installed and started[/green]")
+    elif ch == 8:
+        _systemd.start_service(SYSTEMD_TELEGRAM_SERVICE)
+        console.print("[green][+] Service started[/green]")
+    elif ch == 9:
+        _systemd.stop_service(SYSTEMD_TELEGRAM_SERVICE)
+        console.print("[yellow][*] Service stopped[/yellow]")
+    elif ch == 10:
+        _systemd.restart_service(SYSTEMD_TELEGRAM_SERVICE)
+        console.print("[green][+] Service restarted[/green]")
+    elif ch == 11:
+        _systemd.uninstall(telegram=True)
+        console.print("[yellow][*] Telegram service uninstalled[/yellow]")
+    _pause()
+
+
 def _telegram_menu_action(ch: int, settings: Settings, service_unit: Path) -> None:
     """Dispatch a single Telegram menu action."""
     from mtproxymaxpy.config.settings import load_settings, save_settings
@@ -1489,14 +1547,10 @@ def _telegram_menu_action(ch: int, settings: Settings, service_unit: Path) -> No
             state = "enabled" if settings.telegram_alerts_enabled else "disabled"
             console.print(f"[green][+] Alerts {state}[/green]")
             _pause()
-        elif ch == 6:
-            from mtproxymaxpy import systemd as _systemd
-
-            _systemd.install_telegram_service()
-            console.print("[green][+] Telegram service installed and started[/green]")
-            _pause()
         elif ch == 7:
             _stream_telegram_logs_screen()
+        elif ch in {6, 8, 9, 10, 11}:
+            _telegram_systemd_action(ch)
     except (OSError, ValueError, RuntimeError) as exc:
         console.print(f"[red]Error:[/red] {exc}")
         _pause()
@@ -1536,12 +1590,16 @@ def _telegram_menu() -> None:
             _choice(3, "Enable / Disable"),
             _choice(4, "Set report interval"),
             _choice(5, "Toggle alerts"),
-            _choice(6, "Install / Repair Telegram service"),
-            _choice(7, "Stream telegram bot logs"),
+            _choice(6, "Install / Repair service"),
+            _choice(7, "Stream logs"),
+            _choice(8, "Start service"),
+            _choice(9, "Stop service"),
+            _choice(10, "Restart service"),
+            _choice(11, "Uninstall service"),
             _choice(0, "Back"),
             sep="\n",
         )
-        ch = _ask_choice(7)
+        ch = _ask_choice(11)
         if ch == 0:
             return
         _telegram_menu_action(ch, settings, service_unit)
