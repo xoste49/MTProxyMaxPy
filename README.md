@@ -270,10 +270,6 @@ All files are stored under `/opt/mtproxymaxpy/` with mode `600`.
 | `instances.json` | Multi-port instance definitions |
 | `mtproxy/config.toml` | Auto-generated telemt engine config |
 
-### Legacy Config Migration
-
-If you were running the bash version of MTProxyMax, the first launch automatically detects `settings.conf`, `secrets.conf`, `upstreams.conf`, and `instances.conf` in `/opt/mtproxymaxpy/` and offers an interactive migration wizard to import them.
-
 ---
 
 ## Development
@@ -333,7 +329,6 @@ Complete rewrite from Bash to Python 3.13:
 - **Native telemt binary** — no Docker required; binary downloaded from GitHub releases
 - **aiogram** — Telegram bot backend with command parity
 - **Typer CLI** — `install`, `start`, `stop`, `restart`, `status`, `update`, `secret`, `upstream`
-- **Legacy migration** — auto-detects old bash configs on first run and offers import
 - Removed: replication (master-slave sync), Docker, iptables geo-blocking
 
 ---

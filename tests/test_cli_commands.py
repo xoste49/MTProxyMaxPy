@@ -67,8 +67,6 @@ def test_core_proxy_commands_and_status(monkeypatch: pytest.MonkeyPatch, capsys:
 
     set_mod = SimpleNamespace(load_settings=lambda: settings, save_settings=lambda s: saved.append(s), Settings=FakeSettings)
     monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.settings", set_mod)
-    mig_mod = SimpleNamespace(detect_legacy=list, run_migration=lambda _: None)
-    monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.migration", mig_mod)
 
     pm = SimpleNamespace(
         download_binary=lambda **k: None,

@@ -34,11 +34,10 @@ class Secret(BaseModel):
     @field_validator("expires", mode="before")
     @classmethod
     def _normalize_expires(cls, value: object) -> str:
-        # Accept legacy values (e.g. "0") and normalize to a single internal format.
         if value is None:
             return ""
         raw = str(value).strip()
-        if raw in ("", "0"):
+        if raw == "":
             return ""
 
         # Primary format used by UI/CLI.

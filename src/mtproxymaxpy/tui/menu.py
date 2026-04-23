@@ -322,20 +322,7 @@ def run_tui() -> None:
     _check_update_bg()
 
     if not SETTINGS_FILE.exists():
-        # Check for legacy bash config first
-        migrated = False
-        try:
-            from mtproxymaxpy.config.migration import detect_legacy
-
-            legacy = detect_legacy()
-            if legacy:
-                _migration_screen(legacy)
-                migrated = True
-        except (OSError, ImportError, ValueError):
-            logger.debug("Legacy config migration failed", exc_info=True)
-        # Fresh install — run setup wizard
-        if not migrated:
-            _setup_wizard()
+        _setup_wizard()
 
     while True:
         _clear()
@@ -2074,30 +2061,3 @@ def _setup_wizard() -> None:  # noqa: C901
         _telegram_setup_wizard()
 
     _pause()
-
-
-# ── Migration screen ───────────────────────────────────────────────────────────
-
-
-def _migration_screen(legacy: dict[str, Any]) -> None:
-    _clear()
-    console.print(
-        Panel(
-            "[bold yellow]Legacy bash configuration detected![/bold yellow]\n\n"
-            "MTProxyMaxPy can import your existing settings, secrets, upstreams and instances.\n"
-            "Original files will NOT be modified.",
-            title="[bold]Migration from MTProxyMax (bash)[/bold]",
-            border_style="yellow",
-        ),
-    )
-    files = "\n".join(f"  • {p}" for p in legacy.values() if p)
-    console.print(f"\nDetected files:\n{files}\n")
-    if Confirm.ask("  Import now?", default=True, console=console):
-        try:
-            from mtproxymaxpy.config.migration import run_migration
-
-            result = run_migration(legacy)
-            console.print(f"[green][+] Migration complete: {result}[/green]")
-        except (OSError, ValueError, RuntimeError) as exc:
-            console.print(f"[red][!] Migration failed: {exc}[/red]")
-        _pause()

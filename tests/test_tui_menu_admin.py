@@ -70,7 +70,7 @@ def test_geoblock_menu_actions(monkeypatch: pytest.MonkeyPatch) -> None:
     assert calls == {"add": 1, "remove": 1, "re": 1, "clear": 1}
 
 
-def test_backup_menu_and_migration_screen(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_backup_menu(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _mute_ui(monkeypatch)
     import mtproxymaxpy as pkg
 
@@ -90,10 +90,6 @@ def test_backup_menu_and_migration_screen(monkeypatch: pytest.MonkeyPatch, tmp_p
     monkeypatch.setattr(menu.Prompt, "ask", lambda *a, **k: next(prompts))
     monkeypatch.setattr(menu.Confirm, "ask", lambda *a, **k: True)
     menu._backup_menu()
-
-    monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.migration", SimpleNamespace(run_migration=lambda legacy: {"ok": True}))
-    monkeypatch.setattr(menu.Confirm, "ask", lambda *a, **k: True)
-    menu._migration_screen({"settings": tmp_path / "settings.conf"})
 
 
 def test_telegram_menu_and_helpers(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

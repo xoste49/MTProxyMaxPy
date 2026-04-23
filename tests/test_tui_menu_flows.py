@@ -161,37 +161,3 @@ def test_run_tui_main_loop_routes(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
     monkeypatch.setattr(menu, "_ask_choice", lambda *a, **k: next(choices))
     menu.run_tui()
     assert all(v == 1 for v in calls.values())
-
-
-def test_run_tui_setup_and_migration_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    monkeypatch.setattr(menu, "_clear", lambda: None)
-    monkeypatch.setattr(menu, "_check_update_bg", lambda wait_timeout=3.0: None)
-    monkeypatch.setattr(menu, "_header_panel", lambda: "H")
-    monkeypatch.setattr(menu.console, "print", lambda *a, **k: None)
-
-    settings_file = tmp_path / "settings.toml"
-    monkeypatch.setitem(
-        sys.modules,
-        "mtproxymaxpy.constants",
-        SimpleNamespace(SETTINGS_FILE=settings_file, UPDATE_BADGE_FILE=tmp_path / "badge"),
-    )
-
-    monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.migration", SimpleNamespace(detect_legacy=lambda: ["settings.conf"]))
-    called = {"mig": 0, "wiz": 0}
-    monkeypatch.setattr(menu, "_migration_screen", lambda legacy: called.__setitem__("mig", called["mig"] + 1))
-    monkeypatch.setattr(menu, "_setup_wizard", lambda: called.__setitem__("wiz", called["wiz"] + 1))
-    monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.secrets", SimpleNamespace(load_secrets=list))
-    monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.upstreams", SimpleNamespace(load_upstreams=list))
-    monkeypatch.setitem(
-        sys.modules,
-        "mtproxymaxpy.config.settings",
-        SimpleNamespace(load_settings=lambda: SimpleNamespace(telegram_enabled=False, proxy_port=443, proxy_domain="cf.com")),
-    )
-    monkeypatch.setitem(sys.modules, "mtproxymaxpy.geoblock", SimpleNamespace(list_countries=list))
-    monkeypatch.setattr(menu, "_ask_choice", lambda *a, **k: 0)
-    menu.run_tui()
-    assert called["mig"] == 1
-
-    monkeypatch.setitem(sys.modules, "mtproxymaxpy.config.migration", SimpleNamespace(detect_legacy=list))
-    menu.run_tui()
-    assert called["wiz"] == 1

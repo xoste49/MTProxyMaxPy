@@ -18,7 +18,6 @@ src/mtproxymaxpy/
     secrets.py            — Secret model, JSON persistence
     upstreams.py          — Upstream model, JSON persistence
     instances.py          — multi-port instances, Pydantic model + JSON persistence
-    migration.py          — detect and migrate legacy bash config
   doctor.py               — diagnostic checks
   metrics.py              — telemt metrics endpoint reader
   backup.py               — config backup/restore
@@ -36,7 +35,6 @@ tests/                    — 176 tests across 25 test files
 ```
 
 Install location: `/opt/mtproxymaxpy/`
-Legacy bash dir: `/opt/mtproxymax/` (no `py` suffix)
 
 ## Tech Stack
 
@@ -75,18 +73,14 @@ telemt takes config path as **positional argument**: `telemt /path/to/config.tom
 - **uv** for all package/env operations — not pip directly. Find uv via `shutil.which("uv")` or `~/.local/bin/uv`, never in `.venv/bin/`
 - **Self-update** = `git pull --ff-only` + `uv sync --no-dev` in `INSTALL_DIR` — not `pip install git+...`
 - **Atomic writes**: use `tempfile.mkstemp` + `os.replace` for all config file saves
-- **TUI structure** mirrors bash: `[1] Proxy Management` → submenu with start/stop/restart/logs/health/status; Status screen is view-only
+- **TUI structure**: `[1] Proxy Management` → submenu with start/stop/restart/logs/health/status; Status screen is view-only
 - **Background update check**: `_check_update_bg()` fires a daemon thread comparing GitHub HEAD SHA with `UPDATE_SHA_FILE`
 
 ## Build & Test
 
 ```bash
 uv sync --no-dev          # install deps
-uv run pytest tests/      # run smoke tests (100 tests)
+uv run pytest tests/      # run smoke tests
 uv run mtproxymaxpy       # launch TUI
 uv run mtproxymaxpy --help
 ```
-
-## Reference
-
-Bash original (for feature parity): `mtproxymax.sh` in repo root.
